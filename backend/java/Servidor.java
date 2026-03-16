@@ -3,12 +3,17 @@ import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.net.InetSocketAddress;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Collections;
 import java.util.concurrent.*;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+
 import VO.Partida;
 import VO.CartaMov;
 import VO.Posicion;
@@ -16,6 +21,7 @@ import VO.Tablero;
 import VO.Jugador;
 import VO.Autenticacion;
 import JDBC.JugadorJDBC;
+import VO.Notificacion;
 
 //POR HACER:
 // -> El xml que querias hacer: PRIORIDAD ALTA <-- Puedes empezar con esto si quieres 
@@ -470,6 +476,52 @@ public class Servidor extends WebSocketServer {
         return encontrado;
     }
 
+    private WebSocket buscarConexion(String nombre){
+        WebSocket ws = null;
+        try {
+            mutexConectados.acquire();
+            for(InfoJugador j : conectados){
+                if(j.nombre.equals(nombre)){
+                    ws = j.ws;
+                    break;
+                }
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            mutexConectados.release();
+        }
+        return ws;
+    }
+    
+    private void notificarAmistad(WebSocket conn, JSONObject obj){
+        String remitente = obj.getString("remitente");
+        String destinatario = obj.getString("destinatario");
+        JSONObject msg = new JSONObject();
+        Instant ahora = Instant.now();
+        Instant expiracion = ahora.plus(10, ChronoUnit.DAYS); // La solicitud de amistad expira en 10 días
+        Timestamp fecha_ini = Timestamp.from(ahora);
+        Timestamp fecha_fin = Timestamp.from(expiracion); 
+
+        Notificacion n = new Notificacion(0, Notificacion.TIPO_SOLICITUD_AMISTAD, remitente, destinatario, Notificacion.ESTADO_PENDIENTE, fecha_ini, fecha_fin, null);
+        if (n.registrarNotificacion()) {
+            System.out.println("Solicitud de amistad registrada: " + remitente + " -> " + destinatario);
+            WebSocket ws = buscarConexion(destinatario);
+            if (ws != null && ws.isOpen()) {
+                msg.put("tipo", "SOLICITUD_AMISTAD");
+                msg.put("remitente", remitente);
+                msg.put("fecha_ini", ahora.toString());
+                msg.put("fecha_fin", expiracion.toString());
+                ws.send(msg.toString());
+            }
+        } else {
+            System.out.println("Error al registrar solicitud de amistad: " + remitente + " -> " + destinatario);
+            msg.put("tipo", "ERROR_SOLICITUD_AMISTAD");
+            msg.put("destinatario", destinatario);
+            conn.send(msg.toString());
+        }
+    }
+
     public void registrarJugador(WebSocket conn, JSONObject obj){
         String correo = obj.getString("correo");
         String nombre = obj.getString("nombre");
@@ -559,6 +611,8 @@ public class Servidor extends WebSocketServer {
                 abandonarPartida(conn, obj);
             } else if (tipoMSG.equals("CANCELAR")){
                 cancelarBusqueda(conn);
+            } else if (tipoMSG.equals("INVITACION_AMISTAD")){
+                notificarAmistad(conn, obj);
             }
         });
     }

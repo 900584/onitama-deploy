@@ -35,6 +35,18 @@ Si esta variable no está definida (o el servidor no responde), el frontend usa 
 
 ### 2.2 Mensajes que envía el CLIENTE al servidor
 
+#### `SOLICITUD_AMISTAD`
+
+```json
+{
+  "tipo": "SOLICITUD_AMISTAD",
+  "remitente": "Iron",
+  "destinatario": "Taisen"
+}
+```
+
+---
+
 #### `ABANDONO`
 Se envía al pulsar el boton de abandonar en la partida.
 
@@ -114,6 +126,31 @@ Se envía cuando el jugador ejecuta un movimiento. Solo se incluyen los datos m�
 ---
 
 ### 2.3 Mensajes que envía el SERVIDOR al cliente
+
+#### `SOLICITUD_AMISTAD`
+
+```json
+{
+  "tipo": "SOLICITUD_AMISTAD",
+  "remitente": "Iron",
+  "fecha_ini": "10/03/2026",
+  "fecha_fin": "20/03/2026"
+}
+```
+
+---
+
+#### `ERROR_SOLICITUD_AMISTAD`
+Responde `ERROR_SOLICITUD_AMISTAD` si no se ha podido crear la notificación
+
+```json
+{
+  "tipo": "ERROR_SOLICITUD_AMISTAD",
+  "destinatario": "Taisen"
+}
+```
+
+---
 
 #### `ERROR_SESION_PSSWD`
 Responde al `ERROR_SESION_PSSWD` si la contraseña es incorrecta.
