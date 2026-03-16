@@ -1,6 +1,8 @@
 package VO;
 
 import java.sql.Timestamp;
+import JDBC.NotificacionJDBC;
+import java.sql.SQLException;
 
 /**
  * Value Object para notificaciones unificadas: amistad, invitación partida, pausa, reanudar.
@@ -23,6 +25,7 @@ public class Notificacion {
     private Timestamp fechaCreacion;
     private Timestamp fechaExpiracion;
     private Integer idPartida;
+    private NotificacionJDBC jdbc;
 
     public Notificacion(int idNotificacion, String tipo, String remitente, String destinatario,
                         String estado, Timestamp fechaCreacion, Timestamp fechaExpiracion, Integer idPartida) {
@@ -34,6 +37,16 @@ public class Notificacion {
         this.fechaCreacion = fechaCreacion;
         this.fechaExpiracion = fechaExpiracion;
         this.idPartida = idPartida;
+        jdbc = new NotificacionJDBC();
+    }
+
+    public boolean registrarNotificacion(){
+        try {
+            idNotificacion = jdbc.crear(this);
+            return idNotificacion >= 0; 
+        } catch (SQLException e) {
+            return false;
+        }
     }
 
     public int getIdNotificacion() {

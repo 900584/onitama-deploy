@@ -162,12 +162,14 @@ Responde al `VICTORIA` al jugador que ha ganado la partida.
 
 ```json
 {
-  "tipo": "VICTORIA"
+  "tipo": "VICTORIA",
+  "motivo": "FIN_PARTIDA",
+  "equipo_responsable": 1
 }
 ```
 
 > **Importante:**
-> Solo lo pasa si el jugador a ganado por causa externa, es decir si el realiza un movimiento que le da la partida NO SE LE AVISA
+> Solo lo pasa si el jugador a ganado por causa externa, es decir si el realiza un movimiento que le da la partida NO SE LE AVISA. En caso de que se haya abandonado el motivo será "ABANDONO"
 
 ---
 
