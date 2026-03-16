@@ -35,6 +35,19 @@ Si esta variable no está definida (o el servidor no responde), el frontend usa 
 
 ### 2.2 Mensajes que envía el CLIENTE al servidor
 
+#### `ACEPTAR_AMISTAD`
+Se envia cuando aceptes la solicitud, el remitente es quien te mando la solicitud
+
+```json
+{
+  "tipo": "ACEPTAR_AMISTAD",
+  "remitente": "Iron",
+  "destinatario": "Taisen"
+}
+```
+
+---
+
 #### `SOLICITUD_AMISTAD`
 
 ```json
@@ -126,6 +139,17 @@ Se envía cuando el jugador ejecuta un movimiento. Solo se incluyen los datos m�
 ---
 
 ### 2.3 Mensajes que envía el SERVIDOR al cliente
+
+#### `SOLICITUD_AMISTAD`
+
+```json
+{
+  "tipo": "AMISTAD_ACEPTADA",
+  "amigo": "Iron"
+}
+```
+
+---
 
 #### `SOLICITUD_AMISTAD`
 
