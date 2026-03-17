@@ -259,17 +259,80 @@ function Celda({
   );
 }
 
+interface MovimientoUI {
+  id: string;
+  jugador: string;
+  equipo: EquipoID;
+  carta: CartaMovDef;
+  origen: { fila: number; col: number };
+  destino: { fila: number; col: number };
+}
+
+function formatoCasilla(fila: number, col: number): string {
+  return `(${fila + 1},${col + 1})`;
+}
+
+function UltimoMovimientoGhost({
+  titulo,
+  mov,
+}: {
+  titulo: string;
+  mov: MovimientoUI | null;
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/5 p-2">
+      <p className="text-white/30 text-[9px] uppercase tracking-widest text-center mb-1">{titulo}</p>
+      {!mov ? (
+        <p className="text-white/20 text-[8px] text-center italic">Sin movimiento</p>
+      ) : (
+        <div className="rounded-lg border border-white/10 bg-black/20 p-2 opacity-60">
+          <div className="flex items-center gap-2">
+            <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-white/10">
+              <Image
+                src={getImagenCarta(mov.carta.nombre)}
+                alt={mov.carta.nombre}
+                fill
+                className="object-contain p-1"
+                sizes="64px"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] text-white/80 font-semibold uppercase truncate">{mov.carta.nombre}</p>
+              <p className="text-[8px] text-white/50">
+                {formatoCasilla(mov.origen.fila, mov.origen.col)} to {formatoCasilla(mov.destino.fila, mov.destino.col)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-2 flex justify-center">
+            <MiniGrid
+              carta={mov.carta}
+              equipo={mov.equipo}
+              colorDots={mov.equipo === 1 ? "bg-blue-500" : "bg-red-500"}
+              size={7}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Lógica principal ─────────────────────────────────────────────────────────
 
 function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificultad: Dificultad }) {
   const router = useRouter();
 
   // ── Detectar modo servidor (se comprueba una vez al montar) ─────────────────
-  const enServidor = useRef(!!getWsActivo());
+  const [esModoServidor] = useState<boolean>(() => !!getWsActivo());
+  const enServidor = useRef(esModoServidor);
   /** Equipo del jugador local: 1 = arriba (rojo), 2 = abajo (azul). Por defecto 2 en mock. */
   const equipoJugadorRef = useRef<1 | 2>(2);
+  const [miEquipoActual, setMiEquipoActual] = useState<1 | 2>(2);
   const jugadorActual = obtenerJugadorActivo();
   const infoOponente = useRef<{ nombre: string; puntos: number }>(getMockOponente(dificultad));
+  const [infoOponenteUI, setInfoOponenteUI] = useState<{ nombre: string; puntos: number }>(
+    getMockOponente(dificultad)
+  );
 
   const [mounted, setMounted] = useState(false);
   const [estado, setEstado] = useState<EstadoJuego>(() => ({
@@ -287,16 +350,21 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
   }));
 
   const [aguardandoInicio, setAguardandoInicio] = useState<boolean>(true);
+  const [historialMovimientos, setHistorialMovimientos] = useState<MovimientoUI[]>([]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
+    setHistorialMovimientos([]);
     const raw = sessionStorage.getItem("datosPartida");
     if (raw) {
       try {
         const datos = JSON.parse(raw) as RespuestaPartidaEncontrada;
         setEstado(crearEstadoDesdeServidor(datos));
         equipoJugadorRef.current = datos.equipo;
+        setMiEquipoActual(datos.equipo);
         infoOponente.current = { nombre: datos.oponente, puntos: datos.oponentePt };
+        setInfoOponenteUI({ nombre: datos.oponente, puntos: datos.oponentePt });
         setAguardandoInicio(datos.equipo === 2);
       } catch {
         setEstado(crearEstadoInicial());
@@ -322,6 +390,14 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
   const [mostrarModalAbandono, setMostrarModalAbandono] = useState(false);
 
   const iaOcupada = useRef(false);
+
+  const registrarMovimiento = useCallback((mov: Omit<MovimientoUI, "id">) => {
+    setHistorialMovimientos((prev) => {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const siguiente = [...prev, { id, ...mov }];
+      return siguiente.slice(-12);
+    });
+  }, []);
 
   // ─── Conexión WS y mensajes del servidor ─────────────────────────────────
   useEffect(() => {
@@ -355,6 +431,16 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
             );
             return nuevoEstado;
           });
+          const cartaMsg = TODAS_LAS_CARTAS.find((c) => c.nombre === m.carta);
+          if (cartaMsg) {
+            registrarMovimiento({
+              jugador: infoOponente.current.nombre,
+              equipo: equipoJugadorRef.current === 2 ? 1 : 2,
+              carta: cartaMsg,
+              origen: { fila: m.fila_origen, col: m.col_origen },
+              destino: { fila: m.fila_destino, col: m.col_destino },
+            });
+          }
           break;
         }
 
@@ -378,14 +464,14 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
     });
 
     return desconectar;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Solo al montar
+  }, [jugadorActual.nombre, registrarMovimiento]); // Solo al montar en la practica
 
   // ─── Timer visual ─────────────────────────────────────────────────────────
   useEffect(() => {
     // No correr el timer si la partida terminó
     if (estado.ganador || resultadoFinal) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTiempoRestante(TIEMPO_TURNO);
     const intervalo = setInterval(() => {
       setTiempoRestante((t) => {
@@ -432,9 +518,16 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
         jugada.carta, equipoJugadorRef.current
       );
       setEstado(nuevoEstado);
+      registrarMovimiento({
+        jugador: infoOponente.current.nombre,
+        equipo: equipoIA,
+        carta: jugada.carta,
+        origen: { fila: jugada.origenFila, col: jugada.origenCol },
+        destino: { fila: jugada.destinoFila, col: jugada.destinoCol },
+      });
       iaOcupada.current = false;
     }, 600);
-  }, [dificultad]);
+  }, [dificultad, registrarMovimiento]);
 
   // La IA solo corre en modo entrenamiento/mock y cuando le toca al equipo contrario
   useEffect(() => {
@@ -466,6 +559,13 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
         equipoJugadorRef.current
       );
       setEstado(nuevoEstado);
+      registrarMovimiento({
+        jugador: jugadorActual.nombre,
+        equipo: miEquipo,
+        carta: estado.cartaSeleccionada,
+        origen: { fila: estado.fichaSeleccionada.fila, col: estado.fichaSeleccionada.col },
+        destino: { fila, col },
+      });
 
       // Enviar movimiento al servidor (ignorado si no hay conexión activa)
       enviarMovimiento({
@@ -520,7 +620,6 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
 
   const min = String(Math.floor(tiempoRestante / 60)).padStart(2, "0");
   const seg = String(tiempoRestante % 60).padStart(2, "0");
-  const miEquipoActual = equipoJugadorRef.current;
   const esTurnoJugador = !aguardandoInicio && estado.turnoActual === miEquipoActual && !estado.ganador && !resultadoFinal;
 
   // Ganador: puede llegar por resultadoFinal (VICTORIA/DERROTA del servidor) o por
@@ -534,7 +633,12 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
 
   const razonFin = resultadoFinal?.razon ?? (esVictoria ? "Victoria" : "Derrota");
 
-  const nombreOponente = infoOponente.current.nombre;
+  const nombreOponente = infoOponenteUI.nombre;
+  const equipoOponente: EquipoID = miEquipoActual === 1 ? 2 : 1;
+  const ultimoMovJugador =
+    [...historialMovimientos].reverse().find((m) => m.equipo === miEquipoActual) ?? null;
+  const ultimoMovOponente =
+    [...historialMovimientos].reverse().find((m) => m.equipo === equipoOponente) ?? null;
 
   let ayuda = "";
   if (aguardandoInicio) ayuda = "Esperando al servidor para comenzar…";
@@ -544,7 +648,7 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
     else if (estado.movimientosValidos.length === 0) ayuda = "Sin movimientos válidos. Prueba otra carta o pieza.";
     else ayuda = "Haz clic en una casilla blanca para mover";
   } else if (!hayFinPartida) {
-    ayuda = enServidor.current
+    ayuda = esModoServidor
       ? `Turno de @${nombreOponente}…`
       : `Turno de @${nombreOponente}…`;
   }
@@ -600,10 +704,19 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
             >
               Volver a partidas
             </button>
-            {!enServidor.current && (
+            {!esModoServidor && (
               <button
                 type="button"
-                onClick={() => { setEstado(crearEstadoInicial()); setResultadoFinal(null); setTiempoRestante(TIEMPO_TURNO); }}
+                onClick={() => {
+                  setEstado(crearEstadoInicial());
+                  setResultadoFinal(null);
+                  setTiempoRestante(TIEMPO_TURNO);
+                  setHistorialMovimientos([]);
+                  setMiEquipoActual(2);
+                  const mock = getMockOponente(dificultad);
+                  infoOponente.current = mock;
+                  setInfoOponenteUI(mock);
+                }}
                 className="text-white/40 text-xs hover:text-white/70 transition-colors"
               >
                 Jugar de nuevo (local)
@@ -659,7 +772,7 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
               <span className="text-white/60 text-base">{nombreOponente.charAt(0).toUpperCase()}</span>
             </div>
             <span className="text-white/80 text-[11px] font-semibold">@{nombreOponente}</span>
-            <span className="text-white/30 text-[9px]">{infoOponente.current.puntos} pts</span>
+            <span className="text-white/30 text-[9px]">{infoOponenteUI.puntos} pts</span>
           </div>
 
           <div className="flex flex-col gap-1.5 shrink-0">
@@ -676,6 +789,8 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
               />
             ))}
           </div>
+
+          <UltimoMovimientoGhost titulo="Ultimo movimiento rival" mov={ultimoMovOponente} />
 
           <div className="flex-1 min-h-2" />
 
@@ -792,11 +907,9 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
             ))}
           </div>
 
+          <UltimoMovimientoGhost titulo="Tu ultimo movimiento" mov={ultimoMovJugador} />
+
           <div className="flex-1 min-h-2" />
-          <div className="rounded-lg border border-white/10 bg-white/5 p-1.5 flex flex-col items-center gap-0.5 shrink-0">
-            <p className="text-white/30 text-[9px] uppercase tracking-widest text-center">Cartas de acción</p>
-            <p className="text-white/20 text-[8px] text-center italic">(Próximamente)</p>
-          </div>
 
           <div className="flex flex-col items-center gap-1 shrink-0">
             <p className={`text-center text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${esTurnoJugador

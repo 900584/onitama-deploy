@@ -193,7 +193,10 @@ function generarJugadas(e: EstadoSim, eq: number, soloCapturas: boolean = false)
             const oy = Math.floor(i / DIM);
 
             for (const mov of c.movimientos) {
-                const dx = eq === 1 ? ox + mov.dc : ox - mov.dc;
+                // Keep movement convention aligned with juego.ts:
+                // eq=2 -> nc = col + dc, nf = fila - df
+                // eq=1 -> nc = col - dc, nf = fila + df
+                const dx = eq === 1 ? ox - mov.dc : ox + mov.dc;
                 const dy = eq === 1 ? oy + mov.df : oy - mov.df;
 
                 if (dx < 0 || dx >= DIM || dy < 0 || dy >= DIM) continue;
