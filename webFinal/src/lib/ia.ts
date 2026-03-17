@@ -85,12 +85,25 @@ function initZobrist() {
     isZobristInitialized = true;
 }
 
+// Hash liviano y estable para strings.
+// Lo usamos para evitar colisiones tontas en la TT por nombres parecidos.
+function fnv1a32(str: string, seed: number = 0x811c9dc5): number {
+    let h = seed >>> 0;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h >>> 0;
+}
+
 function getCardStrHash(cEq1: CartaMovDef[], cEq2: CartaMovDef[], cCentro: CartaMovDef): number {
-    // Un hash rápido sumando charCodes del primer caracter para diferenciar sets de cartas
-    let d = cCentro.nombre.charCodeAt(0);
-    cEq1.forEach(c => d += c.nombre.charCodeAt(0) * 13);
-    cEq2.forEach(c => d += c.nombre.charCodeAt(0) * 31);
-    return d >>> 0;
+    // Importante: no solo cuenta "qué cartas hay", sino también en qué lado están.
+    // Mismo set de cartas en manos distintas = estado distinto de partida.
+    let h = 0x811c9dc5;
+    h = fnv1a32(`C:${cCentro.nombre}|`, h);
+    for (const c of cEq1) h = fnv1a32(`1:${c.nombre}|`, h);
+    for (const c of cEq2) h = fnv1a32(`2:${c.nombre}|`, h);
+    return h >>> 0;
 }
 
 function computeZobrist(estado: EstadoSim, turno: number): number {
@@ -289,6 +302,54 @@ function compruebaTrono(e: EstadoSim): number {
     return 0;
 }
 
+function esMovimientoGanadorInmediato(e: EstadoSim, j: JugadaSim, eq: number): boolean {
+    const fromPiece = e.board[toIndex(j.ox, j.oy)];
+    const destPiece = e.board[toIndex(j.dx, j.dy)];
+
+    // 1) Ganar capturando rey.
+    if (eq === 1 && destPiece === 4) return true;
+    if (eq === 2 && destPiece === 3) return true;
+
+    // 2) Ganar entrando al templo rival con nuestro rey.
+    if (eq === 1 && fromPiece === 3 && j.dx === CENTRO && j.dy === DIM - 1) return true;
+    if (eq === 2 && fromPiece === 4 && j.dx === CENTRO && j.dy === 0) return true;
+
+    return false;
+}
+
+function tieneVictoriaEnUno(e: EstadoSim, eq: number): boolean {
+    // "¿Si me toca jugar ahora, tengo mate/victoria inmediata?"
+    // Se usa para detectar blunders y para extender quiescence con amenazas reales.
+    const jugadas = generarJugadas(e, eq, false);
+    for (const j of jugadas) {
+        if (esMovimientoGanadorInmediato(e, j, eq)) return true;
+    }
+    return false;
+}
+
+function generaJugadasTacticas(e: EstadoSim, eq: number): JugadaSim[] {
+    const jugadas = generarJugadas(e, eq, false);
+    const tacticas: JugadaSim[] = [];
+
+    for (const j of jugadas) {
+        const destPiece = e.board[toIndex(j.dx, j.dy)];
+        if (destPiece !== 0 || esMovimientoGanadorInmediato(e, j, eq)) {
+            tacticas.push(j);
+            continue;
+        }
+
+        // También tratamos como táctica una jugada que "deja preparada" una victoria en 1.
+        // Esto ayuda a que quiescence no corte justo antes del golpe táctico.
+        const child = cloneSim(e);
+        aplicarJugada(child, j, eq);
+        if (compruebaTrono(child) === 0 && tieneVictoriaEnUno(child, eq)) {
+            tacticas.push(j);
+        }
+    }
+
+    return tacticas;
+}
+
 function evaluate(e: EstadoSim, eqTurno: number): number {
     const estadoTrono = compruebaTrono(e);
     if (estadoTrono !== 0) {
@@ -382,8 +443,11 @@ function quiescence(e: EstadoSim, alpha: number, beta: number, eqTurno: number):
     if (stand_pat >= beta) return beta;
     if (alpha < stand_pat) alpha = stand_pat;
 
-    const captureMoves = generarJugadas(e, eqTurno, true);
-    for (const j of captureMoves) {
+    // Antes solo extendíamos capturas.
+    // Ahora extendemos capturas + amenazas inmediatas al rey/templo.
+    const tacticalMoves = generaJugadasTacticas(e, eqTurno);
+    tacticalMoves.sort((a, b) => scoreMove(e, b, eqTurno, null) - scoreMove(e, a, eqTurno, null));
+    for (const j of tacticalMoves) {
         const child = cloneSim(e);
         aplicarJugada(child, j, eqTurno);
 
@@ -475,6 +539,7 @@ export function calcularMejorMovimientoIA(
 
     let globalBestMove: JugadaSim | null = null;
     let maxDepthReached = 0;
+    const rivalEq: EquipoID = equipoIA === 1 ? 2 : 1;
 
     // ITERATIVE DEEPENING
     // Limitamos a Profundidad Maxima 15 para evitar loops infinitos teóricos, pero el tiempo cortará antes
@@ -501,8 +566,15 @@ export function calcularMejorMovimientoIA(
             const score = -minimaxAB(child, currentDepth - 1, -beta, -alpha, equipoIA === 1 ? 2 : 1);
             if (timeIsUp) break; // Cortar el for interno. Ya no nos fiamos de este nivel
 
-            if (score > alpha) {
-                alpha = score;
+            let adjustedScore = score;
+            // Cinturón de seguridad: si esta jugada deja al rival ganar en 1,
+            // la hundimos en score aunque minimax no haya llegado a verlo.
+            if (compruebaTrono(child) === 0 && tieneVictoriaEnUno(child, rivalEq)) {
+                adjustedScore -= 75000;
+            }
+
+            if (adjustedScore > alpha) {
+                alpha = adjustedScore;
                 currentDepthBest = j;
             }
         }
