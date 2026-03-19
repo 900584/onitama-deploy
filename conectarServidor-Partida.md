@@ -59,13 +59,14 @@ Se envia cuando aceptes la solicitud, el remitente es quien te mando la solicitu
 ```
 
 ---
+HE CAMBIADO DE "ABANDONO" A "ABANDONAR", QUE ES EL MENSAJE QUE ENVÍA EL FRONTEND DESDE PARTIDA.TS
 
-#### `ABANDONO`
+#### `ABANDONAR`
 Se envía al pulsar el boton de abandonar en la partida.
 
 ```json
 {
-  "tipo": "ABANDONO",
+  "tipo": "ABANDONAR",
   "equipo": 1
 }
 ```
@@ -138,9 +139,67 @@ Se envía cuando el jugador ejecuta un movimiento. Solo se incluyen los datos m�
 
 ---
 
+#### `CANCELAR`
+Se envía cuando el jugador cancela la búsqueda de partida pública.
+```json
+{
+  "tipo": "CANCELAR"
+}
+```
+
+---
+
+#### `RECHAZAR_AMISTAD`
+Se envía cuando el jugador rechaza una solicitud de amistad. El `idNotificacion` se recibe
+en la notificación original que llegó al hacer login.
+```json
+{
+  "tipo": "RECHAZAR_AMISTAD",
+  "idNotificacion": 1
+}
+```
+
+--- 
+
+### 2.2.1 Partidas privadas
+
+#### `INVITACION_PARTIDA`
+Se envía cuando el jugador quiere invitar a un amigo a una partida privada.
+```json
+{
+  "tipo": "INVITACION_PARTIDA",
+  "remitente": "Iron",
+  "destinatario": "Taisen"
+}
+```
+
+---
+
+#### `ACEPTAR_INVITACION`
+Se envía cuando el jugador acepta una invitación a partida privada. El `idNotificacion` se recibe en la notificación original.
+```json
+{
+  "tipo": "ACEPTAR_INVITACION",
+  "idNotificacion": 1
+}
+```
+
+---
+
+#### `RECHAZAR_INVITACION`
+Se envía cuando el jugador rechaza una invitación a partida privada.
+```json
+{
+  "tipo": "RECHAZAR_INVITACION",
+  "idNotificacion": 1
+}
+```
+
+---
+
 ### 2.3 Mensajes que envía el SERVIDOR al cliente
 
-#### `SOLICITUD_AMISTAD`
+#### `AMISTAD_ACEPTADA`
 
 ```json
 {
@@ -162,6 +221,8 @@ Se envía cuando el jugador ejecuta un movimiento. Solo se incluyen los datos m�
   "idNotificacion": 1
 }
 ```
+
+**Nota:** Dado que el frontend cierra el WebSocket tras el login, registro y fin de partida, este mensaje solo se recibe de forma fiable ==al hacer login==, cuando el servidor vuelca todas las solicitudes pendientes que llegaron mientras el jugador estaba desconectado.
 
 ---
 
@@ -194,6 +255,26 @@ Responde al `ERROR_SESION_USS` si no existe el usuario al que se intentan regist
 ```json
 {
   "tipo": "ERROR_SESION_USS"
+}
+```
+
+---
+
+#### `REGISTRO_EXITOSO`
+Confirma que el registro se ha completado correctamente.
+```json
+{
+  "tipo": "REGISTRO_EXITOSO"
+}
+```
+
+---
+
+#### `REGISTRO_ERRONEO`
+El registro ha fallado y puede ser porque el usuario o correo ya existe.
+```json
+{
+  "tipo": "REGISTRO_ERRONEO"
 }
 ```
 
@@ -328,6 +409,84 @@ Se envía al cliente cuando el **oponente** ha ejecutado un movimiento.
 > **Importante:** El servidor solo envía este mensaje al cliente que NO movió (el oponente). El cliente que movió ya actualizó su estado local al enviar.
 
 **Archivo:** `src/api/partida.ts` → interface `RespuestaMover`
+
+---
+
+### 2.3.1 Partidas privadas
+
+#### `INVITACION_PARTIDA`
+Se envía al destinatario cuando otro jugador le invita a una partida privada. Llega a la bandeja de notificaciones.
+```json
+{
+  "tipo": "INVITACION_PARTIDA",
+  "remitente": "Iron",
+  "idNotificacion": 1
+}
+```
+
+---
+
+#### `PARTIDA_PRIVADA_ENCONTRADA`
+Se envía a ambos jugadores cuando se acepta una invitación a partida privada. Tiene los mismos campos que `PARTIDA_ENCONTRADA`.
+```json
+{
+  "tipo": "PARTIDA_PRIVADA_ENCONTRADA",
+  "partida_id": "123",
+  "equipo": 2,
+  "oponente": "Taisen",
+  "oponentePt": 1000,
+  "cartas_jugador": [{
+      "nombre": "Tigre",
+      "movimientos": [{ "x": 0, "y": 1 },{ "x": 1, "y": 0 }]
+    },
+    {
+      "nombre": "Dragon",
+      "movimientos": [{ "x": -1, "y": 1 },{ "x": 1, "y": 1 }]
+    }],
+  "cartas_oponente": [{
+      "nombre": "Rana",
+      "movimientos": [ { "x": 0, "y": 2 } ]
+    },
+    {
+      "nombre": "Conejo",
+      "movimientos": [ { "x": -1, "y": -1 } ]
+    }],
+  "carta_siguiente": [{
+      "nombre": "Oso",
+      "movimientos": [ { "x": 1, "y": 1 }, { "x": 1, "y": -1 } ]
+    }]
+}
+```
+
+---
+
+#### `INVITACION_RECHAZADA`
+Se envía al remitente cuando el destinatario rechaza su invitación.
+```json
+{
+  "tipo": "INVITACION_RECHAZADA"
+}
+```
+
+---
+
+#### `ERROR_DESCONECTADO`
+Se envía al remitente cuando el destinatario no está conectado al intentar invitarle.
+```json
+{
+  "tipo": "ERROR_DESCONECTADO"
+}
+```
+
+---
+
+#### `ERROR_NO_UNIDO`
+Se envía al remitente cuando el temporizador de 2 minutos expira sin que el destinatario haya respondido.
+```json
+{
+  "tipo": "ERROR_NO_UNIDO"
+}
+```
 
 ---
 

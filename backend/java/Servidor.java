@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Collections;
 import java.util.concurrent.*;
+import java.util.Map; // añadido para gestionar timers de partidas privadas
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -24,11 +25,21 @@ import VO.Autenticacion;
 import JDBC.JugadorJDBC;
 import JDBC.NotificacionJDBC;
 import VO.Notificacion;
+import JDBC.CartasMovJDBC;
+
+// imports añadidos para trabajar con partidas privadas
+import gestor.GestorNotificaciones;
+import JDBC.PartidaJDBC;
+import java.util.Comparator;
 
 //POR HACER:
 // -> El xml que querias hacer: PRIORIDAD ALTA <-- Puedes empezar con esto si quieres 
+// todavía por commitear, añado primero las actualizaciones a servidor.java
 // -> Solicitudes de amistad: PRIORIDAD ALTA
+// he terminado rechazar que he vsto que era lo que faltaba
 // -> Solicitudes de partida privadas: PRIORIDAD MEDIA (Antes hay que hacer lo anterior)
+// he planteado las solicitudes de partida privadas, también en el readme
+
 // -> Reanudar/Pausar una partida privada: PRIORIDAD MEDIA (Antes hay que hacer lo anterior)
 // -> Cartas de Accion: PRIORIDAD BAJA (No lo necesitamos para la primera entrega)
 
@@ -86,6 +97,15 @@ public class Servidor extends WebSocketServer {
     private Semaphore mutexParejas = new Semaphore(1);
     private Semaphore mutexConectados = new Semaphore(1);
     private ScheduledExecutorService temporizador = Executors.newScheduledThreadPool(10);
+    // para mapear idNotificacion → timer activo y poder cancelarlo cuando el amigo acepta o rechaza
+    // concurrenthashmap y no hashmap porque el servidor es multihilo --> varios mensajes pueden
+    // llegar a la vez y HashMap no es seguro cuando se usan concurrencias.
+
+    // ScheduledFuture<?> es el handle que devuelve temporizador.schedule() al programar una tarea,
+    // se guarda aquí únicamente para poder llamar a cancel() si B responde antes de que expire,
+    // evitando que se mande ERROR_NO_UNIDO cuando ya no hace falta.
+    // El <?> indica que no nos importa el tipo de retorno de la tarea, porque solo vamos a cancelarla.
+    private Map<Integer, ScheduledFuture<?>> timersInvitacion = new ConcurrentHashMap<>();
     
     private void cartasPartida(Pareja pj, JSONArray mazoJ1, JSONArray mazoJ2, JSONArray cola) {
         List<CartaMov> cartas = pj.partida.getCartasMovimiento();
@@ -435,7 +455,8 @@ public class Servidor extends WebSocketServer {
             }else{
                 try {
                     mutexConectados.acquire();
-                    conectados.add(new InfoJugador(conn, nombre, 0)); //Inicialmente el jugador se registra con 0 puntos
+                    // Inicialmente sí se registra con 0 puntos, pero si inicia sesión, tienen que ser j.getPuntos(), no?
+                    conectados.add(new InfoJugador(conn, nombre, j.getPuntos())); //Inicialmente el jugador se registra con 0 puntos
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 } finally {
@@ -450,6 +471,29 @@ public class Servidor extends WebSocketServer {
                 msg.put("partidas_jugadas", j.getPartidasJugadas());
                 msg.put("cores", j.getCores());
                 conn.send(msg.toString());
+
+                // no hemos considerado que mientras el jugador esté desconectado, no le llegan las notifs (ya que
+                // el ws en el frontend se cierra después de hacer registro, login, jugar)
+                // las notifs pendientes se envían aquí porque el frontend usa ws de manera puntual->
+                // abre el WS para login y lo cierra nada más recibir INICIO_SESION_EXITOSO.
+                // No hay ningún momento en que el servidor tenga conexión abierta con el jugador
+                // fuera de una búsqueda o partida activa, así que aprovechamos el login para volcar
+                // todo lo que se perdió mientras estaba desconectado.
+                NotificacionJDBC notificacionJDBC = new NotificacionJDBC();
+                try {
+                    List<Notificacion> pendientes = notificacionJDBC.obtenerPendientes(nombre);
+                    for (Notificacion n : pendientes) {
+                        JSONObject notif = new JSONObject();
+                        notif.put("tipo", n.getTipo());
+                        notif.put("remitente", n.getRemitente());
+                        notif.put("idNotificacion", n.getIdNotificacion());
+                        notif.put("fecha_ini", n.getFechaCreacion().toString());
+                        notif.put("fecha_fin", n.getFechaExpiracion() != null ? n.getFechaExpiracion().toString() : "");
+                        conn.send(notif.toString());
+                    }
+                } catch (SQLException e) {
+                    System.err.println("Error al obtener notificaciones pendientes: " + e.getMessage());
+                }
             }
             
         } catch (java.sql.SQLException e) {
@@ -528,7 +572,7 @@ public class Servidor extends WebSocketServer {
     private void aceptarAmistad(WebSocket conn, JSONObject obj){
         NotificacionJDBC notificacionJDBC = new NotificacionJDBC();
         try {
-            notificacionJDBC.borrar(obj.getInt("idNotificacion")); //DUDA, ARREGLAR 
+            notificacionJDBC.borrar(obj.getInt("idNotificacion")); //DUDA, ARREGLAR
             JugadorJDBC jugadorJDBC = new JugadorJDBC();
             if(jugadorJDBC.insertarAmistad(obj.getString("remitente"), obj.getString("destinatario"))){
                 System.out.println("Amistad registrada entre " + obj.getString("remitente") + " y " + obj.getString("destinatario"));
@@ -545,7 +589,212 @@ public class Servidor extends WebSocketServer {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error al borrar notificación de amistad: " + e.getMessage());
+        }
+    }
+
+    // nuevo: rechazar solicitud de amistad eliminando la notificación de la BD
+    private void rechazarAmistad(WebSocket conn, JSONObject obj) {
+        NotificacionJDBC notificacionJDBC = new NotificacionJDBC();
+        try {
+            int idNotificacion = obj.getInt("idNotificacion");
+            Notificacion notif = notificacionJDBC.obtenerPorId(idNotificacion);
+
+            if (notif != null) {
+                notificacionJDBC.borrar(idNotificacion);
+
+                // notificamos al que envía
+                WebSocket ws = buscarConexion(notif.getRemitente());
+                if (ws != null && ws.isOpen()) {
+                    JSONObject msg = new JSONObject();
+                    msg.put("tipo", "AMISTAD_RECHAZADA");
+                    msg.put("usuario", notif.getDestinatario());
+                    ws.send(msg.toString());
+                }
+
+                // confirmación al que rechaza
+                conn.send(new JSONObject().put("tipo", "RECHAZO_EXITOSO").toString());
+
+            } else {
+                conn.send(new JSONObject().put("tipo", "ERROR_NOTIFICACION_NO_ENCONTRADA").toString());
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al rechazar amistad: " + e.getMessage());
+            conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
+        }
+    }
+
+    // nuevo: envío de solicitud de partida privada
+    private void gestionarInvitacionPartida(WebSocket conn, JSONObject obj) {
+        String remitente = obj.getString("remitente");
+        String destinatario = obj.getString("destinatario");
+
+        // comprobamos si el destinatario está conectado
+        WebSocket wsB = buscarConexion(destinatario);
+        if (wsB == null || !wsB.isOpen()) {
+            conn.send(new JSONObject().put("tipo", "ERROR_DESCONECTADO").toString());
+            return;
+        }
+
+        // reamos la notificación en BD
+        GestorNotificaciones gestor = new GestorNotificaciones();
+        int idNotificacion;
+        try {
+            idNotificacion = gestor.enviarInvitacionPartida(remitente, destinatario);
+            if (idNotificacion == -1) {
+                conn.send(new JSONObject().put("tipo", "ERROR_DESCONECTADO").toString());
+                return;
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al crear invitación: " + e.getMessage());
+            conn.send(new JSONObject().put("tipo", "ERROR_DESCONECTADO").toString());
+            return;
+        }
+
+        // enviamos la invitación a B
+        // !!!!!!!!!! este mensaje solo llega si el destinatario tiene el ws abierto en este momento
+        // (buscando partida o jugando, inicio sesión/registro). Si está desconectado o simplemente 
+        // navegando por la app, el ws está cerrado y el mensaje se pierde. 
+        // Las notifs pendientes se recuperan al hacer login, pero los mensajes de error 
+        // (ERROR_NO_UNIDO, INVITACION_RECHAZADA) como no se guardan en BD, se pierden si el WS no está abierto.
+        // lo mismo pasa cuando queramos enviar notif a wsA en rechazarInvitacion() y aceptarInvitacion()
+        JSONObject msg = new JSONObject();
+        msg.put("tipo", "INVITACION_PARTIDA");
+        msg.put("remitente", remitente);
+        msg.put("idNotificacion", idNotificacion);
+        wsB.send(msg.toString());
+
+        // empieza el timer de 2 minutos
+        // si nadie lo cancela antes, mandamos ERROR_NO_UNIDO a A
+        final int idNotifFinal = idNotificacion;
+        ScheduledFuture<?>[] timer = new ScheduledFuture<?>[1];
+        timer[0] = temporizador.schedule(() -> {
+            timersInvitacion.remove(idNotifFinal);
+            WebSocket wsA = buscarConexion(remitente);
+            if (wsA != null && wsA.isOpen()) {
+                wsA.send(new JSONObject().put("tipo", "ERROR_NO_UNIDO").toString());
+            }
+        }, 2, TimeUnit.MINUTES);
+
+        timersInvitacion.put(idNotificacion, timer[0]);
+        System.out.println("Invitación privada: " + remitente + " -> " + destinatario + " (notif " + idNotificacion + ")");
+    }
+
+    // nuevo: invitación a partida privada aceptada
+    private void aceptarInvitacion(WebSocket conn, JSONObject obj) {
+        int idNotificacion = obj.getInt("idNotificacion");
+
+        // cancelamos el timer para que no se mande ERROR_NO_UNIDO una vez B ha aceptado
+        // (tal y como en SECUENCIAS)
+        ScheduledFuture<?> timer = timersInvitacion.remove(idNotificacion);
+        if (timer != null) {
+            timer.cancel(false);
+        }
+
+        GestorNotificaciones gestor = new GestorNotificaciones();
+        try {
+            // obtenemos la notificación para saber quién es el remitente y el destinatario
+            NotificacionJDBC notifJdbc = new NotificacionJDBC();
+            Notificacion notif = notifJdbc.obtenerPorId(idNotificacion);
+
+            // aceptamos en BD y creamos la partida privada internamente
+            boolean ok = gestor.aceptarNotificacion(idNotificacion, notif.getDestinatario());
+
+            // buscamos la partida recién creada para obtener sus cartas
+            PartidaJDBC partidaJdbc = new PartidaJDBC();
+            List<Partida> partidas = partidaJdbc.buscarPartidasJugadorPrivadas(notif.getRemitente(), notif.getDestinatario());
+
+            // cogemos la más reciente por ID
+            Partida partida = partidas.stream()
+                .max(Comparator.comparingInt(Partida::getIDPartida))
+                .orElse(partidas.get(0));
+
+            // comprbamos que el remitente sigue conectado
+            WebSocket wsA = buscarConexion(notif.getRemitente());
+            if (wsA == null || !wsA.isOpen()) {
+                conn.send(new JSONObject().put("tipo", "ERROR_DESCONECTADO").toString());
+                return;
+            }
+
+            // cargamos los puntos reales de ambos jugadores desde la BD
+            JugadorJDBC jugadorJdbc = new JugadorJDBC();
+            Jugador jugadorA = jugadorJdbc.buscarJugador(notif.getRemitente());
+            Jugador jugadorB = jugadorJdbc.buscarJugador(notif.getDestinatario());
+            int puntosA = jugadorA != null ? jugadorA.getPuntos() : 0;
+            int puntosB = jugadorB != null ? jugadorB.getPuntos() : 0;
+
+            // construimos los mazos de cartas como en iniciar()
+            JSONArray mazoJ1 = new JSONArray();
+            JSONArray mazoJ2 = new JSONArray();
+            JSONArray cola = new JSONArray();
+
+            CartasMovJDBC cartasMovJdbc = new CartasMovJDBC();
+            List<CartaMov> cartas = cartasMovJdbc.sacarCartasPartida(partida.getIDPartida());
+
+            // mensaje para el remitente (equipo 1)
+            JSONObject msg1 = new JSONObject();
+            msg1.put("tipo", "PARTIDA_PRIVADA_ENCONTRADA");
+            msg1.put("partida_id", partida.getIDPartida());
+            msg1.put("equipo", 1);
+            msg1.put("oponente", notif.getDestinatario());
+            msg1.put("oponentePt", puntosB);
+            msg1.put("cartas_jugador", mazoJ1);
+            msg1.put("cartas_oponente", mazoJ2);
+            msg1.put("carta_siguiente", cola);
+
+            // mensaje para el destinatario (equipo 2)
+            JSONObject msg2 = new JSONObject();
+            msg2.put("tipo", "PARTIDA_PRIVADA_ENCONTRADA");
+            msg2.put("partida_id", partida.getIDPartida());
+            msg2.put("equipo", 2);
+            msg2.put("oponente", notif.getRemitente());
+            msg2.put("oponentePt", puntosA);
+            msg2.put("cartas_jugador", mazoJ2);
+            msg2.put("cartas_oponente", mazoJ1);
+            msg2.put("carta_siguiente", cola);
+
+            wsA.send(msg1.toString());
+            conn.send(msg2.toString());
+            System.out.println("Partida privada iniciada: " + notif.getRemitente() + " vs " + notif.getDestinatario());
+
+        } catch (SQLException e) {
+            System.err.println("Error al aceptar invitación: " + e.getMessage());
+            conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
+        }
+    }
+
+    // nueva: invitación a partida privada rechazada
+    private void rechazarInvitacion(WebSocket conn, JSONObject obj) {
+        int idNotificacion = obj.getInt("idNotificacion");
+
+        // se cancela el timer (como en SECUENCIAS)
+        ScheduledFuture<?> timer = timersInvitacion.remove(idNotificacion);
+        if (timer != null) {
+            timer.cancel(false);
+        }
+
+        // rechazamos la notificación en BD
+        GestorNotificaciones gestor = new GestorNotificaciones();
+        try {
+            NotificacionJDBC notifJdbc = new NotificacionJDBC();
+            Notificacion notif = notifJdbc.obtenerPorId(idNotificacion);
+            if (notif == null) {
+                conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
+                return;
+            }
+
+            gestor.rechazarNotificacion(idNotificacion, notif.getDestinatario());
+
+            // avisamos al remitente
+            WebSocket wsA = buscarConexion(notif.getRemitente());
+            if (wsA != null && wsA.isOpen()) {
+                wsA.send(new JSONObject().put("tipo", "INVITACION_RECHAZADA").toString());
+            }
+
+            System.out.println("Invitación rechazada por " + notif.getDestinatario());
+
+        } catch (SQLException e) {
+            System.err.println("Error al rechazar invitación: " + e.getMessage());
+            conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
         }
     }
 
@@ -596,7 +845,8 @@ public class Servidor extends WebSocketServer {
         // conexiones = new ArrayList<>(); 
         // he comentado esto porque 'conexiones' no estaba definido en ningún
         // otro sitio de 'Servidor.java', luego he continuado con la inicialización 
-        // de las dos listas previamente declaradas.
+        // de las dos listas previamente declaradas
+
         conectados = new ArrayList<>();
         buscando_partida = new ArrayList<>();
         parejas = new ArrayList<>();
@@ -617,6 +867,18 @@ public class Servidor extends WebSocketServer {
             e.printStackTrace();
         } finally {
             mutex.release(); //SIGNAL
+        }
+
+        // elimnamos al jugador de conectados para que pueda volver a iniciar sesión, porque
+        // sin esto, al cerrar el WS de login el jugador queda como ausente,
+        // estaConectado() seguiría devolviendo true y el login fallaría
+        try {
+            mutexConectados.acquire();
+            conectados.removeIf(jugador -> jugador.ws == conn);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            mutexConectados.release();
         }
     }
 
@@ -639,10 +901,19 @@ public class Servidor extends WebSocketServer {
                 abandonarPartida(conn, obj);
             } else if (tipoMSG.equals("CANCELAR")){
                 cancelarBusqueda(conn);
-            } else if (tipoMSG.equals("INVITACION_AMISTAD")){
+                // PREVIAMENTE INVITACION_AMISTAD, NO ERA COHERENTE CON EL README
+            } else if (tipoMSG.equals("SOLICITUD_AMISTAD")){
                 notificarAmistad(conn, obj);
             } else if (tipoMSG.equals("ACEPTAR_AMISTAD")){
                 aceptarAmistad(conn, obj);
+            } else if (tipoMSG.equals("RECHAZAR_AMISTAD")){
+                rechazarAmistad(conn, obj);
+            } else if (tipoMSG.equals("INVITACION_PARTIDA")){
+                gestionarInvitacionPartida(conn, obj);
+            } else if (tipoMSG.equals("ACEPTAR_INVITACION")){
+                aceptarInvitacion(conn, obj);
+            } else if (tipoMSG.equals("RECHAZAR_INVITACION")){
+                rechazarInvitacion(conn, obj);
             }
         });
     }
