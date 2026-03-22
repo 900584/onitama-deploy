@@ -193,4 +193,18 @@ public class Tablero {
         p2.setValor(pos2);
         p1.setValor(pos1);
     }
+
+    /** Cuenta fichas vivas en tablero del equipo indicado (1 o 2). */
+    public int contarFichasEquipo(int equipo) {
+        int n = 0;
+        for (int i = 0; i < DIM; i++) {
+            for (int j = 0; j < DIM; j++) {
+                Ficha f = tablero[i][j].getFicha();
+                if (f != null && f.getEquipo() == equipo) {
+                    n++;
+                }
+            }
+        }
+        return n;
+    }
 }

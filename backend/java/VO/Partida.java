@@ -9,6 +9,10 @@ import JDBC.JugadorJDBC;
 import JDBC.PartidaJDBC;
 
 public class Partida{
+    /** Base de katanas (puntos) al ganar / perder; se ajusta ± (mis fichas − su fichas) en tablero al finalizar. */
+    private static final int BASE_PUNTOS_VICTORIA = 30;
+    private static final int BASE_PUNTOS_DERROTA = 30;
+
     private int IDPartida, tiempo, muertesJ1, muertesJ2, turno;
     private String estado, tipo; //Cambiar fichas por su correspondiente clase
     private boolean j1Ganador, j2Ganador;
@@ -239,21 +243,36 @@ public class Partida{
         return finalizarPartida();
     }
 
+    /**
+     * Katanas según merecimiento: base ± (mis piezas en tablero − piezas rivales).
+     * Victoria: {@code BASE_VICTORIA + diff}. Derrota: {@code -BASE_DERROTA + diff}.
+     * {@code diff} = fichas de mi equipo − fichas del otro (al finalizar).
+     */
+    private int puntosKatanasSegunTablero(boolean victoria, int miEquipo) {
+        int f1 = tablero.contarFichasEquipo(1);
+        int f2 = tablero.contarFichasEquipo(2);
+        int diff = (miEquipo == 1) ? (f1 - f2) : (f2 - f1);
+        if (victoria) {
+            return BASE_PUNTOS_VICTORIA + diff;
+        }
+        return -BASE_PUNTOS_DERROTA + diff;
+    }
+
     //Finaliza la partida y actualiza las estadisticas de los jugadores
     public boolean finalizarPartida(){
         this.estado = "FINALIZADA";
-        //Actualizar estadisticas de los jugadores
+        // Cores: +10 victoria, 0 derrota (sin cambio por tablero)
         if (j1Ganador && jugador1 != null) {
-            jugador1.registrarPartida(10, 50, true);
+            jugador1.registrarPartida(10, puntosKatanasSegunTablero(true, 1), true);
         }
         if (j2Ganador && jugador2 != null) {
-            jugador2.registrarPartida(10, 50, true);
+            jugador2.registrarPartida(10, puntosKatanasSegunTablero(true, 2), true);
         }
         if (!j1Ganador && jugador1 != null) {
-            jugador1.registrarPartida(0, -20, false);
+            jugador1.registrarPartida(0, puntosKatanasSegunTablero(false, 1), false);
         }
         if (!j2Ganador && jugador2 != null) {
-            jugador2.registrarPartida(0, -20, false);
+            jugador2.registrarPartida(0, puntosKatanasSegunTablero(false, 2), false);
         }
         return actualizarBD();
     }
