@@ -41,8 +41,7 @@ import {
   DIM,
 } from "@/lib/juego";
 import { TODAS_LAS_CARTAS, getImagenCarta, type CartaMovDef } from "@/lib/cartas";
-import { obtenerJugadorActivo, guardarSesion } from "@/lib/sesion";
-import { obtenerPerfil } from "@/api/auth";
+import { obtenerJugadorActivo } from "@/lib/sesion";
 import { calcularMejorMovimientoIA, type Dificultad } from "@/lib/ia";
 import {
   getWsActivo,
@@ -610,13 +609,10 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
     setEstado((prev) => ({ ...prev, cartaSeleccionada: carta, movimientosValidos }));
   };
 
-  /** Refresca el perfil en sessionStorage y navega a /partidas */
+  /** Vuelve a /partidas; esa pantalla pide OBTENER_PERFIL al montar (F5 y vuelta desde partida). */
   const volverAPartidas = useCallback(() => {
-    obtenerPerfil(jugadorActual.nombre)
-      .then((datos) => guardarSesion(datos))
-      .catch(() => { /* si falla, partidas/page lo reintentará al montar */ })
-      .finally(() => router.push("/partidas"));
-  }, [jugadorActual.nombre, router]);
+    router.push("/partidas");
+  }, [router]);
 
   /** El jugador confirma que quiere abandonar: notifica al servidor y vuelve */
   const handleConfirmarAbandonar = () => {

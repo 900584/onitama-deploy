@@ -12,11 +12,12 @@
  *  - "Partida Entrenamiento" → modal de dificultad → /partida?modo=entrenamiento&dificultad=X
  *  - "Partida Privada" → TODO
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { obtenerJugadorActivo, type DatosSesion } from "@/lib/sesion";
+import { obtenerJugadorActivo, guardarSesion, type DatosSesion } from "@/lib/sesion";
+import { obtenerPerfil } from "@/api/auth";
 
 // Tipos de partida disponibles con imagen y descripción
 const TIPOS_PARTIDA = [
@@ -84,6 +85,19 @@ export default function PartidasPage() {
   const [jugador, setJugador] = useState<DatosSesion>(obtenerJugadorActivo);
   const [mostrarModalDificultad, setMostrarModalDificultad] = useState(false);
 
+  /** F5, primer acceso o vuelta desde /partida: refrescar puntos/cores desde el servidor */
+  useEffect(() => {
+    const sesion = obtenerJugadorActivo();
+    if (!sesion.nombre) return;
+    obtenerPerfil(sesion.nombre)
+      .then((datos) => {
+        guardarSesion(datos);
+        setJugador(datos);
+      })
+      .catch(() => {
+        /* mantener datos de sessionStorage si falla la red */
+      });
+  }, []);
 
   /** Navega a la pantalla correspondiente según el tipo de partida */
   const handleIniciarPartida = (id: string) => {

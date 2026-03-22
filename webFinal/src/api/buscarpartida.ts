@@ -69,7 +69,7 @@ export interface ResultadoBusqueda {
 export function buscarPartida(
   nombre = "Jugador",
   puntos = 0,
-  timeoutMs = 30_000
+  timeoutMs = 3000_000
 ): ResultadoBusqueda {
   if (!usarServidor) {
     return {
