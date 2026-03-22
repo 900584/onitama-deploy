@@ -908,6 +908,8 @@ public class Servidor extends WebSocketServer {
                 aceptarInvitacion(conn, obj);
             } else if (tipoMSG.equals("RECHAZAR_INVITACION")){
                 rechazarInvitacion(conn, obj);
+            } else if (tipoMSG.equals("OBTENER_PERFIL")){
+                obtenerPerfil(conn, obj);
             }
         });
     }
@@ -920,6 +922,33 @@ public class Servidor extends WebSocketServer {
     @Override
     public void onStart() {
         System.out.println("Servidor iniciado, puerto -> " + getPort());
+    }
+
+    private void obtenerPerfil(WebSocket conn, JSONObject obj) {
+        try {
+            String nombre = obj.getString("nombre");
+            Jugador j = new JugadorJDBC().buscarJugador(nombre);
+            if (j == null) {
+                System.out.println("OBTENER_PERFIL: jugador no encontrado -> " + nombre);
+                return;
+            }
+            JSONObject msg = new JSONObject();
+            msg.put("tipo", "PERFIL_ACTUALIZADO");
+            msg.put("nombre", j.getNombre());
+            msg.put("correo", j.getCorreo());
+            msg.put("puntos", j.getPuntos());
+            msg.put("partidas_ganadas", j.getPartidasGanadas());
+            msg.put("partidas_jugadas", j.getPartidasJugadas());
+            msg.put("cores", j.getCores());
+            System.out.println("PERFIL_ACTUALIZADO enviado -> " + nombre
+                + " | puntos=" + j.getPuntos()
+                + " | cores=" + j.getCores()
+                + " | ganadas=" + j.getPartidasGanadas()
+                + " | jugadas=" + j.getPartidasJugadas());
+            conn.send(msg.toString());
+        } catch (Exception e) {
+            System.err.println("Error al obtener perfil: " + e.getMessage());
+        }
     }
 
     public static void main(String[] args) {

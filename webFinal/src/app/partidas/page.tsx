@@ -16,7 +16,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { obtenerJugadorActivo } from "@/lib/sesion";
+import { obtenerJugadorActivo, type DatosSesion } from "@/lib/sesion";
 
 // Tipos de partida disponibles con imagen y descripción
 const TIPOS_PARTIDA = [
@@ -81,8 +81,9 @@ const NIVELES_DIFICULTAD = [
 
 export default function PartidasPage() {
   const router = useRouter();
-  const jugador = obtenerJugadorActivo();
+  const [jugador, setJugador] = useState<DatosSesion>(obtenerJugadorActivo);
   const [mostrarModalDificultad, setMostrarModalDificultad] = useState(false);
+
 
   /** Navega a la pantalla correspondiente según el tipo de partida */
   const handleIniciarPartida = (id: string) => {

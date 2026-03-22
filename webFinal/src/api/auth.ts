@@ -20,7 +20,7 @@
  * No se reutiliza con la conexión de partida (que se abre después en buscarpartida.ts).
  */
 
-import { DatosSesion } from "@/lib/sesion";
+import { DatosSesion, obtenerJugadorActivo } from "@/lib/sesion";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "";
 
@@ -136,6 +136,50 @@ export async function iniciarSesion(
  *   REGISTRO_EXITOSO  → OK
  *   REGISTRO_ERRONEO  → error (usuario/correo ya existe)
  */
+/**
+ * Pide al servidor los datos actualizados del jugador (puntos, cores, etc.)
+ * Útil para refrescar la UI al entrar a la pantalla de partidas o tras una partida.
+ *
+ * Mensaje enviado:  { tipo: "OBTENER_PERFIL", nombre: string }
+ * Respuesta:        PERFIL_ACTUALIZADO { tipo, nombre, correo, puntos, partidas_ganadas, partidas_jugadas, cores }
+ */
+export async function obtenerPerfil(nombre: string): Promise<DatosSesion> {
+  if (!usarServidor) {
+    return obtenerJugadorActivo();
+  }
+
+  const ws = await abrirWS();
+
+  return new Promise<DatosSesion>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      ws.close();
+      reject(new Error("Timeout al obtener perfil."));
+    }, 8_000);
+
+    ws.onmessage = (ev) => {
+      clearTimeout(timeout);
+      ws.close();
+      try {
+        const resp = JSON.parse(ev.data as string) as { tipo: string } & Record<string, unknown>;
+        if (resp.tipo === "PERFIL_ACTUALIZADO") {
+          resolve(resp as unknown as DatosSesion);
+        } else {
+          reject(new Error("Respuesta inesperada del servidor."));
+        }
+      } catch {
+        reject(new Error("Respuesta inválida del servidor."));
+      }
+    };
+
+    ws.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error("Error de conexión al obtener perfil."));
+    };
+
+    ws.send(JSON.stringify({ tipo: "OBTENER_PERFIL", nombre }));
+  });
+}
+
 export async function registrarUsuario(
   correo: string,
   nombre: string,

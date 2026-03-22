@@ -41,7 +41,8 @@ import {
   DIM,
 } from "@/lib/juego";
 import { TODAS_LAS_CARTAS, getImagenCarta, type CartaMovDef } from "@/lib/cartas";
-import { obtenerJugadorActivo } from "@/lib/sesion";
+import { obtenerJugadorActivo, guardarSesion } from "@/lib/sesion";
+import { obtenerPerfil } from "@/api/auth";
 import { calcularMejorMovimientoIA, type Dificultad } from "@/lib/ia";
 import {
   getWsActivo,
@@ -609,11 +610,19 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
     setEstado((prev) => ({ ...prev, cartaSeleccionada: carta, movimientosValidos }));
   };
 
+  /** Refresca el perfil en sessionStorage y navega a /partidas */
+  const volverAPartidas = useCallback(() => {
+    obtenerPerfil(jugadorActual.nombre)
+      .then((datos) => guardarSesion(datos))
+      .catch(() => { /* si falla, partidas/page lo reintentará al montar */ })
+      .finally(() => router.push("/partidas"));
+  }, [jugadorActual.nombre, router]);
+
   /** El jugador confirma que quiere abandonar: notifica al servidor y vuelve */
   const handleConfirmarAbandonar = () => {
     setMostrarModalAbandono(false);
-    enviarAbandonar(equipoJugadorRef.current); // No hace nada si no hay servidor conectado
-    router.push("/partidas");
+    enviarAbandonar(equipoJugadorRef.current);
+    volverAPartidas();
   };
 
   // ─── Derivados para el render ──────────────────────────────────────────────
@@ -699,7 +708,7 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
             </p>
             <button
               type="button"
-              onClick={() => router.push("/partidas")}
+              onClick={volverAPartidas}
               className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm bg-[#e8e8e8] text-[#1a2d4a] hover:bg-white transition-all"
             >
               Volver a partidas
