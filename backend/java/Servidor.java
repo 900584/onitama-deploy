@@ -920,6 +920,70 @@ public class Servidor extends WebSocketServer {
         }
     }
 
+    public void solicitarPartidas(WebSocket conn, JSONObject obj, String tipo){
+        String usuario = obj.getString("usuario");
+        PartidaJDBC jdbc = new PartidaJDBC();
+        JSONObject msg = new JSONObject();
+        if (tipo.equals("PRIVADA")) {
+            String amigo = obj.getString("amigo");
+            try {
+                List<Partida> partidas = jdbc.buscarPartidasJugadorPrivadas(usuario, amigo);
+                msg.put("tipo", "PARTIDAS_PRIVADAS");
+                msg.put("oponente", amigo);
+                for (Partida p : partidas) {
+                    String estado = p.getEstado();
+                    msg.put("estado", p.getEstado());
+                    msg.put("tiempo", p.getTiempo());
+                    if (p.isEs_Ganador_J1()) {
+                        msg.put("ganador", p.getJ1());
+                    }else if (p.isEs_Ganador_J2()){
+                        msg.put("ganador", p.getJ2());
+                    }else if (estado.equals("FINALIZADA")){
+                        msg.put("ganador", "Empate");
+                    }else{
+                        msg.put("ganador", "NO_HAY");
+                    }
+                }
+                conn.send(msg.toString());
+            } catch (SQLException e) {
+                e.printStackTrace();
+                System.err.println("SQL State: " + e.getSQLState());
+                System.err.println("Error al buscar partidas privadas: " + e.getMessage());
+                conn.send(new JSONObject().put("tipo", "ERROR_AL_BUSCAR_PARTIDAS_PRIV").toString());
+            }
+        } else if (tipo.equals("PUBLICA")){
+            try {
+                List<Partida> partidas = jdbc.buscarPartidasJugadorPublicas(usuario);
+                msg.put("tipo", "PARTIDAS_PUBLICAS");
+                for (Partida p : partidas) {
+                    if (usuario.equals(p.getJ1())) {
+                        msg.put("oponente", p.getJ2());
+                    }else{
+                        msg.put("oponente", p.getJ1());
+                    }
+                    String estado = p.getEstado();
+                    msg.put("estado", p.getEstado());
+                    msg.put("tiempo", p.getTiempo());
+                    if (p.isEs_Ganador_J1()) {
+                        msg.put("ganador", p.getJ1());
+                    }else if (p.isEs_Ganador_J2()){
+                        msg.put("ganador", p.getJ2());
+                    }else if (estado.equals("FINALIZADA")){
+                        msg.put("ganador", "Empate");
+                    }else{
+                        msg.put("ganador", "NO_HAY");
+                    }
+                }
+                conn.send(msg.toString());
+            } catch (SQLException e) {
+                e.printStackTrace();
+                System.err.println("SQL State: " + e.getSQLState());
+                System.err.println("Error al buscar partidas publicas: " + e.getMessage());
+                conn.send(new JSONObject().put("tipo", "ERROR_AL_BUSCAR_PARTIDAS_PUB").toString());
+            }
+        }
+    }
+
     public Servidor(int puerto) {
         super(new InetSocketAddress(puerto));
         conectados = new ArrayList<>();
@@ -997,6 +1061,10 @@ public class Servidor extends WebSocketServer {
                 buscarAmigos(conn, obj);
             } else if (tipoMSG.equals("BORRAR_AMIGO")){
                 borrarAmigo(conn, obj);
+            } else if (tipoMSG.equals("SOLICITAR_PARTIDAS_PUB")){
+                solicitarPartidas(conn, obj, "PUBLICA");
+            } else if (tipoMSG.equals("SOLICITAR_PARTIDAS_PRIV")){
+                solicitarPartidas(conn, obj, "PRIVADA");
             }
         });
     }

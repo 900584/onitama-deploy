@@ -82,7 +82,7 @@ public final class PartidaJDBC {
     }
 
     public List<Partida> buscarPartidasJugadorPublicas(String nombreUS) throws SQLException {
-        final String sql = "SELECT * FROM Partida WHERE (J1 = ? OR J2 = ?) AND Tipo = 'Publico'";
+        final String sql = "SELECT * FROM Partida WHERE (J1 = ? OR J2 = ?) AND Tipo = 'Publico' ORDER BY ID_Partida DESC LIMIT 3";
 
         List<Partida> partidas = new ArrayList<>();
 
@@ -101,7 +101,7 @@ public final class PartidaJDBC {
     }
 
     public List<Partida> buscarPartidasJugadorPrivadas(String miNombre, String nombreUS) throws SQLException {
-        final String sql = "SELECT * FROM Partida WHERE ((J1 = ? AND J2 = ?) OR (J1 = ? AND J2 = ?)) AND Tipo = 'Privado'";
+        final String sql = "SELECT * FROM Partida WHERE ((J1 = ? AND J2 = ?) OR (J1 = ? AND J2 = ?)) AND Tipo = 'Privado' ORDER BY ID_Partida DESC LIMIT 3";
 
         List<Partida> partidas = new ArrayList<>();
 
