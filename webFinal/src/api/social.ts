@@ -30,6 +30,18 @@ export interface InfoJugadorBusqueda {
   puntos: number;
 }
 
+export interface InfoAmigo {
+  nombre: string;
+  puntos: number;
+}
+
+export interface ResumenPartidaAmigo {
+  oponente: string;
+  estado: string;
+  tiempo: number;
+  ganador: string;
+}
+
 // ─── Búsqueda de jugadores ────────────────────────────────────────────────────
 
 /**
@@ -62,6 +74,114 @@ export async function buscarJugadores(
     });
 
     WS.enviar({ tipo: "BUSCAR_JUGADORES", raiz });
+  });
+}
+
+// ─── Amigos ───────────────────────────────────────────────────────────────────
+
+/** Obtiene la lista de amigos del usuario desde el servidor. */
+export async function obtenerAmigos(usuario: string): Promise<InfoAmigo[]> {
+  if (!WS.usarServidor || !WS.estaConectado()) return [];
+
+  return new Promise<InfoAmigo[]>((resolve) => {
+    const timeout = setTimeout(() => {
+      unsub();
+      resolve([]);
+    }, 6_000);
+
+    const unsub = WS.suscribirTodos((msg) => {
+      if (
+        msg.tipo !== "INFORMACION_AMIGOS" &&
+        msg.tipo !== "NO_AMIGOS" &&
+        msg.tipo !== "ERROR_AMIGOS"
+      ) {
+        return;
+      }
+      clearTimeout(timeout);
+      unsub();
+      if (msg.tipo === "INFORMACION_AMIGOS") {
+        resolve((msg.info as InfoAmigo[]) ?? []);
+      } else {
+        resolve([]);
+      }
+    });
+
+    WS.enviar({ tipo: "OBTENER_AMIGOS", usuario });
+  });
+}
+
+/** Borra una amistad entre usuario y amigo. */
+export async function borrarAmigo(usuario: string, amigo: string): Promise<boolean> {
+  if (!WS.usarServidor || !WS.estaConectado()) return false;
+
+  return new Promise<boolean>((resolve) => {
+    const timeout = setTimeout(() => {
+      unsub();
+      resolve(false);
+    }, 6_000);
+
+    const unsub = WS.suscribirTodos((msg) => {
+      if (msg.tipo !== "AMIGO_BORRADO" && msg.tipo !== "ERROR_AL_BORRAR_AMIGO") return;
+      clearTimeout(timeout);
+      unsub();
+      resolve(msg.tipo === "AMIGO_BORRADO");
+    });
+
+    WS.enviar({ tipo: "BORRAR_AMIGO", usuario, amigo });
+  });
+}
+
+/** Obtiene partidas privadas recientes entre usuario y amigo. */
+export async function obtenerPartidasConAmigo(
+  usuario: string,
+  amigo: string
+): Promise<ResumenPartidaAmigo[]> {
+  if (!WS.usarServidor || !WS.estaConectado()) return [];
+
+  return new Promise<ResumenPartidaAmigo[]>((resolve) => {
+    const timeout = setTimeout(() => {
+      unsub();
+      resolve([]);
+    }, 6_000);
+
+    const unsub = WS.suscribirTodos((msg) => {
+      if (msg.tipo !== "PARTIDAS_PRIVADAS" && msg.tipo !== "ERROR_AL_BUSCAR_PARTIDAS_PRIV") return;
+      clearTimeout(timeout);
+      unsub();
+      if (msg.tipo !== "PARTIDAS_PRIVADAS") {
+        resolve([]);
+        return;
+      }
+
+      // Compatibilidad: el backend puede enviar array (ideal) o un único bloque sobrescrito.
+      const posiblesArrays =
+        (msg.partidas as unknown[]) ??
+        (msg.info as unknown[]) ??
+        null;
+      if (Array.isArray(posiblesArrays)) {
+        resolve(
+          posiblesArrays.map((p) => ({
+            oponente: (p as Record<string, unknown>).oponente as string,
+            estado: (p as Record<string, unknown>).estado as string,
+            tiempo: Number((p as Record<string, unknown>).tiempo ?? 0),
+            ganador: ((p as Record<string, unknown>).ganador as string) ?? "NO_HAY",
+          }))
+        );
+        return;
+      }
+
+      // Fallback: formato plano actual del backend (solo una partida)
+      resolve([
+        {
+          oponente: (msg.oponente as string) ?? amigo,
+          estado: (msg.estado as string) ?? "DESCONOCIDO",
+          tiempo: Number(msg.tiempo ?? 0),
+          ganador: (msg.ganador as string) ?? "NO_HAY",
+        },
+      ]);
+    });
+
+    WS.enviar({ tipo: "SOLICITAR_PARTIDAS_PRIV", usuario, amigo });
   });
 }
 
@@ -105,4 +225,24 @@ export function aceptarSolicitudAmistad(
  */
 export function rechazarSolicitudAmistad(idNotificacion: number): boolean {
   return WS.enviar({ tipo: "RECHAZAR_AMISTAD", idNotificacion });
+}
+
+// ─── Partidas privadas ────────────────────────────────────────────────────────
+
+/** Envía una invitación de partida privada a un amigo. */
+export function enviarInvitacionPartidaPrivada(
+  remitente: string,
+  destinatario: string
+): boolean {
+  return WS.enviar({ tipo: "INVITACION_PARTIDA", remitente, destinatario });
+}
+
+/** Acepta una invitación a partida privada. */
+export function aceptarInvitacionPartidaPrivada(idNotificacion: number): boolean {
+  return WS.enviar({ tipo: "ACEPTAR_INVITACION", idNotificacion });
+}
+
+/** Rechaza una invitación a partida privada. */
+export function rechazarInvitacionPartidaPrivada(idNotificacion: number): boolean {
+  return WS.enviar({ tipo: "RECHAZAR_INVITACION", idNotificacion });
 }

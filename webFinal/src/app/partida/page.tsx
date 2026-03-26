@@ -29,7 +29,6 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
 import {
   crearEstadoInicial,
   crearEstadoDesdeServidor,
@@ -341,6 +340,7 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
   );
 
   const [mounted, setMounted] = useState(false);
+  const [tipoPartida, setTipoPartida] = useState<"PUBLICA" | "PRIVADA" | "ENTRENAMIENTO">("ENTRENAMIENTO");
   const [estado, setEstado] = useState<EstadoJuego>(() => ({
     tablero: crearTableroInicial(),
     turnoActual: 1,
@@ -365,21 +365,24 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
     const raw = sessionStorage.getItem("datosPartida");
     if (raw) {
       try {
-        const datos = JSON.parse(raw) as RespuestaPartidaEncontrada;
+        const datos = JSON.parse(raw) as RespuestaPartidaEncontrada & { tipo?: string };
         setEstado(crearEstadoDesdeServidor(datos));
         equipoJugadorRef.current = datos.equipo;
         setMiEquipoActual(datos.equipo);
         infoOponente.current = { nombre: datos.oponente, puntos: datos.oponentePt };
         setInfoOponenteUI({ nombre: datos.oponente, puntos: datos.oponentePt });
         setAguardandoInicio(datos.equipo === 2);
+        setTipoPartida(datos.tipo === "PARTIDA_PRIVADA_ENCONTRADA" ? "PRIVADA" : "PUBLICA");
       } catch {
         setEstado(crearEstadoInicial());
         setAguardandoInicio(false);
+        setTipoPartida("ENTRENAMIENTO");
       }
     } else {
       // Mock mode: randomization happens only on client
       setEstado(crearEstadoInicial());
       setAguardandoInicio(false);
+      setTipoPartida("ENTRENAMIENTO");
     }
   }, []);
 
@@ -391,6 +394,7 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
   const [resultadoFinal, setResultadoFinal] = useState<{
     ganador: string; razon: string;
   } | null>(null);
+  const [razonLocalFin, setRazonLocalFin] = useState<string | null>(null);
 
   /** Controla la visibilidad del modal de confirmación de abandono */
   const [mostrarModalAbandono, setMostrarModalAbandono] = useState(false);
@@ -409,8 +413,13 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
   useEffect(() => {
     if (!enServidor.current) return; // Modo mock: no hay WS
 
-    // Avisar al servidor (ignorado por el servidor actual, pero mantener por compatibilidad futura)
-    enviarEstoyListo();
+    // En desarrollo con StrictMode, este componente puede montarse dos veces.
+    // Persistimos una marca por partida para evitar enviar ESTOY_LISTO duplicado.
+    const claveListo = `estoy_listo_${partidaId}`;
+    if (sessionStorage.getItem(claveListo) !== "1") {
+      enviarEstoyListo();
+      sessionStorage.setItem(claveListo, "1");
+    }
 
     const desconectar = conectarPartida((msg) => {
       switch (msg.tipo) {
@@ -452,12 +461,18 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
 
         case "VICTORIA":
           // El servidor nos declara ganadores de esta partida
-          setResultadoFinal({ ganador: jugadorActual.nombre, razon: "REY_CAPTURADO" });
+          setResultadoFinal({
+            ganador: jugadorActual.nombre,
+            razon: String((msg as { motivo?: string }).motivo ?? "FIN_PARTIDA"),
+          });
           break;
 
         case "DERROTA":
           // El servidor declara al oponente como ganador
-          setResultadoFinal({ ganador: infoOponente.current.nombre, razon: "REY_CAPTURADO" });
+          setResultadoFinal({
+            ganador: infoOponente.current.nombre,
+            razon: String((msg as { motivo?: string }).motivo ?? "FIN_PARTIDA"),
+          });
           break;
 
         case "TERMINAR_PARTIDA": {
@@ -488,7 +503,15 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
             // la derrota por tiempo y enviará TERMINAR_PARTIDA cuando corresponda.
             return 0;
           } else {
-            // En mock: pasar turno sin penalizar (comportamiento de desarrollo)
+            // En entrenamiento/mock: si se agota el tiempo del jugador, pierde la partida.
+            if (estado.turnoActual === equipoJugadorRef.current) {
+              setResultadoFinal({
+                ganador: infoOponente.current.nombre,
+                razon: "TIEMPO_AGOTADO",
+              });
+              return 0;
+            }
+            // Si el tiempo se agotara en turno del bot, se rota turno para evitar bloqueo.
             setEstado((prev) => ({
               ...prev,
               turnoActual: prev.turnoActual === 2 ? 1 : 2,
@@ -518,12 +541,15 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
         dificultad
       );
       if (!jugada) { iaOcupada.current = false; return; }
-      const { nuevoEstado } = ejecutarMovimiento(
+      const { nuevoEstado, victoriaPortrono, esReyCapturado } = ejecutarMovimiento(
         est, jugada.origenFila, jugada.origenCol,
         jugada.destinoFila, jugada.destinoCol,
         jugada.carta, equipoJugadorRef.current
       );
       setEstado(nuevoEstado);
+      if (nuevoEstado.ganador === equipoIA) {
+        setRazonLocalFin(victoriaPortrono ? "TRONO" : esReyCapturado ? "REY_CAPTURADO" : "FIN_PARTIDA");
+      }
       registrarMovimiento({
         jugador: infoOponente.current.nombre,
         equipo: equipoIA,
@@ -556,7 +582,7 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
       estado.fichaSeleccionada &&
       estado.cartaSeleccionada
     ) {
-      const { nuevoEstado } = ejecutarMovimiento(
+      const { nuevoEstado, victoriaPortrono, esReyCapturado } = ejecutarMovimiento(
         estado,
         estado.fichaSeleccionada.fila,
         estado.fichaSeleccionada.col,
@@ -565,6 +591,9 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
         equipoJugadorRef.current
       );
       setEstado(nuevoEstado);
+      if (nuevoEstado.ganador === miEquipo) {
+        setRazonLocalFin(victoriaPortrono ? "TRONO" : esReyCapturado ? "REY_CAPTURADO" : "FIN_PARTIDA");
+      }
       registrarMovimiento({
         jugador: jugadorActual.nombre,
         equipo: miEquipo,
@@ -623,6 +652,10 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
    * El delay evita leer la BD antes de que el backend termine de actualizar puntos/cores.
    */
   const volverAPartidas = useCallback(() => {
+    if (tipoPartida !== "PUBLICA") {
+      router.push("/partidas");
+      return;
+    }
     window.setTimeout(() => {
       obtenerPerfil(jugadorActual.nombre)
         .then((datos) => guardarSesion(datos))
@@ -631,7 +664,7 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
         })
         .finally(() => router.push("/partidas"));
     }, DELAY_PERFIL_MS);
-  }, [jugadorActual.nombre, router]);
+  }, [jugadorActual.nombre, router, tipoPartida]);
 
   /** El jugador confirma que quiere abandonar: notifica al servidor y vuelve */
   const handleConfirmarAbandonar = () => {
@@ -655,9 +688,33 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
     ? resultadoFinal.ganador === jugadorActual.nombre
     : estado.ganador === miEquipoActual;
 
-  const razonFin = resultadoFinal?.razon ?? (esVictoria ? "Victoria" : "Derrota");
-
+  const razonFin = resultadoFinal?.razon ?? razonLocalFin ?? "FIN_PARTIDA";
+  const razonFinLabel =
+    razonFin === "ABANDONO"
+      ? "RIVAL ABANDONO"
+      : razonFin === "TIEMPO_AGOTADO"
+        ? "TE QUEDASTE SIN TIEMPO"
+      : razonFin === "TRONO"
+        ? "LLEGASTE AL TEMPLO RIVAL"
+        : razonFin === "REY_CAPTURADO"
+          ? "CAPTURASTE EL REY RIVAL"
+          : "FIN DE PARTIDA";
   const nombreOponente = infoOponenteUI.nombre;
+  const descripcionFin = esVictoria
+    ? razonFin === "ABANDONO"
+      ? "Tu rival ha abandonado la partida."
+      : razonFin === "TIEMPO_AGOTADO"
+        ? "Ganaste porque tu rival superó el tiempo límite."
+      : razonFin === "TRONO"
+        ? "Has ganado por victoria de templo."
+        : razonFin === "REY_CAPTURADO"
+          ? "Has ganado capturando al rey rival."
+          : "¡Excelente partida! Has dominado el tablero."
+    : razonFin === "ABANDONO"
+      ? "Has abandonado la partida."
+      : razonFin === "TIEMPO_AGOTADO"
+        ? "Te has tomado demasiado tiempo para pensar."
+      : `@${nombreOponente} ha ganado esta vez.`;
   const equipoOponente: EquipoID = miEquipoActual === 1 ? 2 : 1;
   const ultimoMovJugador =
     [...historialMovimientos].reverse().find((m) => m.equipo === miEquipoActual) ?? null;
@@ -682,9 +739,9 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
 
       {/* ═══ HEADER ════════════════════════════════════════════════════════ */}
       <header className="bg-[#1a2d4a] px-5 py-2 flex items-center justify-between shrink-0 shadow-lg">
-        <Link href="/" className="flex items-center">
+        <div className="flex items-center">
           <Image src="/nombre.png" alt="Onitama" width={110} height={32} priority className="h-8 w-auto object-contain" style={{ height: '2rem', width: 'auto' }} />
-        </Link>
+        </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
             <Image src="/katanas.png" alt="Puntos" width={18} height={18} className="h-4 w-auto" />
@@ -715,11 +772,9 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
             <h2 className="text-2xl font-bold text-white uppercase tracking-widest text-center">
               {esVictoria ? "¡Victoria!" : "Derrota"}
             </h2>
-            <p className="text-white/50 text-xs uppercase tracking-widest">{razonFin.replace(/_/g, " ")}</p>
+            <p className="text-white/50 text-xs uppercase tracking-widest">{razonFinLabel}</p>
             <p className="text-white/60 text-sm text-center">
-              {esVictoria
-                ? "¡Excelente partida! Has dominado el tablero."
-                : `@${nombreOponente} ha ganado esta vez.`}
+              {descripcionFin}
             </p>
             <button
               type="button"
@@ -734,9 +789,10 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
                 onClick={() => {
                   setEstado(crearEstadoInicial());
                   setResultadoFinal(null);
+                  setRazonLocalFin(null);
                   setTiempoRestante(TIEMPO_TURNO);
                   setHistorialMovimientos([]);
-                  setMiEquipoActual(2);
+                  setMiEquipoActual(1);
                   const mock = getMockOponente(dificultad);
                   infoOponente.current = mock;
                   setInfoOponenteUI(mock);
@@ -885,11 +941,12 @@ function PartidaInterna({ partidaId, dificultad }: { partidaId: string; dificult
           <div className="flex items-center justify-center gap-2 shrink-0">
             <p className="text-[#1a2d4a]/70 font-bold text-[9px] uppercase tracking-widest shrink-0">Mazo:</p>
             {estado.cartasSiguientes.map((carta, i) => {
-              // SIGUIENTE (i=0): color del equipo que moverá (quien recibirá esta carta)
-              // Resto (i>0): blanco/gris claro (todavía en espera en el mazo)
-              const colorDots = i === 0
-                ? (estado.turnoActual === 1 ? "bg-blue-500" : "bg-red-500")
-                : "bg-white/50";
+              // Color según el equipo que recibirá esa carta al salir de la cola.
+              // i=0 la recibe el equipo que mueve ahora; i=1 el contrario; i=2 el actual...
+              const equipoRecibeCarta = (i % 2 === 0)
+                ? estado.turnoActual
+                : (estado.turnoActual === 1 ? 2 : 1);
+              const colorDots = equipoRecibeCarta === 1 ? "bg-blue-500" : "bg-red-500";
               return (
                 <CartaCola
                   key={`${carta.nombre}-${i}`}

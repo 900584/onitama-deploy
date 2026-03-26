@@ -28,6 +28,9 @@ import * as WS from "./ws";
 
 export const usarServidor = WS.usarServidor;
 
+// Evita peticiones duplicadas de OBTENER_PERFIL (p. ej. StrictMode en desarrollo).
+let perfilEnCurso: { nombre: string; promise: Promise<DatosSesion> } | null = null;
+
 // ─── Listener de notificaciones ───────────────────────────────────────────────
 
 /**
@@ -220,7 +223,11 @@ export async function obtenerPerfil(nombre: string): Promise<DatosSesion> {
     return obtenerJugadorActivo();
   }
 
-  return new Promise<DatosSesion>((resolve, reject) => {
+  if (perfilEnCurso && perfilEnCurso.nombre === nombre) {
+    return perfilEnCurso.promise;
+  }
+
+  const promise = new Promise<DatosSesion>((resolve, reject) => {
     const timeout = setTimeout(() => {
       unsub();
       reject(new Error("Timeout al obtener perfil."));
@@ -233,5 +240,12 @@ export async function obtenerPerfil(nombre: string): Promise<DatosSesion> {
     });
 
     WS.enviar({ tipo: "OBTENER_PERFIL", nombre });
+  });
+
+  perfilEnCurso = { nombre, promise };
+  return promise.finally(() => {
+    if (perfilEnCurso?.promise === promise) {
+      perfilEnCurso = null;
+    }
   });
 }

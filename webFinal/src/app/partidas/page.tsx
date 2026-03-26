@@ -15,7 +15,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { obtenerJugadorActivo, guardarSesion, type DatosSesion } from "@/lib/sesion";
 import { obtenerPerfil } from "@/api/auth";
@@ -26,10 +25,18 @@ import {
 } from "@/lib/notificaciones";
 import {
   buscarJugadores,
+  obtenerAmigos,
+  borrarAmigo,
+  obtenerPartidasConAmigo,
+  enviarInvitacionPartidaPrivada,
+  aceptarInvitacionPartidaPrivada,
+  rechazarInvitacionPartidaPrivada,
   enviarSolicitudAmistad,
   aceptarSolicitudAmistad,
   rechazarSolicitudAmistad,
   type InfoJugadorBusqueda,
+  type InfoAmigo,
+  type ResumenPartidaAmigo,
 } from "@/api/social";
 import * as WS from "@/api/ws";
 
@@ -100,6 +107,13 @@ export default function PartidasPage() {
   const router = useRouter();
   const [jugador, setJugador] = useState<DatosSesion>(obtenerJugadorActivo);
   const [mostrarModalDificultad, setMostrarModalDificultad] = useState(false);
+  const [mostrarModalPartidaPrivada, setMostrarModalPartidaPrivada] = useState(false);
+  const [tabPartidaPrivada, setTabPartidaPrivada] = useState<"crear" | "reanudar">("crear");
+  const [invitacionPrivadaEnCurso, setInvitacionPrivadaEnCurso] = useState<{
+    destinatario: string;
+  } | null>(null);
+  const [mensajePrivada, setMensajePrivada] = useState<string | null>(null);
+  const [tiempoEsperaPrivada, setTiempoEsperaPrivada] = useState(120);
 
   // Panel lateral activo (null = pantalla principal con las tarjetas de partida)
   const [panelActivo, setPanelActivo] = useState<string | null>(null);
@@ -108,10 +122,13 @@ export default function PartidasPage() {
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
 
   // ── Amigos ──────────────────────────────────────────────────────────────────
-  // La lista de amigos existentes no se puede pedir al servidor todavía (falta
-  // OBTENER_AMIGOS). Se actualiza durante la sesión cuando se acepta una solicitud.
-  const [amigos, setAmigos] = useState<string[]>([]);
+  // Lista real de amigos desde backend (OBTENER_AMIGOS)
+  const [amigos, setAmigos] = useState<InfoAmigo[]>([]);
   const [tabAmigos, setTabAmigos] = useState<"lista" | "buscar">("lista");
+  const [amigoSeleccionado, setAmigoSeleccionado] = useState<InfoAmigo | null>(null);
+  const [partidasConAmigo, setPartidasConAmigo] = useState<ResumenPartidaAmigo[]>([]);
+  const [cargandoPartidasAmigo, setCargandoPartidasAmigo] = useState(false);
+  const [mostrarModalPartidasAmigo, setMostrarModalPartidasAmigo] = useState(false);
 
   // ── Búsqueda de jugadores ───────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState("");
@@ -143,14 +160,30 @@ export default function PartidasPage() {
       );
     });
 
+    const unsubInvitacionPartida = WS.suscribir("INVITACION_PARTIDA", (msg) => {
+      const nueva: Notificacion = {
+        idNotificacion: msg.idNotificacion as number,
+        tipo: "INVITACION_PARTIDA",
+        remitente: msg.remitente as string,
+      };
+      setNotificaciones((prev) =>
+        prev.find((n) => n.idNotificacion === nueva.idNotificacion)
+          ? prev
+          : [...prev, nueva]
+      );
+    });
+
     // Cuando se acepta una amistad, añadirla a la lista local
     const unsubAmistad = WS.suscribir("AMISTAD_ACEPTADA", (msg) => {
       const amigo = msg.amigo as string;
-      setAmigos((prev) => (prev.includes(amigo) ? prev : [...prev, amigo]));
+      setAmigos((prev) =>
+        prev.some((a) => a.nombre === amigo) ? prev : [...prev, { nombre: amigo, puntos: 0 }]
+      );
     });
 
     return () => {
       unsubSolicitud();
+      unsubInvitacionPartida();
       unsubAmistad();
     };
   }, []);
@@ -166,6 +199,72 @@ export default function PartidasPage() {
       })
       .catch(() => {});
   }, []);
+
+  /** Cargar amigos desde backend al abrir el panel de amigos. */
+  useEffect(() => {
+    if (panelActivo !== "amigos" || !jugador.nombre) return;
+    obtenerAmigos(jugador.nombre)
+      .then((lista) => setAmigos(lista))
+      .catch(() => setAmigos([]));
+  }, [panelActivo, jugador.nombre]);
+
+  /** Cargar amigos también al abrir el popup de partida privada (pestaña crear). */
+  useEffect(() => {
+    if (!mostrarModalPartidaPrivada || tabPartidaPrivada !== "crear" || !jugador.nombre) return;
+    obtenerAmigos(jugador.nombre)
+      .then((lista) => setAmigos(lista))
+      .catch(() => setAmigos([]));
+  }, [mostrarModalPartidaPrivada, tabPartidaPrivada, jugador.nombre]);
+
+  /** Mensajes WS para flujo de invitación a partida privada. */
+  useEffect(() => {
+    const unsubEncontrada = WS.suscribir("PARTIDA_PRIVADA_ENCONTRADA", (msg) => {
+      sessionStorage.setItem("datosPartida", JSON.stringify(msg));
+      setInvitacionPrivadaEnCurso(null);
+      setMostrarModalPartidaPrivada(false);
+      router.push("/presentacion-partida");
+    });
+
+    const unsubRechazada = WS.suscribir("INVITACION_RECHAZADA", () => {
+      setInvitacionPrivadaEnCurso(null);
+      setMostrarModalPartidaPrivada(false);
+      setMensajePrivada("Tu amigo rechazó la solicitud de partida privada.");
+    });
+
+    const unsubTimeout = WS.suscribir("ERROR_NO_UNIDO", () => {
+      setInvitacionPrivadaEnCurso(null);
+      setMostrarModalPartidaPrivada(false);
+      setMensajePrivada("Tu amigo no aceptó la solicitud de partida en el tiempo límite.");
+    });
+
+    const unsubDesconectado = WS.suscribir("ERROR_DESCONECTADO", () => {
+      setInvitacionPrivadaEnCurso(null);
+      setMensajePrivada("Tu amigo no está conectado en este momento.");
+    });
+
+    return () => {
+      unsubEncontrada();
+      unsubRechazada();
+      unsubTimeout();
+      unsubDesconectado();
+    };
+  }, [router]);
+
+  /** Countdown visual de espera de invitación (2 minutos). */
+  useEffect(() => {
+    if (!invitacionPrivadaEnCurso) return;
+    setTiempoEsperaPrivada(120);
+    const interval = setInterval(() => {
+      setTiempoEsperaPrivada((t) => {
+        if (t <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [invitacionPrivadaEnCurso]);
 
   /** Debounce: enviar búsqueda al servidor 400 ms después de que el usuario deje de escribir. */
   useEffect(() => {
@@ -195,7 +294,10 @@ export default function PartidasPage() {
   const handleIniciarPartida = (id: string) => {
     if (id === "publica") router.push("/buscar");
     else if (id === "entrenamiento") setMostrarModalDificultad(true);
-    // TODO: id === "privada" → INVITACION_PARTIDA
+    else if (id === "privada") {
+      setTabPartidaPrivada("crear");
+      setMostrarModalPartidaPrivada(true);
+    }
   };
 
   const handleSeleccionarDificultad = (dificultad: string) => {
@@ -222,6 +324,22 @@ export default function PartidasPage() {
     );
   }, []);
 
+  const handleAceptarInvitacionPartida = useCallback((notif: Notificacion) => {
+    aceptarInvitacionPartidaPrivada(notif.idNotificacion);
+    eliminarNotificacion(notif.idNotificacion);
+    setNotificaciones((prev) =>
+      prev.filter((n) => n.idNotificacion !== notif.idNotificacion)
+    );
+  }, []);
+
+  const handleRechazarInvitacionPartida = useCallback((notif: Notificacion) => {
+    rechazarInvitacionPartidaPrivada(notif.idNotificacion);
+    eliminarNotificacion(notif.idNotificacion);
+    setNotificaciones((prev) =>
+      prev.filter((n) => n.idNotificacion !== notif.idNotificacion)
+    );
+  }, []);
+
   const handleEnviarSolicitud = useCallback(
     (destinatario: string) => {
       enviarSolicitudAmistad(jugador.nombre, destinatario);
@@ -230,17 +348,59 @@ export default function PartidasPage() {
     [jugador.nombre]
   );
 
+  const handleSeleccionarAmigo = useCallback(
+    async (amigo: InfoAmigo) => {
+      setAmigoSeleccionado(amigo);
+      setMostrarModalPartidasAmigo(true);
+      setCargandoPartidasAmigo(true);
+      try {
+        const partidas = await obtenerPartidasConAmigo(jugador.nombre, amigo.nombre);
+        setPartidasConAmigo(partidas);
+      } finally {
+        setCargandoPartidasAmigo(false);
+      }
+    },
+    [jugador.nombre]
+  );
+
+  const handleBorrarAmigo = useCallback(
+    async (amigo: InfoAmigo) => {
+      const confirmar = window.confirm(`¿Seguro que quieres borrar a ${amigo.nombre} de tus amigos?`);
+      if (!confirmar) return;
+      const ok = await borrarAmigo(jugador.nombre, amigo.nombre);
+      if (!ok) return;
+      setAmigos((prev) => prev.filter((a) => a.nombre !== amigo.nombre));
+      if (amigoSeleccionado?.nombre === amigo.nombre) {
+        setAmigoSeleccionado(null);
+        setPartidasConAmigo([]);
+        setMostrarModalPartidasAmigo(false);
+      }
+    },
+    [jugador.nombre, amigoSeleccionado]
+  );
+
+  const handleInvitarPartidaPrivada = useCallback(
+    (amigo: InfoAmigo) => {
+      const ok = enviarInvitacionPartidaPrivada(jugador.nombre, amigo.nombre);
+      if (!ok) {
+        setMensajePrivada("No se pudo enviar la invitación. Revisa la conexión.");
+        return;
+      }
+      setInvitacionPrivadaEnCurso({ destinatario: amigo.nombre });
+      setMostrarModalPartidaPrivada(false);
+    },
+    [jugador.nombre]
+  );
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
-  const notifPendientes = notificaciones.filter(
-    (n) => n.tipo === "SOLICITUD_AMISTAD"
-  ).length;
+  const notifPendientes = notificaciones.length;
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* ─── Header ─────────────────────────────────────────────────────── */}
       <header className="bg-[#1a2d4a] px-6 py-3 flex items-center justify-between shrink-0">
-        <Link href="/" className="flex items-center">
+        <div className="flex items-center" aria-label="Onitama">
           <Image
             src="/nombre.png"
             alt="Onitama"
@@ -249,7 +409,7 @@ export default function PartidasPage() {
             priority
             className="h-9 w-auto object-contain"
           />
-        </Link>
+        </div>
 
         <div className="flex items-center gap-5">
           <div className="w-11 h-11 rounded-full bg-[#2a4a6a] border-2 border-white/30 flex items-center justify-center overflow-hidden">
@@ -314,6 +474,19 @@ export default function PartidasPage() {
 
         {/* ─── Área principal ──────────────────────────────────────────── */}
         <main className="flex-1 bg-stone-100 overflow-y-auto">
+          {mensajePrivada && (
+            <div className="mx-6 mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800 text-sm flex items-center justify-between">
+              <span>{mensajePrivada}</span>
+              <button
+                type="button"
+                onClick={() => setMensajePrivada(null)}
+                className="text-amber-700 hover:text-amber-900 font-bold"
+                aria-label="Cerrar mensaje"
+              >
+                ×
+              </button>
+            </div>
+          )}
 
           {/* Pantalla principal: tarjetas de partida */}
           {!panelActivo && (
@@ -351,6 +524,10 @@ export default function PartidasPage() {
             <PanelAmigos
               jugador={jugador}
               amigos={amigos}
+              amigoSeleccionado={amigoSeleccionado}
+              partidasConAmigo={partidasConAmigo}
+              cargandoPartidasAmigo={cargandoPartidasAmigo}
+              mostrarModalPartidasAmigo={mostrarModalPartidasAmigo}
               tabActiva={tabAmigos}
               onCambiarTab={setTabAmigos}
               textoBusqueda={textoBusqueda}
@@ -359,6 +536,9 @@ export default function PartidasPage() {
               buscando={buscando}
               solicitudesEnviadas={solicitudesEnviadas}
               onEnviarSolicitud={handleEnviarSolicitud}
+              onSeleccionarAmigo={handleSeleccionarAmigo}
+              onBorrarAmigo={handleBorrarAmigo}
+              onCerrarModalPartidas={() => setMostrarModalPartidasAmigo(false)}
             />
           )}
 
@@ -366,8 +546,10 @@ export default function PartidasPage() {
           {panelActivo === "notificaciones" && (
             <PanelNotificaciones
               notificaciones={notificaciones}
-              onAceptar={handleAceptarSolicitud}
-              onRechazar={handleRechazarSolicitud}
+              onAceptarAmistad={handleAceptarSolicitud}
+              onRechazarAmistad={handleRechazarSolicitud}
+              onAceptarInvitacionPartida={handleAceptarInvitacionPartida}
+              onRechazarInvitacionPartida={handleRechazarInvitacionPartida}
             />
           )}
 
@@ -438,6 +620,110 @@ export default function PartidasPage() {
           </div>
         </div>
       )}
+
+      {/* ─── Modal: Partida privada (doble pestaña) ───────────────────── */}
+      {mostrarModalPartidaPrivada && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-stone-900 uppercase tracking-wide">Partida privada</h2>
+              <button
+                type="button"
+                onClick={() => setMostrarModalPartidaPrivada(false)}
+                className="text-3xl leading-none text-stone-500 hover:text-stone-800"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-5 flex border-b border-stone-300">
+              <button
+                type="button"
+                onClick={() => setTabPartidaPrivada("crear")}
+                className={`px-5 py-3 text-sm font-semibold uppercase tracking-wider ${
+                  tabPartidaPrivada === "crear"
+                    ? "border-b-2 border-[#1a2d4a] text-[#1a2d4a]"
+                    : "text-stone-500 hover:text-stone-700"
+                }`}
+              >
+                Crear nueva partida
+              </button>
+              <button
+                type="button"
+                onClick={() => setTabPartidaPrivada("reanudar")}
+                className={`px-5 py-3 text-sm font-semibold uppercase tracking-wider ${
+                  tabPartidaPrivada === "reanudar"
+                    ? "border-b-2 border-[#1a2d4a] text-[#1a2d4a]"
+                    : "text-stone-500 hover:text-stone-700"
+                }`}
+              >
+                Reanudar partida
+              </button>
+            </div>
+
+            {tabPartidaPrivada === "crear" && (
+              <div className="mt-5">
+                {amigos.length === 0 ? (
+                  <p className="text-stone-500 text-sm">No tienes amigos disponibles para invitar.</p>
+                ) : (
+                  <ul className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                    {amigos.map((amigo) => (
+                      <li key={amigo.nombre} className="flex items-center gap-3 bg-stone-50 rounded-xl px-4 py-3">
+                        <div className="w-9 h-9 rounded-full bg-[#1a2d4a] text-white flex items-center justify-center font-bold text-sm">
+                          {amigo.nombre.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-stone-800">{amigo.nombre}</p>
+                          <p className="text-xs text-stone-500 flex items-center gap-1 mt-0.5">
+                            <Image src="/katanas.png" alt="Katanas" width={12} height={12} className="h-3 w-auto" />
+                            <span>{amigo.puntos}</span>
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleInvitarPartidaPrivada(amigo)}
+                          className="text-xs font-semibold px-4 py-2 rounded-lg bg-[#1a2d4a] text-white hover:bg-[#203a60]"
+                        >
+                          Invitar
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {tabPartidaPrivada === "reanudar" && (
+              <div className="mt-8 rounded-xl border border-dashed border-stone-300 bg-stone-50 p-8 text-center">
+                <p className="text-stone-500 font-semibold">Pendiente de soporte backend</p>
+                <p className="text-stone-400 text-sm mt-1">
+                  Esta pestaña se activará cuando estén listos los mensajes de pausa y reanudar.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Pantalla de espera: invitación privada en curso ───────────── */}
+      {invitacionPrivadaEnCurso && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b1522]/90 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-[#1a2d4a] rounded-2xl border border-white/10 p-8 text-white text-center shadow-2xl">
+            <h3 className="text-2xl font-bold uppercase tracking-widest">Esperando respuesta</h3>
+            <p className="text-white/70 mt-3">
+              Has invitado a <span className="font-semibold">@{invitacionPrivadaEnCurso.destinatario}</span> a una partida privada.
+            </p>
+            <p className="text-white/60 text-sm mt-2">
+              Tienes 2 minutos para que acepte la solicitud.
+            </p>
+            <p className="font-mono text-4xl mt-6 text-yellow-300">
+              {String(Math.floor(tiempoEsperaPrivada / 60)).padStart(2, "0")}:
+              {String(tiempoEsperaPrivada % 60).padStart(2, "0")}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -446,7 +732,11 @@ export default function PartidasPage() {
 
 interface PanelAmigosProps {
   jugador: DatosSesion;
-  amigos: string[];
+  amigos: InfoAmigo[];
+  amigoSeleccionado: InfoAmigo | null;
+  partidasConAmigo: ResumenPartidaAmigo[];
+  cargandoPartidasAmigo: boolean;
+  mostrarModalPartidasAmigo: boolean;
   tabActiva: "lista" | "buscar";
   onCambiarTab: (tab: "lista" | "buscar") => void;
   textoBusqueda: string;
@@ -455,11 +745,18 @@ interface PanelAmigosProps {
   buscando: boolean;
   solicitudesEnviadas: Set<string>;
   onEnviarSolicitud: (destinatario: string) => void;
+  onSeleccionarAmigo: (amigo: InfoAmigo) => void;
+  onBorrarAmigo: (amigo: InfoAmigo) => void;
+  onCerrarModalPartidas: () => void;
 }
 
 function PanelAmigos({
   jugador,
   amigos,
+  amigoSeleccionado,
+  partidasConAmigo,
+  cargandoPartidasAmigo,
+  mostrarModalPartidasAmigo,
   tabActiva,
   onCambiarTab,
   textoBusqueda,
@@ -468,6 +765,9 @@ function PanelAmigos({
   buscando,
   solicitudesEnviadas,
   onEnviarSolicitud,
+  onSeleccionarAmigo,
+  onBorrarAmigo,
+  onCerrarModalPartidas,
 }: PanelAmigosProps) {
   return (
     <div className="max-w-xl mx-auto px-6 py-8">
@@ -503,25 +803,47 @@ function PanelAmigos({
               <p className="text-sm mt-1">
                 Usa la pestaña &ldquo;Buscar&rdquo; para encontrar jugadores.
               </p>
-              <p className="text-xs mt-3 text-stone-300">
-                La lista de amigos existentes se cargará cuando el servidor
-                añada soporte para OBTENER_AMIGOS.
-              </p>
             </div>
           ) : (
-            <ul className="space-y-2">
-              {amigos.map((nombre) => (
-                <li
-                  key={nombre}
-                  className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 shadow-sm"
-                >
-                  <div className="w-9 h-9 rounded-full bg-[#1a2d4a] flex items-center justify-center text-white font-bold text-sm">
-                    {nombre.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="font-medium text-stone-800">{nombre}</span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="space-y-2">
+                {amigos.map((amigo) => (
+                  <li
+                    key={amigo.nombre}
+                    className={`flex items-center gap-3 bg-white rounded-xl px-4 py-3 shadow-sm border ${
+                      amigoSeleccionado?.nombre === amigo.nombre
+                        ? "border-[#1a2d4a]"
+                        : "border-transparent"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="flex items-center gap-3 flex-1 text-left"
+                      onClick={() => onSeleccionarAmigo(amigo)}
+                    >
+                      <div className="w-9 h-9 rounded-full bg-[#1a2d4a] flex items-center justify-center text-white font-bold text-sm">
+                        {amigo.nombre.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-stone-800">{amigo.nombre}</p>
+                        <p className="text-xs text-stone-500 flex items-center gap-1 mt-0.5">
+                          <Image src="/katanas.png" alt="Katanas" width={12} height={12} className="h-3 w-auto" />
+                          <span>{amigo.puntos}</span>
+                        </p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onBorrarAmigo(amigo)}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                    >
+                      Borrar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+            </>
           )}
         </div>
       )}
@@ -551,7 +873,7 @@ function PanelAmigos({
             <ul className="space-y-2">
               {resultados.map((j) => {
                     const esMismoUsuario = j.nombre === jugador.nombre;
-                    const esAmigo = amigos.includes(j.nombre);
+                    const esAmigo = amigos.some((a) => a.nombre === j.nombre);
                     const yaEnviado = solicitudesEnviadas.has(j.nombre);
 
                     return (
@@ -564,7 +886,10 @@ function PanelAmigos({
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-stone-800 truncate">{j.nombre}</p>
-                          <p className="text-xs text-stone-400">{j.puntos} puntos</p>
+                          <p className="text-xs text-stone-500 flex items-center gap-1 mt-0.5">
+                            <Image src="/katanas.png" alt="Katanas" width={12} height={12} className="h-3 w-auto" />
+                            <span>{j.puntos}</span>
+                          </p>
                         </div>
                         {!esMismoUsuario && (
                           esAmigo ? (
@@ -599,6 +924,66 @@ function PanelAmigos({
           )}
         </div>
       )}
+
+      {/* Modal grande: historial con amigo */}
+      {mostrarModalPartidasAmigo && amigoSeleccionado && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[1px] flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-white rounded-3xl shadow-2xl p-6 md:p-8 relative">
+            <button
+              type="button"
+              onClick={onCerrarModalPartidas}
+              className="absolute right-5 top-4 text-3xl leading-none text-black hover:text-stone-600"
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+
+            <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 items-start">
+              <div className="flex flex-col items-center">
+                <div className="w-28 h-28 rounded-full bg-stone-200 flex items-center justify-center text-3xl text-stone-500">
+                  {amigoSeleccionado.nombre.charAt(0).toUpperCase()}
+                </div>
+                <p className="mt-3 text-xl font-semibold text-stone-800">@{amigoSeleccionado.nombre}</p>
+                <p className="mt-2 text-sm text-stone-600 flex items-center gap-1">
+                  <Image src="/katanas.png" alt="Katanas" width={16} height={16} className="h-4 w-auto" />
+                  <span>{amigoSeleccionado.puntos}</span>
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-2xl font-extrabold uppercase tracking-wide text-stone-800 mb-4">
+                  Tus últimas partidas contra @{amigoSeleccionado.nombre}
+                </h3>
+
+                {cargandoPartidasAmigo ? (
+                  <div className="rounded-2xl bg-stone-200 text-stone-600 px-6 py-6 text-center font-semibold">
+                    Cargando historial...
+                  </div>
+                ) : partidasConAmigo.length === 0 ? (
+                  <div className="rounded-2xl bg-stone-200 text-stone-700 px-6 py-6 text-center font-semibold">
+                    No tiene partidas jugadas.
+                  </div>
+                ) : (
+                  <ul className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                    {partidasConAmigo.map((p, idx) => (
+                      <li
+                        key={`${p.oponente}-${p.estado}-${p.tiempo}-${idx}`}
+                        className="rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700"
+                      >
+                        <span className="font-bold">{p.estado}</span>
+                        <span className="mx-2 text-stone-400">•</span>
+                        <span>Ganador: {p.ganador}</span>
+                        <span className="mx-2 text-stone-400">•</span>
+                        <span>Duración: {p.tiempo}s</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -607,16 +992,20 @@ function PanelAmigos({
 
 interface PanelNotificacionesProps {
   notificaciones: Notificacion[];
-  onAceptar: (notif: Notificacion) => void;
-  onRechazar: (notif: Notificacion) => void;
+  onAceptarAmistad: (notif: Notificacion) => void;
+  onRechazarAmistad: (notif: Notificacion) => void;
+  onAceptarInvitacionPartida: (notif: Notificacion) => void;
+  onRechazarInvitacionPartida: (notif: Notificacion) => void;
 }
 
 function PanelNotificaciones({
   notificaciones,
-  onAceptar,
-  onRechazar,
+  onAceptarAmistad,
+  onRechazarAmistad,
+  onAceptarInvitacionPartida,
+  onRechazarInvitacionPartida,
 }: PanelNotificacionesProps) {
-  const solicitudes = notificaciones.filter((n) => n.tipo === "SOLICITUD_AMISTAD");
+  const items = notificaciones;
 
   return (
     <div className="max-w-xl mx-auto px-6 py-8">
@@ -624,15 +1013,15 @@ function PanelNotificaciones({
         Notificaciones
       </h2>
 
-      {solicitudes.length === 0 ? (
+      {items.length === 0 ? (
         <div className="text-center py-16 text-stone-400">
           <p className="text-4xl mb-3">🔔</p>
           <p className="font-semibold">Sin notificaciones pendientes.</p>
-          <p className="text-sm mt-1">Aquí aparecerán las solicitudes de amistad.</p>
+          <p className="text-sm mt-1">Aquí aparecerán solicitudes de amistad e invitaciones privadas.</p>
         </div>
       ) : (
         <ul className="space-y-3">
-          {solicitudes.map((notif) => (
+          {items.map((notif) => (
             <li
               key={notif.idNotificacion}
               className="bg-white rounded-xl px-4 py-4 shadow-sm flex items-center gap-3"
@@ -648,7 +1037,9 @@ function PanelNotificaciones({
                   {notif.remitente}
                 </p>
                 <p className="text-xs text-stone-400">
-                  Te ha enviado una solicitud de amistad
+                  {notif.tipo === "SOLICITUD_AMISTAD"
+                    ? "Te ha enviado una solicitud de amistad"
+                    : "Te ha invitado a una partida privada"}
                 </p>
               </div>
 
@@ -656,14 +1047,22 @@ function PanelNotificaciones({
               <div className="flex gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => onAceptar(notif)}
+                  onClick={() =>
+                    notif.tipo === "SOLICITUD_AMISTAD"
+                      ? onAceptarAmistad(notif)
+                      : onAceptarInvitacionPartida(notif)
+                  }
                   className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#1a2d4a] text-white hover:bg-[#203a60] transition-colors"
                 >
                   Aceptar
                 </button>
                 <button
                   type="button"
-                  onClick={() => onRechazar(notif)}
+                  onClick={() =>
+                    notif.tipo === "SOLICITUD_AMISTAD"
+                      ? onRechazarAmistad(notif)
+                      : onRechazarInvitacionPartida(notif)
+                  }
                   className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-stone-200 text-stone-600 hover:bg-stone-300 transition-colors"
                 >
                   Rechazar
