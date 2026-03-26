@@ -1,6 +1,7 @@
 package com.example.onitama.ui.activities
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
@@ -47,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import com.example.onitama.R
 import com.example.onitama.api.BuscarPartida
 import com.example.onitama.autoLogin
+import com.example.onitama.ui.activities.partida.PartidaActivity
 import kotlinx.coroutines.delay
 
 class Buscar_PartidaActivity: AppCompatActivity() {
@@ -73,9 +75,11 @@ class Buscar_PartidaActivity: AppCompatActivity() {
                     val respuesta = resultBuscOponente.promise.await()
                     if (respuesta.estado == BuscarPartida.EstadoPartida.ENCONTRADA) {
                         // Si encuentra partida tendría que abrir la pantalla de juego
-                        // val intentJuego = Intent(this@Buscar_PartidaActivity, JuegoActivity::class.java)
-                        // startActivity(intentJuego)
-                        // finish() // Cerramos la pantalla de búsqueda
+                        val intentJuego = Intent(this@Buscar_PartidaActivity, PartidaActivity::class.java).apply {
+                            putExtra("MODO_JUEGO", "PUBLICA")
+                        }
+                        startActivity(intentJuego)
+                        finish() // Cerramos la pantalla de búsqueda
                     }
                 }
 

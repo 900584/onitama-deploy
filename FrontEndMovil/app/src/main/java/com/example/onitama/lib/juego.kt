@@ -7,6 +7,12 @@ const val CENTRO = (DIM/2)
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
+enum class ModoJuego {
+    PUBLICA,
+    PRIVADA,
+    BOT
+}
+
 enum class EquipoID (val id: Int){
     ARROJO(1),
     ABAZUL(2)
@@ -20,7 +26,8 @@ data class Ficha(
 data class Celda (
     val ficha: Ficha?,
     /** true si esta casilla es el trono de algún equipo */
-    val esTrono: Boolean
+    val esTrono: Boolean,
+    val equipoTrono: EquipoID?
 )
 
 data class Posicion (
@@ -33,23 +40,23 @@ data class EstadoJuego (
     val turnoActual: EquipoID,
 
     /** 2 cartas del jugador local (equipo 2) */
-    val cartasJugador: List<carta>,
+    val cartasJugador: List<Carta>,
 
     /** 2 cartas del oponente (equipo 1) */
-    val cartasOponente: List<carta>,
+    val cartasOponente: List<Carta>,
 
     /**
      * Cola de 3 cartas en espera.
      * - cartasSiguientes[0] es la que recibirá quien juegue.
      * - La carta usada se añade al final (índice 2).
      */
-    val cartasSiguientes: List<carta>,
+    val cartasSiguientes: List<Carta>,
 
     /** Ficha que el jugador ha pulsado (highlight amarillo) */
     val fichaSeleccionada: Posicion?,
 
     /** Carta que el jugador ha seleccionado (activa las casillas azules) */
-    val cartaSeleccionada: carta?,
+    val cartaSeleccionada: Carta?,
 
     /** Casillas destino válidas según la ficha y carta seleccionadas */
     val movimientosValidos: List<Posicion>,
@@ -68,6 +75,8 @@ fun crearTableroInicial(): List<List<Celda>> {
     return List(DIM) { fila ->
         List(DIM) { col ->
             var ficha: Ficha? = null
+            val esTronoSuperior = fila == 0 && col == CENTRO
+            val esTronoInferior = fila == DIM - 1 && col == CENTRO
             if (fila == 0 || fila == DIM - 1){
                 val equipo: EquipoID
                 if (fila == 0){
@@ -80,7 +89,12 @@ fun crearTableroInicial(): List<List<Celda>> {
             }
             Celda(
                 ficha = ficha,
-                esTrono = (fila == 0 || fila == DIM - 1) && col == CENTRO
+                esTrono = esTronoSuperior || esTronoInferior,
+                equipoTrono = when {
+                    esTronoSuperior -> EquipoID.ARROJO
+                    esTronoInferior -> EquipoID.ABAZUL
+                    else -> null
+                }
             )
         }
     }
@@ -91,7 +105,7 @@ fun crearTableroInicial(): List<List<Celda>> {
  * Se reparten 7 cartas aleatorias: 2 jugador + 2 oponente + 3 en cola.
  */
 fun crearEstadoInicial(): EstadoJuego {
-    val cartas = cartas.selectRandomCards(7)
+    val cartas = Cartas.selectRandomCards(7)
     return EstadoJuego(
         tablero = crearTableroInicial(),
         turnoActual = EquipoID.ABAZUL,
@@ -117,7 +131,7 @@ fun calcularMovimientosValidos (
     tablero: List<List<Celda>>,
     fila: Int,
     col: Int,
-    cartaMov: carta,
+    cartaMov: Carta,
     equipo: EquipoID
 ): List<Posicion> {
     var signo: Int
@@ -169,27 +183,27 @@ data class CartaServidor (
  * Si el servidor no envía movimientos (retrocompatibilidad mock), se busca
  * por nombre en el catálogo local.
  */
-fun convertirCarta(cartaS: Any):carta{
+fun convertirCarta(cartaS: Any):Carta{
     // Formato antiguo: solo nombre (mock o versión anterior del servidor)
     if (cartaS is String){
-        val encontrada = cartas.todas_cartas.find {
+        val encontrada = Cartas.todas_cartas.find {
             it.nombre == cartaS
         }
 
         if (encontrada == null){
             println("[juego] Carta \"$cartaS\" no encontrada en catálogo. Usando primera disponible.")
-            return cartas.todas_cartas[0]
+            return Cartas.todas_cartas[0]
         }
         return encontrada
     }
 
     if (cartaS is CartaServidor){
         // Formato nuevo: objeto con nombre y movimientos del servidor
-        val imagen = cartas.todas_cartas.find {
+        val imagen = Cartas.todas_cartas.find {
             it.nombre == cartaS.nombre
         }?.imagen ?: "🃏"
 
-        return carta(
+        return Carta(
             nombre = cartaS.nombre,
             imagen,
             movimientos = cartaS.movimientos?.map {
@@ -197,7 +211,7 @@ fun convertirCarta(cartaS: Any):carta{
             }?: emptyList()
         )
     }
-    return cartas.todas_cartas[0]
+    return Cartas.todas_cartas[0]
 }
 
 /**
@@ -263,7 +277,7 @@ fun ejecutarMovimiento (
     estado: EstadoJuego,
     origen: Posicion,
     destino: Posicion,
-    carta: carta,
+    carta: Carta,
     equipoLocal: EquipoID = EquipoID.ABAZUL
 ): ResultadoMovimiento {
     val tablero = estado.tablero.map { fila ->
@@ -281,8 +295,8 @@ fun ejecutarMovimiento (
 
     /** Victoria por trono: el rey llega al trono enemigo */
     val victoriaPorTrono = fichaMovida.esRey &&
-            ((fichaMovida.equipo === EquipoID.ABAZUL && destino.fila == 0 && destino.col === CENTRO) ||
-                    (fichaMovida.equipo === EquipoID.ARROJO && destino.fila === DIM - 1 && destino.col === CENTRO));
+            ((fichaMovida.equipo == EquipoID.ABAZUL && destino.fila == 0 && destino.col == CENTRO) ||
+                    (fichaMovida.equipo == EquipoID.ARROJO && destino.fila == DIM - 1 && destino.col == CENTRO));
 
     /** El jugador recibe la primera carta de la cola; la carta usada va al final.*/
     val cartaRecibida = estado.cartasSiguientes[0]

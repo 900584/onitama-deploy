@@ -117,21 +117,41 @@ class BuscarPartida(
             }
             override fun onMessage(webSocket: WebSocket, event: String) { //al recibir un mensaje del websocket
                 if (promise.isCompleted) {
-                    PartidaActiva.onMensajeJuegoRecibido?.invoke(event) //si la partida ya ha empezado se le pasa el mensaje a la pantalla de juego usando el objeto gamesession
+                    PartidaActiva.onMensajeJuegoRecibido?.invoke(event) //si la partida ya ha empezado se le pasa el mensaje a la pantalla de juego usando el objeto PartidaActiva
                     return
                 }
                 try {
-                    val jsonTolerante = Json { ignoreUnknownKeys = true } //en caso de que el mensaje sea correcto se inicia la partida
-                    val datos = jsonTolerante.decodeFromString<RespuestaBuscarPartida>(event)
-                    if (datos.estado == EstadoPartida.ENCONTRADA) {
-                        timerJob.cancel()
-                        val resultadoFinal = datos.copy(
-                            mensaje = "Partida encontrada, te enfrentarás a ${datos.oponente}"
-                        )
-                        PartidaActiva.datosPartida = resultadoFinal
-                        PartidaActiva.wsActivo = webSocket
-                        promise.complete(resultadoFinal)
+                    val jsonTolerante = Json {
+                        ignoreUnknownKeys = true
+                        classDiscriminator = "tipo" // El nombre del campo que dice si es PARTIDA_ENCONTRADA u otro
+                    } //en caso de que el mensaje sea correcto se inicia la partida
+                    val mensajeEntrante = jsonTolerante.decodeFromString<Partida.MensajeServidor>(event)
+                    when (mensajeEntrante) {
+                        is Partida.RespuestaPartidaEncontrada -> {
+                            timerJob.cancel()
 
+                            // 1. Guardamos los datos de la partida en el Singleton
+                            PartidaActiva.datosPartida = mensajeEntrante
+                            PartidaActiva.wsActivo = webSocket
+
+                            // 2. Resolvemos la promesa para que la UI sepa que hemos terminado
+                            promise.complete(
+                                RespuestaBuscarPartida(
+                                    estado = EstadoPartida.ENCONTRADA,
+                                    mensaje = "¡Partida encontrada! Te enfrentarás a ${mensajeEntrante.oponente}",
+                                    // Estos campos ya no hacen falta aquí porque están en PartidaActiva,
+                                    // pero los mantenemos si tu UI los lee:
+                                    partida_id = mensajeEntrante.partida_id,
+                                    oponente = mensajeEntrante.oponente,
+                                    oponentePt = mensajeEntrante.oponentePt
+                                )
+                            )
+                        }
+
+                        else -> {
+                            // Es otro tipo de mensaje (ej: "BUSCANDO..."), lo ignoramos
+                            Log.d("BuscarPartida", "Mensaje de estado recibido: $event")
+                        }
                     }
                 } catch( x: Exception){ //si no lo es se usa el mock
                     Log.w("BuscarPartida","Error al decodificar el mensaje: $event")

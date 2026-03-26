@@ -74,14 +74,18 @@ class Partida(
     @SerialName("PARTIDA_ENCONTRADA")
     data class RespuestaPartidaEncontrada(
         val partida_id: String,
-        val equipo: EquipoID,
+        val equipo: Int,
         val oponente: String,
         val oponentePt: Int,
         val cartas_jugador: List<String>,
         val cartas_oponente: List<String>,
-        val cartas_siguiente: List<String>
+        val carta_siguiente: List<String>
 
-    ): MensajeServidor()
+    ): MensajeServidor(){
+        fun obtenerEquipoID(): EquipoID {
+            return if (equipo == 1) EquipoID.ARROJO else EquipoID.ABAZUL
+        }
+    }
 
     @Serializable
     @SerialName("TU_TURNO")
@@ -177,6 +181,7 @@ class Partida(
             PartidaActiva.wsActivo?.close(1000, "Cerrando conexión")
             PartidaActiva.wsActivo = null
             PartidaActiva.wsEstoyListoEnviado = false
+            PartidaActiva.datosPartida = null
         }
     }
 

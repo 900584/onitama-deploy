@@ -1,6 +1,7 @@
 package com.example.onitama
 
 import com.example.onitama.api.BuscarPartida
+import com.example.onitama.api.Partida
 import okhttp3.WebSocket
 
 
@@ -12,7 +13,7 @@ import okhttp3.WebSocket
 object PartidaActiva {
 
     var wsEstoyListoEnviado: Boolean = false
-    var datosPartida: BuscarPartida.RespuestaBuscarPartida? = null
+    var datosPartida: Partida.RespuestaPartidaEncontrada? = null
     var wsActivo: WebSocket? = null
 
     // Usaremos esto en la pantalla del juego para recibir los mensajes
