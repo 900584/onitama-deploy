@@ -930,20 +930,26 @@ public class Servidor extends WebSocketServer {
                 List<Partida> partidas = jdbc.buscarPartidasJugadorPrivadas(usuario, amigo);
                 msg.put("tipo", "PARTIDAS_PRIVADAS");
                 msg.put("oponente", amigo);
+                JSONArray partidasJSON = new JSONArray();
                 for (Partida p : partidas) {
+                    JSONObject partidaJSON = new JSONObject();
                     String estado = p.getEstado();
-                    msg.put("estado", p.getEstado());
-                    msg.put("tiempo", p.getTiempo());
+                    partidaJSON.put("partida_id", p.getIDPartida());
+                    partidaJSON.put("oponente", amigo);
+                    partidaJSON.put("estado", estado);
+                    partidaJSON.put("tiempo", p.getTiempo());
                     if (p.isEs_Ganador_J1()) {
-                        msg.put("ganador", p.getJ1());
-                    }else if (p.isEs_Ganador_J2()){
-                        msg.put("ganador", p.getJ2());
-                    }else if (estado.equals("FINALIZADA")){
-                        msg.put("ganador", "Empate");
-                    }else{
-                        msg.put("ganador", "NO_HAY");
+                        partidaJSON.put("ganador", p.getJ1());
+                    } else if (p.isEs_Ganador_J2()) {
+                        partidaJSON.put("ganador", p.getJ2());
+                    } else if (estado.equals("FINALIZADA")) {
+                        partidaJSON.put("ganador", "Empate");
+                    } else {
+                        partidaJSON.put("ganador", "NO_HAY");
                     }
+                    partidasJSON.put(partidaJSON);
                 }
+                msg.put("partidas", partidasJSON);
                 conn.send(msg.toString());
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -955,25 +961,32 @@ public class Servidor extends WebSocketServer {
             try {
                 List<Partida> partidas = jdbc.buscarPartidasJugadorPublicas(usuario);
                 msg.put("tipo", "PARTIDAS_PUBLICAS");
+                JSONArray partidasJSON = new JSONArray();
                 for (Partida p : partidas) {
+                    JSONObject partidaJSON = new JSONObject();
+                    String oponente;
                     if (usuario.equals(p.getJ1())) {
-                        msg.put("oponente", p.getJ2());
-                    }else{
-                        msg.put("oponente", p.getJ1());
+                        oponente = p.getJ2();
+                    } else {
+                        oponente = p.getJ1();
                     }
                     String estado = p.getEstado();
-                    msg.put("estado", p.getEstado());
-                    msg.put("tiempo", p.getTiempo());
+                    partidaJSON.put("partida_id", p.getIDPartida());
+                    partidaJSON.put("oponente", oponente);
+                    partidaJSON.put("estado", estado);
+                    partidaJSON.put("tiempo", p.getTiempo());
                     if (p.isEs_Ganador_J1()) {
-                        msg.put("ganador", p.getJ1());
-                    }else if (p.isEs_Ganador_J2()){
-                        msg.put("ganador", p.getJ2());
-                    }else if (estado.equals("FINALIZADA")){
-                        msg.put("ganador", "Empate");
-                    }else{
-                        msg.put("ganador", "NO_HAY");
+                        partidaJSON.put("ganador", p.getJ1());
+                    } else if (p.isEs_Ganador_J2()) {
+                        partidaJSON.put("ganador", p.getJ2());
+                    } else if (estado.equals("FINALIZADA")) {
+                        partidaJSON.put("ganador", "Empate");
+                    } else {
+                        partidaJSON.put("ganador", "NO_HAY");
                     }
+                    partidasJSON.put(partidaJSON);
                 }
+                msg.put("partidas", partidasJSON);
                 conn.send(msg.toString());
             } catch (SQLException e) {
                 e.printStackTrace();

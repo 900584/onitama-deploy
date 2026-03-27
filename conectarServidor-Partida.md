@@ -231,6 +231,31 @@ Se envía cuando el jugador rechaza una invitación a partida privada.
 
 ---
 
+### 2.2.2 Historial de partidas (publicas y privadas)
+
+#### `SOLICITAR_PARTIDAS_PRIV`
+Se envía para pedir el historial de partidas privadas contra un amigo concreto.
+```json
+{
+  "tipo": "SOLICITAR_PARTIDAS_PRIV",
+  "usuario": "Iron",
+  "amigo": "Taisen"
+}
+```
+
+---
+
+#### `SOLICITAR_PARTIDAS_PUB`
+Se envía para pedir el historial de partidas públicas del usuario.
+```json
+{
+  "tipo": "SOLICITAR_PARTIDAS_PUB",
+  "usuario": "Iron"
+}
+```
+
+---
+
 ### 2.3 Mensajes que envía el SERVIDOR al cliente 
 #### `ERROR_AL_BORRAR_AMIGO`
 
@@ -256,6 +281,83 @@ El servidor manda este mensaje si ha habido un error al buscar amigos
 ```json
 {
   "tipo": "ERROR_AMIGOS"
+}
+```
+
+---
+
+#### `PARTIDAS_PRIVADAS`
+Respuesta al mensaje `SOLICITAR_PARTIDAS_PRIV`.
+```json
+{
+  "tipo": "PARTIDAS_PRIVADAS",
+  "oponente": "Taisen",
+  "partidas": [
+    {
+      "partida_id": 31,
+      "oponente": "Taisen",
+      "estado": "FINALIZADA",
+      "tiempo": 842,
+      "ganador": "Iron"
+    },
+    {
+      "partida_id": 28,
+      "oponente": "Taisen",
+      "estado": "PAUSADA",
+      "tiempo": 413,
+      "ganador": "NO_HAY"
+    }
+  ]
+}
+```
+
+**Nota importante:** `partidas` siempre es un array. Si no hay datos, el servidor responde con `partidas: []`.
+
+---
+
+#### `PARTIDAS_PUBLICAS`
+Respuesta al mensaje `SOLICITAR_PARTIDAS_PUB`.
+```json
+{
+  "tipo": "PARTIDAS_PUBLICAS",
+  "partidas": [
+    {
+      "partida_id": 77,
+      "oponente": "Ney",
+      "estado": "FINALIZADA",
+      "tiempo": 915,
+      "ganador": "Ney"
+    },
+    {
+      "partida_id": 74,
+      "oponente": "Messi",
+      "estado": "FINALIZADA",
+      "tiempo": 640,
+      "ganador": "Iron"
+    }
+  ]
+}
+```
+
+**Nota importante:** `partidas` siempre es un array. Si no hay datos, el servidor responde con `partidas: []`.
+
+---
+
+#### `ERROR_AL_BUSCAR_PARTIDAS_PRIV`
+Error al recuperar historial de partidas privadas.
+```json
+{
+  "tipo": "ERROR_AL_BUSCAR_PARTIDAS_PRIV"
+}
+```
+
+---
+
+#### `ERROR_AL_BUSCAR_PARTIDAS_PUB`
+Error al recuperar historial de partidas públicas.
+```json
+{
+  "tipo": "ERROR_AL_BUSCAR_PARTIDAS_PUB"
 }
 ```
 
