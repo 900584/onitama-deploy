@@ -136,7 +136,7 @@ public class Servidor extends WebSocketServer {
     }
 
     // Con 'iniciar' construimos los JSON de tipo PARTIDA_ENCONTRADA
-    public void iniciar(Pareja pj){
+    public void iniciar(Pareja pj, String msgTipoPartida){
 
         JSONArray mazoJ1 = new JSONArray();
         JSONArray mazoJ2 = new JSONArray();
@@ -144,7 +144,7 @@ public class Servidor extends WebSocketServer {
         cartasPartida(pj, mazoJ1, mazoJ2, cola);
 
         JSONObject msg1 = new JSONObject(); // el que espera a jugar
-        msg1.put("tipo", "PARTIDA_ENCONTRADA");
+        msg1.put("tipo", msgTipoPartida);
         msg1.put("partida_id", pj.partida.getIDPartida());
         msg1.put("equipo", 1);
         msg1.put("oponente", pj.p2.nombre);
@@ -154,7 +154,7 @@ public class Servidor extends WebSocketServer {
         msg1.put("carta_siguiente", cola);
 
         JSONObject msg2= new JSONObject(); // al que le emparejan a j1
-        msg2.put("tipo", "PARTIDA_ENCONTRADA");
+        msg2.put("tipo", msgTipoPartida);
         msg2.put("partida_id", pj.partida.getIDPartida());
         msg2.put("equipo", 2);
         msg2.put("oponente", pj.p1.nombre);
@@ -223,7 +223,7 @@ public class Servidor extends WebSocketServer {
         }
 
         if(oponente != null){
-            iniciar(pj);
+            iniciar(pj, "PARTIDA_ENCONTRADA");
             System.out.println("Partida creada: " + nombre + " VS " + oponente.nombre);
         }
     }
@@ -290,7 +290,7 @@ public class Servidor extends WebSocketServer {
 
             if (oponenteEncontrado != null) {
                 System.out.println("Partida creada tardía: " + jug.nombre + " VS " + oponenteEncontrado.nombre);
-                iniciar(pj);
+                iniciar(pj, "PARTIDA_ENCONTRADA");
                 
                 tareaLoop[0].cancel(false); 
             } else {
@@ -319,8 +319,6 @@ public class Servidor extends WebSocketServer {
         } finally {
             mutexParejas.release(); //SIGNAL
         }
-        
-        //LANZAR SUBRUTINA EN LA VERSION NO POCHA
 
         if (pj != null) {
             InfoJugador oponente = pj.getOponente(conn);
@@ -521,6 +519,24 @@ public class Servidor extends WebSocketServer {
         return encontrado;
     }
 
+    private InfoJugador buscarJugadorConectado(String nombre){
+        InfoJugador encontrado = null;
+        try {
+            mutexConectados.acquire();
+            for(InfoJugador j : conectados){
+                if(j.nombre.equals(nombre)){
+                    encontrado = j;
+                    break;
+                }
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            mutexConectados.release();
+        }
+        return encontrado;
+    }
+
     private WebSocket buscarConexion(String nombre){
         WebSocket ws = null;
         try {
@@ -702,58 +718,10 @@ public class Servidor extends WebSocketServer {
             PartidaJDBC partidaJdbc = new PartidaJDBC();
             List<Partida> partidas = partidaJdbc.buscarPartidasJugadorPrivadas(notif.getRemitente(), notif.getDestinatario());
 
-            // cogemos la más reciente por ID
-            Partida partida = partidas.stream()
-                .max(Comparator.comparingInt(Partida::getIDPartida))
-                .orElse(partidas.get(0));
-
-            // comprbamos que el remitente sigue conectado
-            WebSocket wsA = buscarConexion(notif.getRemitente());
-            if (wsA == null || !wsA.isOpen()) {
-                conn.send(new JSONObject().put("tipo", "ERROR_DESCONECTADO").toString());
-                return;
-            }
-
-            // cargamos los puntos reales de ambos jugadores desde la BD
-            JugadorJDBC jugadorJdbc = new JugadorJDBC();
-            Jugador jugadorA = jugadorJdbc.buscarJugador(notif.getRemitente());
-            Jugador jugadorB = jugadorJdbc.buscarJugador(notif.getDestinatario());
-            int puntosA = jugadorA != null ? jugadorA.getPuntos() : 0;
-            int puntosB = jugadorB != null ? jugadorB.getPuntos() : 0;
-
-            // construimos los mazos de cartas como en iniciar()
-            JSONArray mazoJ1 = new JSONArray();
-            JSONArray mazoJ2 = new JSONArray();
-            JSONArray cola = new JSONArray();
-
-            CartasMovJDBC cartasMovJdbc = new CartasMovJDBC();
-            List<CartaMov> cartas = cartasMovJdbc.sacarCartasPartida(partida.getIDPartida());
-
-            // mensaje para el remitente (equipo 1)
-            JSONObject msg1 = new JSONObject();
-            msg1.put("tipo", "PARTIDA_PRIVADA_ENCONTRADA");
-            msg1.put("partida_id", partida.getIDPartida());
-            msg1.put("equipo", 1);
-            msg1.put("oponente", notif.getDestinatario());
-            msg1.put("oponentePt", puntosB);
-            msg1.put("cartas_jugador", mazoJ1);
-            msg1.put("cartas_oponente", mazoJ2);
-            msg1.put("carta_siguiente", cola);
-
-            // mensaje para el destinatario (equipo 2)
-            JSONObject msg2 = new JSONObject();
-            msg2.put("tipo", "PARTIDA_PRIVADA_ENCONTRADA");
-            msg2.put("partida_id", partida.getIDPartida());
-            msg2.put("equipo", 2);
-            msg2.put("oponente", notif.getRemitente());
-            msg2.put("oponentePt", puntosA);
-            msg2.put("cartas_jugador", mazoJ2);
-            msg2.put("cartas_oponente", mazoJ1);
-            msg2.put("carta_siguiente", cola);
-
-            wsA.send(msg1.toString());
-            conn.send(msg2.toString());
-            System.out.println("Partida privada iniciada: " + notif.getRemitente() + " vs " + notif.getDestinatario());
+            InfoJugador j1 = buscarJugadorConectado(notif.getRemitente());
+            InfoJugador j2 = buscarJugadorConectado(notif.getDestinatario());
+            Pareja pj = new Pareja(j1, j2);
+            iniciar(pj, "PARTIDA_PRIVADA_ENCONTRADA");
 
         } catch (SQLException e) {
             System.err.println("Error al aceptar invitación: " + e.getMessage());
