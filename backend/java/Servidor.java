@@ -710,17 +710,12 @@ public class Servidor extends WebSocketServer {
             // obtenemos la notificación para saber quién es el remitente y el destinatario
             NotificacionJDBC notifJdbc = new NotificacionJDBC();
             Notificacion notif = notifJdbc.obtenerPorId(idNotificacion);
-
-            // aceptamos en BD y creamos la partida privada internamente
-            boolean ok = gestor.aceptarNotificacion(idNotificacion, notif.getDestinatario());
-
-            // buscamos la partida recién creada para obtener sus cartas
-            PartidaJDBC partidaJdbc = new PartidaJDBC();
-            List<Partida> partidas = partidaJdbc.buscarPartidasJugadorPrivadas(notif.getRemitente(), notif.getDestinatario());
+            System.err.println("NOTIFICACION CON LOS SIGUIENTES: " + notif.getRemitente() + ", " + notif.getDestinatario());
 
             InfoJugador j1 = buscarJugadorConectado(notif.getRemitente());
             InfoJugador j2 = buscarJugadorConectado(notif.getDestinatario());
             Pareja pj = new Pareja(j1, j2);
+            System.err.println("Partida privada con id: " + pj.partida.getIDPartida());
             iniciar(pj, "PARTIDA_PRIVADA_ENCONTRADA");
 
         } catch (SQLException e) {
