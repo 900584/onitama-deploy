@@ -715,6 +715,7 @@ public class Servidor extends WebSocketServer {
             InfoJugador j1 = buscarJugadorConectado(notif.getRemitente());
             InfoJugador j2 = buscarJugadorConectado(notif.getDestinatario());
             Pareja pj = new Pareja(j1, j2, "PRIVADA");
+            parejas.add(pj);
             System.err.println("Partida privada con id: " + pj.partida.getIDPartida());
             iniciar(pj, "PARTIDA_PRIVADA_ENCONTRADA");
 
