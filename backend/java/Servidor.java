@@ -59,11 +59,11 @@ class Pareja{
     InfoJugador p1, p2;
     Partida partida;
 
-    public Pareja(InfoJugador _p1, InfoJugador _p2){
+    public Pareja(InfoJugador _p1, InfoJugador _p2, String tipo){
         p1 = _p1;
         p2 = _p2;
         //De momento solo existe partidas Publicas
-        partida = new Partida(0, "JUGANDOSE", 0, "PUBLICA", null, null, 0, 0, _p1.nombre, _p2.nombre, false, false, 0);
+        partida = new Partida(0, "JUGANDOSE", 0, tipo, null, null, 0, 0, _p1.nombre, _p2.nombre, false, false, 0);
         partida.registrarPartida();
         partida.asignarCartas(); //Genera las cartas aleatorias
         partida.repartirCartas(); //Repartimos a los equipos sus cartas
@@ -197,7 +197,7 @@ public class Servidor extends WebSocketServer {
             if (oponente != null){
                 buscando_partida.remove(oponente);
                 InfoJugador nuevoJugador = new InfoJugador(conn, nombre, puntos);
-                pj = new Pareja(oponente, nuevoJugador);
+                pj = new Pareja(oponente, nuevoJugador, "PUBLICA");
 
                 try{
                     mutexParejas.acquire();//WAIT
@@ -271,7 +271,7 @@ public class Servidor extends WebSocketServer {
                 if (oponenteEncontrado != null) {
                     buscando_partida.remove(jug);
                     buscando_partida.remove(oponenteEncontrado);
-                    pj = new Pareja(oponenteEncontrado, jug);
+                    pj = new Pareja(oponenteEncontrado, jug, "PUBLICA");
                     try{
                         mutexParejas.acquire();//WAIT
                         parejas.add(pj);
@@ -714,7 +714,7 @@ public class Servidor extends WebSocketServer {
 
             InfoJugador j1 = buscarJugadorConectado(notif.getRemitente());
             InfoJugador j2 = buscarJugadorConectado(notif.getDestinatario());
-            Pareja pj = new Pareja(j1, j2);
+            Pareja pj = new Pareja(j1, j2, "PRIVADA");
             System.err.println("Partida privada con id: " + pj.partida.getIDPartida());
             iniciar(pj, "PARTIDA_PRIVADA_ENCONTRADA");
 
