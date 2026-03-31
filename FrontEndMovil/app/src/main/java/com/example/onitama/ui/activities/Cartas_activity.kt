@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,23 +49,28 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat.startActivity
 import com.example.onitama.R
 import com.example.onitama.autoLogin
+import com.example.onitama.lib.Carta
+import com.example.onitama.lib.Cartas
+import com.example.onitama.lib.Movimiento
 import com.example.onitama.ui.activities.partida.PartidaActivity
 
-class MenuPrincipalActivity : AppCompatActivity() {
+class Cartas_activity: AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val nombreUsuario = autoLogin.obtenerNombre(this) ?: "Jugador"
         val valorCores = autoLogin.obtenerCores(this)
         val valorKatanas = autoLogin.obtenerKatanas(this)
+
         setContent {
             // Un contenedor base opcional (útil para temas y colores de fondo por defecto)
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                MainMenuScreen(
+                CartasScreen(
                     nombre = nombreUsuario,
                     cores = valorCores,
                     katanas = valorKatanas
@@ -75,14 +81,12 @@ class MenuPrincipalActivity : AppCompatActivity() {
 }
 
 @Composable
-fun MainMenuScreen(
+fun CartasScreen(
     nombre: String = "Jugador",
     cores: Int = 0,
     katanas: Int = 0
 ) {
     val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
-    var menuPrivadoDesplegado by remember { mutableStateOf(false) }
-    val alphaOtrosBotones by animateFloatAsState(targetValue = if (menuPrivadoDesplegado) 0.3f else 1f)
     val context = LocalContext.current
 
 
@@ -120,129 +124,7 @@ fun MainMenuScreen(
         // ==========================================
         // 2. Parte que se desplegara al hacer click en el botón de partida privada
         // ==========================================
-        if (menuPrivadoDesplegado) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .clickable { menuPrivadoDesplegado = false } // Si tocas fuera, se cierra
-            )
-        }
 
-        // ==========================================
-        // 2. SECCIÓN CENTRAL (Botones de Partida)
-        // ==========================================
-        // Usamos un Column centrado para apilar las opciones de juego
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 130.dp, bottom = 100.dp), // Deja espacio para no pisar la cabecera ni la barra inferior
-            horizontalAlignment = Alignment.CenterHorizontally // Centra todo horizontalmente
-        ) {
-
-            // --- Partida Online ---
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 20.dp).alpha(alphaOtrosBotones)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.publicmatch),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(150.dp).padding(end = 16.dp)
-                )
-                Button(
-                    onClick = {
-                        val intent = Intent(context, Buscar_PartidaActivity::class.java)
-                        context.startActivity(intent)
-                    },
-                    enabled = !menuPrivadoDesplegado,
-                    modifier = Modifier.size(width = 220.dp, height = 100.dp),
-                    shape = RoundedCornerShape(16.dp), // Reemplaza @drawable/boton_esquinas_redondas
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                ) {
-                    Text("PARTIDA ONLINE", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
-                }
-            }
-
-            // --- Partida Entrenamiento ---
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 20.dp).alpha(alphaOtrosBotones)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ironbot),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(150.dp).padding(end = 16.dp)
-                )
-                Button(
-                    onClick = {
-                        val intent = Intent(context, PartidaActivity::class.java)
-                        context.startActivity(intent) },
-                    enabled = !menuPrivadoDesplegado,
-                    modifier = Modifier.size(width = 220.dp, height = 100.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                ) {
-                    Text("PARTIDA ENTRENAMIENTO", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
-                }
-            }
-
-            // --- Partida Privada ---
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            )
-            {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.privatematch),
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.size(150.dp).padding(end = 16.dp)
-                    )
-                    Button(
-                        onClick = { menuPrivadoDesplegado = !menuPrivadoDesplegado },
-                        modifier = Modifier.size(width = 220.dp, height = 100.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (menuPrivadoDesplegado) Color.LightGray else Color.White)
-                    ) {
-                        Text("PARTIDA PRIVADA", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
-                    }
-                }
-                AnimatedVisibility(visible = menuPrivadoDesplegado) {
-                    Column(
-                        modifier = Modifier
-                            .padding(top = 10.dp)
-                            .padding(start = 116.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ){
-                        Button(
-                            onClick = { /* Acción Continuar Partida Privada */ },
-                            modifier = Modifier.size(width = 200.dp, height = 60.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                        ){
-                            Text("CONTINUAR PARTIDA", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Button(
-                            onClick = { /* Acción Empezar Partida Privada */ },
-                            modifier = Modifier.size(width = 200.dp, height = 60.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                        ){
-                            Text("NUEVA PARTIDA", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
-                        }
-                    }
-                }
-            }
-
-        }
 
         // ==========================================
         // 3. CABECERA (Contadores y Perfil)
@@ -325,12 +207,12 @@ fun MainMenuScreen(
                 }
                 IconButton(
                     onClick = {
-                        val intent = Intent(context, Cartas_activity::class.java)
+                        val intent = Intent(context, MenuPrincipalActivity::class.java)
                         context.startActivity(intent)},
                     modifier = Modifier.size(60.dp)
                 ) {
-                    Image(painterResource(R.drawable.cards),
-                        contentDescription = "Cards")
+                    Image(painterResource(R.drawable.espadas),
+                        contentDescription = "Jugar")
                 }
 
                 Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
@@ -352,7 +234,6 @@ fun MainMenuScreen(
                 }
             }
 
-            // Botón central "A JUGAR" sobresaliendo
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -360,18 +241,118 @@ fun MainMenuScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 IconButton(
-                    onClick = { /* Iniciar partida rápida */ },
+                    onClick = {  },
                     modifier = Modifier.size(70.dp)
                 ) {
-                    Image(painterResource(R.drawable.espadas), contentDescription = "Jugar")
+                    Image(painterResource(R.drawable.cards), contentDescription = "Cartas")
                 }
                 Text(
-                    text = "¡A JUGAR!",
+                    text = "MIS CARTAS",
                     fontFamily = quattrocentoBold,
                     fontSize = 12.sp,
                     color = Color.White,
                     modifier = Modifier.offset(y = (-8).dp)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun CartaCatalogo(carta: Carta, seleccionada: Boolean, onClick: () -> Unit) {
+
+    val ancho = if (seleccionada) 192.dp else 170.dp
+    val alto = if (seleccionada) 120.dp else 100.dp
+    val context = LocalContext.current
+
+    // 1. Usamos tu función, pero por si acaso tiene espacios, le ponemos replace
+    val nombreSeguro = Cartas.imagenCarta(carta).replace(" ", "_")
+
+    val imageResId = context.resources.getIdentifier(
+        nombreSeguro,
+        "drawable",
+        context.packageName
+    )
+
+    //🛡️ PROTECCIÓN ANTI-CRASH: Si la imagen no existe (0), ponemos el logo por defecto
+    val idSeguro = if (imageResId != 0) imageResId else R.drawable.onitama_text
+
+    Box(
+        modifier = Modifier
+            .padding(start = 15.dp)
+            .height(alto)
+            .width(ancho)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+            // 3. 🎨 Feedback visual: Si está seleccionada, se pone azul
+            .background(if (seleccionada) Color(0xFFBBDEFB) else Color.LightGray)
+            // 4. 👆 INTERACTIVIDAD: Si no pones esto, ¡la carta no hace nada al tocarla!
+            .clickable { onClick() }
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically // Centra el minigrid y la imagen
+        ) {
+            Column{
+                Image(
+                    painter = painterResource(id = idSeguro), // USAMOS LA VARIABLE SEGURA
+                    contentDescription = carta.nombre,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .padding(5.dp)
+                        .height(65.dp)
+                        .width(65.dp)
+                )
+                Text(
+                    carta.nombre,
+                    fontFamily = FontFamily(Font(R.font.quattrocento_bold)),
+                    fontSize = 15.sp,
+                    modifier = Modifier
+                        .offset(y = (-2).dp)
+                        .padding(start = 10.dp)
+                )
+            }
+
+            MinigridCatalogo(carta.movimientos)
+        }
+    }
+}
+
+@Composable
+fun MinigridCatalogo(movimientos: List<Movimiento>){
+    val tamanoGrid = 7
+    val centro = tamanoGrid / 2
+
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.padding(4.dp)
+    ) {
+        for (f in 0 until tamanoGrid) {
+            Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                for (c in 0 until tamanoGrid) {
+                    // Calculamos el desplazamiento relativo de esta celda respecto al centro
+                    // En Onitama: df es filas (y), dc es columnas (x)
+                    val dfRelativo = centro - f
+                    val dcRelativo = c - centro
+
+                    // Verificamos si este punto coincide con algún movimiento de la carta
+                    val esMovimiento = movimientos.any { it.df == dfRelativo && it.dc == dcRelativo }
+                    val esCentro = f == centro && c == centro
+
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp) // Tamaño de cada puntito del grid
+                            .clip(RoundedCornerShape(16))
+                            .border(1.dp, Color.Black)
+                            .background(
+                                when {
+                                    esCentro -> Color.Black
+                                    esMovimiento -> Color(0xFF2196F3) // Azul para movimientos
+                                    else -> Color.White.copy(alpha = 0.3f) // Fondo tenue
+                                }
+                            )
+                    )
+                }
             }
         }
     }

@@ -51,7 +51,7 @@ class BuscarPartida(
     data class RespuestaBuscarPartida(
         val estado: EstadoPartida,
         val mensaje: String,
-        val partida_id: String?,
+        val partida_id: Int?,
         val oponente: String?,
         val oponentePt: Int?
     )
@@ -63,7 +63,7 @@ class BuscarPartida(
         return RespuestaBuscarPartida(
             estado = EstadoPartida.ENCONTRADA,
             mensaje = "¡Partida encontrada! (modo local sin servidor)",
-            partida_id = "mock-partida-001", // o partida_id dependiendo de cómo lo dejaras
+            partida_id = 6969, // o partida_id dependiendo de cómo lo dejaras
             oponente = "granluchador",
             oponentePt = 1200
         )

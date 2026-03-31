@@ -44,52 +44,64 @@ class Partida(
 ){
 
     val usarServidor: Boolean get() = !(wsUrl.isEmpty())
+    // ----------------------------------------------------
+    // MENSAJES QUE ENVIAMOS AL SERVIDOR (Cliente -> Servidor)
+    // ----------------------------------------------------
     @Serializable
-    sealed class MensajeServidor
-
     sealed class MensajeCliente
 
-    data class MensajeEstoyListo(
-        val tipo: String = "ESTOY_LISTO",
-    ): MensajeCliente()
+    @Serializable
+    @SerialName("ESTOY_LISTO")
+    object MensajeEstoyListo : MensajeCliente() // Usamos object porque no tiene variables
 
-
+    @Serializable
+    @SerialName("MOVER")
     data class MensajeMover(
-        val tipo: String = "MOVER",
-        val equipo: EquipoID,
+        // Borramos el 'val tipo' manual. @SerialName("MOVER") lo añadirá automáticamente.
+        val equipo: Int,
         val col_origen: Int,
         val fila_origen: Int,
         val col_destino: Int,
         val fila_destino: Int,
         val carta: String
-
     ): MensajeCliente()
 
+    @Serializable
+    @SerialName("ABANDONAR")
     data class MensajeAbandonar(
-        val tipo: String = "ABANDONAR",
-        val equipo: EquipoID
+        val equipo: Int
     ): MensajeCliente()
+
+    // ----------------------------------------------------
+    // MENSAJES QUE RECIBIMOS DEL SERVIDOR (Servidor -> Cliente)
+    // ----------------------------------------------------
+    @Serializable
+    sealed class MensajeServidor
+
+    @Serializable
+    data class CartaJson(
+        val nombre: String
+    )
 
     @Serializable
     @SerialName("PARTIDA_ENCONTRADA")
     data class RespuestaPartidaEncontrada(
-        val partida_id: String,
+        val partida_id: Int,
         val equipo: Int,
         val oponente: String,
         val oponentePt: Int,
-        val cartas_jugador: List<String>,
-        val cartas_oponente: List<String>,
-        val carta_siguiente: List<String>
-
-    ): MensajeServidor(){
+        val cartas_jugador: List<CartaJson>,
+        val cartas_oponente: List<CartaJson>,
+        val carta_siguiente: List<CartaJson>
+    ): MensajeServidor() {
         fun obtenerEquipoID(): EquipoID {
-            return if (equipo == 1) EquipoID.ARROJO else EquipoID.ABAZUL
+            return if (equipo == 1) EquipoID.AZUL else EquipoID.ROJO
         }
     }
 
     @Serializable
     @SerialName("TU_TURNO")
-    class RespuestaTuTurno : MensajeServidor()
+    object RespuestaTuTurno : MensajeServidor() // Convertido a object
 
     @Serializable
     @SerialName("MOVER")
@@ -105,22 +117,16 @@ class Partida(
     @SerialName("TERMINAR_PARTIDA")
     data class RespuestaTerminarPartida(
         val ganador: String,
-        /** Razón: TIEMPO_AGOTADO | REY_CAPTURADO | TRONO | ABANDONO */
         val razon: String
     ): MensajeServidor()
 
     @Serializable
     @SerialName("VICTORIA")
-    class RespuestaVictoria: MensajeServidor()
+    object RespuestaVictoria : MensajeServidor() // Convertido a object
 
     @Serializable
     @SerialName("DERROTA")
-    class RespuestaDerrota: MensajeServidor()
-
-    data class MensajeDesconocido(
-        val tipo: String,
-        val other: Map<String, Any?>
-    ): MensajeServidor()
+    object RespuestaDerrota : MensajeServidor() // Convertido a object
 
     /**
      * Devuelve una función lambda () -> Unit que sirve para desconectar (limpiar).
@@ -187,7 +193,12 @@ class Partida(
 
     fun enviar(msg: Partida.MensajeCliente): Boolean {
         //si el websocket no está activo no se puede enviar nada
-        val ws = PartidaActiva.wsActivo ?: return false
+        val ws = PartidaActiva.wsActivo
+
+        if (ws == null) {
+            Log.e( "Partida", "No se puede enviar mensaje, el WebSocket no está activo.")
+            return false
+        }
 
         return try {
             val jsonTexto = jsonPartida.encodeToString(msg)
@@ -202,7 +213,7 @@ class Partida(
         if(PartidaActiva.wsEstoyListoEnviado){
             return true
         }
-        val msg = MensajeEstoyListo()
+        val msg = MensajeEstoyListo
         val res = enviar(msg)
         if (res) {PartidaActiva.wsEstoyListoEnviado = true}
         return res
@@ -212,7 +223,7 @@ class Partida(
         return enviar(datos)
     }
 
-    fun enviarAbandono(quien: EquipoID):Boolean{
+    fun enviarAbandono(quien: Int):Boolean{
         val msg = MensajeAbandonar(equipo = quien)
         return enviar(msg)
     }

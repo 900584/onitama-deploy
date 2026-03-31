@@ -21,7 +21,7 @@ data class Carta(
 object Cartas{
     val todas_cartas = listOf(
         Carta("Tigre",   "🐯", listOf(Movimiento(0, -1), Movimiento(0, 2))),
-        Carta("Dragon",   "🐉", listOf(Movimiento(-2, 1), Movimiento( -1, -1), Movimiento(1, 1), Movimiento(2, 1))),
+        Carta("Dragon",   "🐉", listOf(Movimiento(-2, 1), Movimiento( -1, -1), Movimiento(1, -1), Movimiento(2, 1))),
         Carta("Rana",   "🐸", listOf(Movimiento(-1, 1), Movimiento(1, -1), Movimiento(-2, 0))),
         Carta("Conejo",   "🐰", listOf(Movimiento(1, 1), Movimiento(-1, -1), Movimiento(2, 0))),
         Carta("Cangrejo",   "🦀", listOf(Movimiento(-2, 0), Movimiento(2, 0),Movimiento(0,1))),
@@ -45,6 +45,10 @@ object Cartas{
 
     fun imagenCarta(carta: Carta): String {
         return carta.nombre.lowercase()
+    }
+
+    fun getCarta(nombre: String): Carta {
+        return todas_cartas.find { it.nombre == nombre }!!
     }
 
 }

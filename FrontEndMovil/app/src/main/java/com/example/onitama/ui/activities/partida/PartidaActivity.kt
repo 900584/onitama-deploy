@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
+import com.example.onitama.PartidaActiva
 import com.example.onitama.R
 import com.example.onitama.api.BuscarPartida
 import com.example.onitama.autoLogin
@@ -74,7 +75,12 @@ class PartidaActivity: AppCompatActivity() {
         val valorKatanas = autoLogin.obtenerKatanas(this)
 
         val modoString = intent.getStringExtra("MODO_JUEGO") ?: ModoJuego.BOT.name
-        val modoJuego = ModoJuego.valueOf(modoString)
+        val modoJuego = try {
+            ModoJuego.valueOf(modoString)
+        } catch (e: Exception) {
+            ModoJuego.BOT
+        }
+        viewModel.iniciarPartida(modoJuego)
 
         setContent {
             // Observamos el estado del ViewModel. Cuando cambie, la UI se repintará sola.
@@ -85,7 +91,8 @@ class PartidaActivity: AppCompatActivity() {
                     nombre = nombreUsuario,
                     cores = valorCores,
                     katanas = valorKatanas,
-                    estado = estadoJuego // Pasamos el estado a la UI
+                    estado = estadoJuego, // Pasamos el estado a la UI
+                    modo = modoJuego
                 )
             }
         }
@@ -97,7 +104,8 @@ class PartidaActivity: AppCompatActivity() {
         nombre: String = "Jugador",
         cores: Int = 0,
         katanas: Int = 0,
-        estado: EstadoJuego
+        estado: EstadoJuego,
+        modo: ModoJuego
     ) {
 
         val context = LocalContext.current
@@ -216,41 +224,37 @@ class PartidaActivity: AppCompatActivity() {
                             .size(80.dp)
                             .clip(CircleShape)
                             .background(Color.Companion.White),
-                        painter = painterResource(id = R.drawable.ironbot),
+                        painter = painterResource(id = if(modo == ModoJuego.BOT) R.drawable.ironbot else R.drawable.publicmatch), //pendiente cambiarlo cuando se tengan las públicas por la imagen de perfil del oponente
                         contentDescription = "Imagen del rival",
 
                         )
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            text = "Iron",
+                            text = if(modo == ModoJuego.BOT) "Iron" else PartidaActiva.datosPartida!!.oponente,
                             fontFamily = quattrocentoBold,
                             fontSize = 30.sp,
                             color = Color.Companion.White
                         )
-                        /*if (nombreOponente != "Iron") {
-                            Row(verticalAlignment = Alignment.Companion.CenterVertically) {
+                        if(modo != ModoJuego.BOT){
+                            Row{
                                 Image(
                                     painterResource(id = R.drawable.katanas),
                                     contentDescription = "Katanas",
-
-                                    modifier = Modifier.Companion
-                                        .size(30.dp)
+                                    modifier = Modifier.Companion.size(30.dp)
                                 )
                                 Text(
-                                    katanas.toString(),
+                                    PartidaActiva.datosPartida!!.oponentePt.toString(),
                                     color = Color.Companion.White,
                                     fontSize = 24.sp,
-                                    fontFamily = quattrocentoBold,
-                                    modifier = Modifier.Companion.padding(start = 4.dp)
-                                )
+                                    )
                             }
+                        }
 
-                        }*/
                     }
 
                     Button(
                         onClick = {
-                            //se cierra y se vuelve a la pantalla anterior (cuando consiga la comunicación api, añado la función cancelar búsqueda)
+                            //se cierra y se vuelve a la pantalla anterior (cuando consiga la comunicación api, añado la función abandonar)
 
                             (context as? Activity)?.finish()
                         },
@@ -291,24 +295,6 @@ class PartidaActivity: AppCompatActivity() {
                         estado = estado,
                         onCasillaClick = { pos -> viewModel.tocarCelda(pos) }
                     )
-                    if (estado.ganador != null) {
-                        AlertDialog(
-                            onDismissRequest = { /* No dejamos que lo cierre tocando fuera */ },
-                            title = { Text(text = "¡Partida Finalizada!") },
-                            text = {
-                                val mensaje = if (estado.ganador == EquipoID.ABAZUL) "¡Has ganado!" else "Ha ganado el Bot"
-                                Text(text = mensaje)
-                            },
-                            confirmButton = {
-                                Button(onClick = {
-                                    // Aquí deberías salir de la activity o reiniciar el ViewModel
-                                    (context as? Activity)?.finish()
-                                }) {
-                                    Text("Salir")
-                                }
-                            }
-                        )
-                    }
                 }
                 Row(
                     verticalAlignment = Alignment.Companion.Top,
@@ -479,8 +465,18 @@ class PartidaActivity: AppCompatActivity() {
 
 
     @Composable
-    fun GridTablero(estado: EstadoJuego, onCasillaClick: (Posicion) -> Unit){
+    fun GridTablero(estado: EstadoJuego, onCasillaClick: (Posicion) -> Unit) {
         val tamanoGrid = 7
+
+        // 1. ¿Quién es el jugador que tiene el móvil en la mano?
+        // Si juegas local (contra el bot), asumimos que el humano es el Azul.
+        val equipoLocal = remember {
+            PartidaActiva.datosPartida?.obtenerEquipoID() ?: EquipoID.AZUL
+        }
+
+        // 2. ¿Debemos girar la pantalla 180 grados?
+        val invertirPantalla = (equipoLocal == EquipoID.ROJO)
+
         Column(
             verticalArrangement = Arrangement.spacedBy(2.dp),
             modifier = Modifier.padding(4.dp)
@@ -489,30 +485,43 @@ class PartidaActivity: AppCompatActivity() {
                 Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
                     for (c in 0 until tamanoGrid) {
 
+                        // ⚡ LA MAGIA: Calculamos la coordenada real del tablero interno
+                        val logicaF = if (invertirPantalla) (6 - f) else f
+                        val logicaC = if (invertirPantalla) (6 - c) else c
+
+                        val posLogica = Posicion(logicaF, logicaC)
+                        val celda = estado.tablero[logicaF][logicaC]
+
                         Box(
                             modifier = Modifier
                                 .size(50.dp)
                                 .clip(RoundedCornerShape(5))
                                 .background(
                                     when {
-                                        estado.fichaSeleccionada == Posicion(f, c) -> Color.Yellow
-                                        estado.movimientosValidos.contains(Posicion(f, c)) -> Color.LightGray
-                                        estado.tablero[f][c].esTrono -> Color.DarkGray
+                                        estado.fichaSeleccionada == posLogica -> Color.Yellow
+                                        estado.movimientosValidos.contains(posLogica) -> Color.LightGray
+                                        celda.esTrono -> Color.DarkGray
                                         else -> Color.White.copy(alpha = 0.3f)
                                     }
                                 )
-                                .clickable { onCasillaClick(Posicion(f, c)) }
-                        ){
-                            if (estado.tablero[f][c].ficha != null) {
+                                // Mandamos SIEMPRE la posición lógica al ViewModel
+                                .clickable { onCasillaClick(posLogica) }
+                        ) {
+                            // Guardamos la ficha en una variable segura (Adiós a los !!)
+                            val ficha = celda.ficha
+
+                            if (ficha != null) {
                                 Image(
-                                    painter = when{
-                                        estado.tablero[f][c].ficha!!.esRey && estado.tablero[f][c].ficha!!.equipo == EquipoID.ARROJO -> painterResource(id = R.drawable.rey_rojo)
-                                        estado.tablero[f][c].ficha!!.esRey && estado.tablero[f][c].ficha!!.equipo == EquipoID.ABAZUL -> painterResource(id = R.drawable.rey_azul)
-                                        estado.tablero[f][c].ficha!!.equipo == EquipoID.ARROJO -> painterResource(id = R.drawable.peon_rojo)
+                                    painter = when {
+                                        ficha.esRey && ficha.equipo == EquipoID.ROJO -> painterResource(id = R.drawable.rey_rojo)
+                                        ficha.esRey && ficha.equipo == EquipoID.AZUL -> painterResource(id = R.drawable.rey_azul)
+                                        ficha.equipo == EquipoID.ROJO -> painterResource(id = R.drawable.peon_rojo)
                                         else -> painterResource(id = R.drawable.peon_azul)
                                     },
-                                    contentDescription = "Ficha ${estado.tablero[f][c].ficha!!.equipo}",
-                                    modifier = Modifier.fillMaxSize().padding(1.dp)
+                                    contentDescription = "Ficha ${ficha.equipo}",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(1.dp)
                                 )
                             }
                         }

@@ -14,8 +14,8 @@ enum class ModoJuego {
 }
 
 enum class EquipoID (val id: Int){
-    ARROJO(1),
-    ABAZUL(2)
+    ROJO(2),
+    AZUL(1);
 }
 
 data class Ficha(
@@ -80,10 +80,10 @@ fun crearTableroInicial(): List<List<Celda>> {
             if (fila == 0 || fila == DIM - 1){
                 val equipo: EquipoID
                 if (fila == 0){
-                    equipo = EquipoID.ARROJO
+                    equipo = EquipoID.ROJO
                 }
                 else {
-                    equipo = EquipoID.ABAZUL
+                    equipo = EquipoID.AZUL
                 }
                 ficha = Ficha(equipo, col == CENTRO)
             }
@@ -91,8 +91,8 @@ fun crearTableroInicial(): List<List<Celda>> {
                 ficha = ficha,
                 esTrono = esTronoSuperior || esTronoInferior,
                 equipoTrono = when {
-                    esTronoSuperior -> EquipoID.ARROJO
-                    esTronoInferior -> EquipoID.ABAZUL
+                    esTronoSuperior -> EquipoID.ROJO
+                    esTronoInferior -> EquipoID.AZUL
                     else -> null
                 }
             )
@@ -108,7 +108,7 @@ fun crearEstadoInicial(): EstadoJuego {
     val cartas = Cartas.selectRandomCards(7)
     return EstadoJuego(
         tablero = crearTableroInicial(),
-        turnoActual = EquipoID.ABAZUL,
+        turnoActual = EquipoID.AZUL,
         cartasJugador = listOf(cartas[0], cartas[1]),
         cartasOponente = listOf(cartas[2], cartas[3]),
         cartasSiguientes = listOf(cartas[4], cartas[5], cartas[6]),
@@ -124,18 +124,17 @@ fun crearEstadoInicial(): EstadoJuego {
  * Devuelve las casillas a las que puede moverse la ficha en (fila, col)
  * utilizando la carta dada.
  *
- *  - Equipo 2 (abajo)
- *  - Equipo 1 (arriba)
  */
 fun calcularMovimientosValidos (
     tablero: List<List<Celda>>,
     fila: Int,
     col: Int,
     cartaMov: Carta,
-    equipo: EquipoID
+    equipoFicha: EquipoID,
+    equipoPropio: EquipoID
 ): List<Posicion> {
     var signo: Int
-    if (equipo == EquipoID.ABAZUL) {
+    if (equipoFicha == equipoPropio){
         signo = 1
     }
     else {
@@ -151,7 +150,7 @@ fun calcularMovimientosValidos (
         if (nf < 0 || nf >= DIM || nc < 0 || nc>= DIM){
             continue
         }
-        if (tablero[nf][nc].ficha?.equipo == equipo){
+        if (tablero[nf][nc].ficha?.equipo == equipoFicha){
             continue
         }
 
@@ -229,11 +228,10 @@ fun crearEstadoServidor (
     cartas_jugador: List<Any>,
     cartas_oponente: List<Any>,
     carta_siguiente: List<Any>,
-    equipo: EquipoID?
 ): EstadoJuego {
     return EstadoJuego (
         tablero = crearTableroInicial(),
-        turnoActual = EquipoID.ARROJO,
+        turnoActual = EquipoID.AZUL,
         cartasJugador = cartas_jugador.map { convertirCarta(it) },
         cartasOponente = cartas_oponente.map { convertirCarta(it) },
         cartasSiguientes = carta_siguiente.map { convertirCarta(it) },
@@ -278,7 +276,7 @@ fun ejecutarMovimiento (
     origen: Posicion,
     destino: Posicion,
     carta: Carta,
-    equipoLocal: EquipoID = EquipoID.ABAZUL
+    equipoLocal: EquipoID = EquipoID.AZUL
 ): ResultadoMovimiento {
     val tablero = estado.tablero.map { fila ->
         fila.toMutableList()
@@ -295,8 +293,8 @@ fun ejecutarMovimiento (
 
     /** Victoria por trono: el rey llega al trono enemigo */
     val victoriaPorTrono = fichaMovida.esRey &&
-            ((fichaMovida.equipo == EquipoID.ABAZUL && destino.fila == 0 && destino.col == CENTRO) ||
-                    (fichaMovida.equipo == EquipoID.ARROJO && destino.fila == DIM - 1 && destino.col == CENTRO));
+            ((fichaMovida.equipo == equipoLocal && destino.fila == 0 && destino.col == CENTRO) ||
+                    (fichaMovida.equipo != equipoLocal && destino.fila == DIM - 1 && destino.col == CENTRO));
 
     /** El jugador recibe la primera carta de la cola; la carta usada va al final.*/
     val cartaRecibida = estado.cartasSiguientes[0]
@@ -330,7 +328,7 @@ fun ejecutarMovimiento (
 
     val nuevoEstado = estado.copy(
         tablero = tablero,
-        turnoActual = if (equipoActual == EquipoID.ARROJO) EquipoID.ABAZUL else EquipoID.ARROJO,
+        turnoActual = if (equipoActual == EquipoID.ROJO) EquipoID.AZUL else EquipoID.ROJO,
         cartasJugador = nuevasCartasJugador,
         cartasOponente = nuevasCartasOponente,
         cartasSiguientes = nuevasSiguientes,

@@ -48,6 +48,9 @@
         <activity
             android:name=".ui.activities.partida.PartidaActivity">
         </activity>
+        <activity
+            android:name=".ui.activities.Cartas_activity">
+        </activity>
 
 
     </application>
