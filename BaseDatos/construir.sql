@@ -1,3 +1,7 @@
+-- Skin base gratuita para todos los jugadores
+INSERT INTO Skin (Nombre, Precio, Color_tablero, Color_Fichas_Aliadas, Color_Fichas_Enemigas)
+VALUES ('Skin0', 0, 'DEFAULT', 'DEFAULT', 'DEFAULT');
+
 INSERT INTO Cartas_Mov (Nombre, Movimientos, Puntos_min) VALUES ('Tigre', '(0,-1),(0,2)',0);
 INSERT INTO Cartas_Mov (Nombre, Movimientos, Puntos_min) VALUES ('Dragon', '(-2,1),(-1,-1),(1,1),(2,1)',0);
 INSERT INTO Cartas_Mov (Nombre, Movimientos, Puntos_min) VALUES ('Rana', '(-1,1),(1,-1),(-2,0)',0);
