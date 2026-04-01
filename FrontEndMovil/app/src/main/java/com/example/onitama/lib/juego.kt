@@ -14,8 +14,8 @@ enum class ModoJuego {
 }
 
 enum class EquipoID (val id: Int){
-    ROJO(2),
-    AZUL(1);
+    ROJO(1),
+    AZUL(2);
 }
 
 data class Ficha(

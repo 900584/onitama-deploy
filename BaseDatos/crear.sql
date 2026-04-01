@@ -15,8 +15,8 @@ CREATE TABLE Jugador (
     Partidas_Ganadas INTEGER DEFAULT 0,
     Partidas_Jugadas INTEGER DEFAULT 0,
     Avatar_id VARCHAR(50),
-    Skin_Activa VARCHAR(50) NOT NULL DEFAULT 'Skin0'
-    FOREIGN KEY (Skin_Activa) REFERENCES Skin(Nombre);
+    Skin_Activa VARCHAR(50) NOT NULL DEFAULT 'Skin0',
+    FOREIGN KEY (Skin_Activa) REFERENCES Skin(Nombre)
 );
 
 

@@ -96,7 +96,7 @@ fun initZobrist() {
             i = i + 1 
         }
 
-        p = i + 1
+        p = p + 1
     }
     isZobristInitialized = true
 }
@@ -220,7 +220,7 @@ fun crearEstadoSim (
 
             if (fi != null) {
                 if (fi.esRey){
-                    if (fi.equipo == EquipoID.ROJO) {
+                    if (fi.equipo == EquipoID.ARROJO) {
                         board[toIndex(c, f)] = 3
                     } 
                     else {
@@ -228,7 +228,7 @@ fun crearEstadoSim (
                     }
                 }
                 else {
-                    if (fi.equipo == EquipoID.ROJO) {
+                    if (fi.equipo == EquipoID.ARROJO) {
                         board[toIndex(c, f)] = 1 
                     }
                     else {
@@ -510,7 +510,8 @@ fun esMovimientoGanadorInmediato (
         return true
     }
 
-     if (eq == 1 && fromPiece == 3 && j.destinoX == CENTRO && j.destinoY == 0) {
+    // Habia un problema, solo se analizaba para un equipo
+    if (eq == 2 && fromPiece == 4 && j.destinoX == CENTRO && j.destinoY == 0) {
         return true
     }
 
@@ -709,7 +710,7 @@ fun scoreMove (
     eq: Int,
     hashMove: JugadaSim?
 ) : Int {
-    if (hashMove  != null && m.carta.nombre == hashMove.carta.nombre && m.destinoX == hashMove.destinoX && m.destinoY == hashMove.destinoY && m.origenX === hashMove.origenX) {
+    if (hashMove  != null && m.carta.nombre == hashMove.carta.nombre && m.destinoX == hashMove.destinoX && m.destinoY == hashMove.destinoY && m.origenX == hashMove.origenX) {
         return 1000000 // Prioridad absoluta al PV (Principal Variation) de la pasada anterior
     }
 
@@ -935,7 +936,7 @@ fun calcularMejorMovimientoIA (
     var globalBestMove: JugadaSim? = null
     var maxDepthReached = 0
 
-    val rivalEq = if (equipoIA.id == 1) EquipoID.AZUL else EquipoID.ROJO
+    val rivalEq = if (equipoIA.id == 1) EquipoID.ABAZUL else EquipoID.ARROJO
 
     // ITERATIVE DEEPENING
     // Limitamos a Profundidad Maxima 15 para evitar loops infinitos teóricos, pero el tiempo cortará antes
