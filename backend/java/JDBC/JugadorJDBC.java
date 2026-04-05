@@ -31,7 +31,7 @@ public final class JugadorJDBC{
     }
     
     public boolean registrarse(Jugador jugador) throws SQLException {
-        final String sql = "INSERT INTO Jugador (Correo, Nombre_US, Contrasena_Hash, Puntos, Cores, Partidas_Ganadas, Partidas_Jugadas) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        final String sql = "INSERT INTO Jugador (Correo, Nombre_US, Contrasena_Hash, Puntos, Cores, Partidas_Ganadas, Partidas_Jugadas, avatar_id, skin_activa) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
         try (Connection conn = dataSource.getConnection();
             PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -43,16 +43,21 @@ public final class JugadorJDBC{
             ps.setInt(5, jugador.getCores());
             ps.setInt(6, jugador.getPartidasGanadas());
             ps.setInt(7, jugador.getPartidasJugadas());
+            // NUEVO PARA AVATAR Y  SKIN
+            ps.setString(8, jugador.getAvatarId());
+            ps.setString(9, jugador.getSkinActiva());
             int filasAfectadas = ps.executeUpdate();
             return filasAfectadas > 0;
             
         } catch (SQLException e) {
+            e.printStackTrace(); // ESTO TE DIRÁ EL ERROR REAL
             return false; // Si hay una excepción, asumimos que no se creó
         }
     }
 
     public Jugador buscarJugador(String nombreUS) throws SQLException {
-        final String sql = "SELECT Correo, Nombre_US, Contrasena_Hash, Puntos, Cores, Partidas_Ganadas, Partidas_Jugadas FROM Jugador WHERE Nombre_US = ?";
+        // añadido avatar y skin
+        final String sql = "SELECT Correo, Nombre_US, Contrasena_Hash, Puntos, Cores, Partidas_Ganadas, Partidas_Jugadas, avatar_id, skin_activa FROM Jugador WHERE Nombre_US = ?";
         try (Connection conn = dataSource.getConnection();
             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, nombreUS);
@@ -153,6 +158,31 @@ public final class JugadorJDBC{
         }
     }
 
+    // nuevos updates para avtar y skin
+    public boolean updateAvatar(String nombreUS, String nuevoAvatarId) throws SQLException {
+        try(Connection c = dataSource.getConnection();
+            PreparedStatement p = c.prepareStatement("UPDATE Jugador SET avatar_id = ? WHERE Nombre_US = ?")) {
+            p.setString(1, nuevoAvatarId);
+            p.setString(2, nombreUS);
+            p.executeUpdate();
+            return true;
+        }catch (SQLException e) {
+            return false; // Si hay una excepción, asumimos que no se creó
+        }
+    }
+
+    public boolean updateSkinActiva(String nombreUS, String nuevaSkin) throws SQLException {
+        try(Connection c = dataSource.getConnection();
+             PreparedStatement p = c.prepareStatement("UPDATE Jugador SET skin_activa = ? WHERE Nombre_US = ?")) {
+            p.setString(1, nuevaSkin);
+            p.setString(2, nombreUS);
+            p.executeUpdate();
+            return true;
+        }catch (SQLException e) {
+            return false; // Si hay una excepción, asumimos que no se actualizó
+        }
+    }
+
     /**
      * Inserta una amistad aceptada. Las solicitudes se gestionan en Notificaciones.
      * Mantiene Jugador_1 < Jugador_2 para consistencia.
@@ -187,7 +217,8 @@ public final class JugadorJDBC{
     }
 
     public List<Jugador> sacarAmigos(String nombreUS) throws SQLException {
-        final String sql = "SELECT DISTINCT j.Correo, j.Nombre_US, j.Contrasena_Hash, j.Puntos, j.Cores, j.Partidas_Ganadas, j.Partidas_Jugadas FROM Jugador j, Amistades a WHERE (j.Nombre_US = a.Jugador_1 AND a.Jugador_2 = ?) OR (j.Nombre_US = a.Jugador_2 AND a.Jugador_1 = ?)";
+        // añadido avatar y skin
+        final String sql = "SELECT DISTINCT j.Correo, j.Nombre_US, j.Contrasena_Hash, j.Puntos, j.Cores, j.Partidas_Ganadas, j.Partidas_Jugadas, j.avatar_id, j.skin_activa FROM Jugador j, Amistades a WHERE (j.Nombre_US = a.Jugador_1 AND a.Jugador_2 = ?) OR (j.Nombre_US = a.Jugador_2 AND a.Jugador_1 = ?)";
 
         List<Jugador> amigos = new ArrayList<>();
 
@@ -271,7 +302,10 @@ public final class JugadorJDBC{
             rs.getInt("Puntos"),
             rs.getInt("Cores"),
             rs.getInt("Partidas_Ganadas"),
-            rs.getInt("Partidas_Jugadas")
+            rs.getInt("Partidas_Jugadas"),
+            // añadido avatar y skin
+            rs.getString("avatar_id"),
+            rs.getString("skin_activa")
         );
     }
 }

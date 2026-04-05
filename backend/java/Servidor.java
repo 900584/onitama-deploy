@@ -43,15 +43,25 @@ import java.util.Comparator;
 // -> Reanudar/Pausar una partida privada: PRIORIDAD MEDIA (Antes hay que hacer lo anterior)
 // -> Cartas de Accion: PRIORIDAD BAJA (No lo necesitamos para la primera entrega)
 
+
+// NOTAS: 
+
+// gestionarBusquedaPartida crea InfoJugador sin avatarId porque en el momento no tiene
+// el objeto jugador, entonces podemos o pasarle null o hacer una consulta para saber su avatar.
+// lo he dejado comentado lo que sería una consulta en gestionarBsquedaPartida.
+
 class InfoJugador {
     WebSocket ws;
     String nombre;
     int puntos;
+    //nuevo 
+    String avatarId;
 
-    public InfoJugador(WebSocket w, String nom, int pt) {
+    public InfoJugador(WebSocket w, String nom, int pt, String avatar) {
         ws = w;
         nombre = nom;
         puntos = pt;
+        avatarId = avatar;
     }
 }
 
@@ -157,6 +167,8 @@ public class Servidor extends WebSocketServer {
         msg1.put("cartas_jugador", mazoJ1);
         msg1.put("cartas_oponente", mazoJ2);
         msg1.put("carta_siguiente", cola);
+        // nuevo
+        msg1.put("oponente_avatar_id", pj.p2.avatarId);
 
         JSONObject msg2 = new JSONObject(); // al que le emparejan a j1
         msg2.put("tipo", msgTipoPartida);
@@ -167,6 +179,8 @@ public class Servidor extends WebSocketServer {
         msg2.put("cartas_jugador", mazoJ2);
         msg2.put("cartas_oponente", mazoJ1);
         msg2.put("carta_siguiente", cola);
+        // nuevo
+        msg2.put("oponente_avatar_id", pj.p1.avatarId);
 
         pj.p1.ws.send(msg1.toString());
         pj.p2.ws.send(msg2.toString());
@@ -188,6 +202,15 @@ public class Servidor extends WebSocketServer {
         String nombre = obj.getString("nombre");
         int puntos = obj.getInt("puntos");
 
+            // consultamos la base para obtener el avatarId del jugador
+            String avatarId = null;
+            try {
+                Jugador j = new JugadorJDBC().buscarJugador(nombre);
+                if (j != null) avatarId = j.getAvatarId();
+            } catch (SQLException e) {
+                System.err.println("Error al obtener avatarId en búsqueda: " + e.getMessage());
+            }
+
         InfoJugador oponente = null;
         Pareja pj = null;
 
@@ -205,7 +228,7 @@ public class Servidor extends WebSocketServer {
             // if gestiona caso de match y else si no ha habido match
             if (oponente != null) {
                 buscando_partida.remove(oponente);
-                InfoJugador nuevoJugador = new InfoJugador(conn, nombre, puntos);
+                InfoJugador nuevoJugador = new InfoJugador(conn, nombre, puntos, avatarId);
                 pj = new Pareja(oponente, nuevoJugador, "PUBLICA");
 
                 try {
@@ -218,7 +241,7 @@ public class Servidor extends WebSocketServer {
                 }
 
             } else {
-                InfoJugador jugador = new InfoJugador(conn, nombre, puntos);
+                InfoJugador jugador = new InfoJugador(conn, nombre, puntos, avatarId);
                 buscando_partida.add(jugador);
                 System.out.println(nombre + " está esperando a unirse a una partida.");
                 hilos.submit(() -> {
@@ -485,7 +508,8 @@ public class Servidor extends WebSocketServer {
                     mutexConectados.acquire();
                     // Inicialmente sí se registra con 0 puntos, pero si inicia sesión, tienen que
                     // ser j.getPuntos(), no?
-                    conectados.add(new InfoJugador(conn, nombre, j.getPuntos())); // Inicialmente el jugador se registra
+                    // nuevo
+                    conectados.add(new InfoJugador(conn, nombre, j.getPuntos(), j.getAvatarId())); // Inicialmente el jugador se registra
                                                                                   // con 0 puntos
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -500,6 +524,9 @@ public class Servidor extends WebSocketServer {
                 msg.put("partidas_ganadas", j.getPartidasGanadas());
                 msg.put("partidas_jugadas", j.getPartidasJugadas());
                 msg.put("cores", j.getCores());
+                // nuevo
+                msg.put("skin_activa", j.getSkinActiva());
+                msg.put("avatar_id", j.getAvatarId());
                 conn.send(msg.toString());
 
                 // no hemos considerado que mientras el jugador esté desconectado, no le llegan
@@ -810,12 +837,16 @@ public class Servidor extends WebSocketServer {
         String correo = obj.getString("correo");
         String nombre = obj.getString("nombre");
         String contrasena = obj.getString("password");
-        Jugador prueba = new Jugador(correo, nombre, contrasena); // El constructor ya hashea la contraseña internamente
+
+        // nuevo añadimos avatar a la hora de registrar (skin no, va por defecto en inserción en base de datos)
+        // y añadimos campo avatar al constructor
+        String avatar_id = obj.getString("avatar_id");
+        Jugador prueba = new Jugador(correo, nombre, contrasena, avatar_id); // El constructor ya hashea la contraseña internamente
         if (prueba.registrarse() && !estaConectado(nombre)) {
             System.out.println("Jugador registrado");
             try {
                 mutexConectados.acquire();
-                conectados.add(new InfoJugador(conn, nombre, 0)); // Inicialmente el jugador se registra con 0 puntos
+                conectados.add(new InfoJugador(conn, nombre, 0, avatar_id)); // Inicialmente el jugador se registra con 0 puntos
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {
@@ -862,6 +893,7 @@ public class Servidor extends WebSocketServer {
                 JSONObject info = new JSONObject();
                 info.put("nombre", j.getNombre());
                 info.put("puntos", j.getPuntos());
+                info.put("avatar_id", j.getAvatarId());
                 infoJugadores.put(info);
             }
 
@@ -892,6 +924,7 @@ public class Servidor extends WebSocketServer {
                 JSONObject info = new JSONObject();
                 info.put("nombre", j.getNombre());
                 info.put("puntos", j.getPuntos());
+                info.put("avatar_id", j.getAvatarId());
                 infoJugadores.put(info);
             }
 
@@ -1090,6 +1123,13 @@ public class Servidor extends WebSocketServer {
                 solicitarPartidas(conn, obj, "PRIVADA");
             } else if (tipoMSG.equals("OBTENER_CARTAS")) {
                 obtenerCartas(conn, obj);
+            // AÑADIMOS SOLICITUD DE PAUSA DE PARTIDA
+            } else if (tipoMSG.equals("SOLICITAR_PAUSA")) {
+                gestionarSolicitudPausa(conn, obj);
+            } else if (tipoMSG.equals("ACEPTAR_PAUSA")) {
+                gestionarRespuestaPausa(conn, obj, true);
+            } else if (tipoMSG.equals("RECHAZAR_PAUSA")) {
+                gestionarRespuestaPausa(conn, obj, false);
             }
         });
     }
@@ -1120,6 +1160,9 @@ public class Servidor extends WebSocketServer {
             msg.put("partidas_ganadas", j.getPartidasGanadas());
             msg.put("partidas_jugadas", j.getPartidasJugadas());
             msg.put("cores", j.getCores());
+            // nuevo
+            msg.put("skin_activa", j.getSkinActiva());
+            msg.put("avatar_id", j.getAvatarId());
             System.out.println("PERFIL_ACTUALIZADO enviado -> " + nombre
                     + " | puntos=" + j.getPuntos()
                     + " | cores=" + j.getCores()
@@ -1149,6 +1192,89 @@ public class Servidor extends WebSocketServer {
         } catch (SQLException e) {
             System.err.println("Error al obtener cartas: " + e.getMessage());
             conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
+        }
+    }
+
+    private void gestionarSolicitudPausa(WebSocket conn, JSONObject obj) {
+        try {
+            String remitente = obj.getString("remitente");
+            String destinatario = obj.getString("destinatario");
+            int idPartida = obj.getInt("idPartida");
+
+            GestorNotificaciones gestor = new GestorNotificaciones();
+            int idNotif = gestor.enviarSolicitudPausa(remitente, destinatario, idPartida);
+
+            WebSocket wsDestino = buscarConexion(destinatario);
+            if (wsDestino != null && wsDestino.isOpen()) {
+                JSONObject aviso = new JSONObject();
+                aviso.put("tipo", "SOLICITUD_PAUSA");
+                aviso.put("remitente", remitente);
+                aviso.put("idNotificacion", idNotif);
+                wsDestino.send(aviso.toString());
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error al gestionar solicitud de pausa: " + e.getMessage());
+        }
+    }
+
+    private Pareja buscarParejaPorNombre(String nombre) {
+        try {
+            mutexParejas.acquire();
+            for (Pareja pj : parejas) {
+                if (pj.p1.nombre.equals(nombre) || pj.p2.nombre.equals(nombre)) {
+                    return pj;
+                }
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            mutexParejas.release();
+        }
+        return null;
+    }
+
+    private void gestionarRespuestaPausa(WebSocket conn, JSONObject obj, boolean aceptar) {
+        try {
+            int idNotificacion = obj.getInt("idNotificacion");
+            String nombreQuienResponde = obj.getString("nombre");
+
+            NotificacionJDBC notifJdbc = new NotificacionJDBC();
+            Notificacion notif = notifJdbc.obtenerPorId(idNotificacion);
+            if (notif == null) return;
+
+            GestorNotificaciones gestor = new GestorNotificaciones();
+
+            if (aceptar) {
+                boolean ok = gestor.aceptarNotificacion(idNotificacion, nombreQuienResponde);
+                if (ok) {
+                    Pareja pj = buscarParejaPorNombre(notif.getRemitente());
+                    if (pj == null) pj = buscarParejaPorNombre(notif.getDestinatario());
+                    if (pj != null) {
+                        pj.partida.actualizarBD(); // guardamos tablero, cartas y turno
+                        try {
+                            mutexParejas.acquire();
+                            parejas.remove(pj); // liberamos de memoria
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        } finally {
+                            mutexParejas.release();
+                        }
+                        JSONObject msg = new JSONObject().put("tipo", "PARTIDA_PAUSADA");
+                        pj.p1.ws.send(msg.toString());
+                        pj.p2.ws.send(msg.toString());
+                    }
+                }
+            } else {
+                gestor.rechazarNotificacion(idNotificacion, nombreQuienResponde);
+                WebSocket wsRemitente = buscarConexion(notif.getRemitente());
+                if (wsRemitente != null && wsRemitente.isOpen()) {
+                    wsRemitente.send(new JSONObject().put("tipo", "PAUSA_RECHAZADA").toString());
+                }
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error al gestionar respuesta de pausa: " + e.getMessage());
         }
     }
 

@@ -12,6 +12,10 @@ import gestor.GestorNotificaciones;
 public class Jugador {
     private String nombre, password, correo;
     private int puntos, cores, partidasGanadas, partidasJugadas;
+    // NUEVOS ATRIBUTOS: AVATAR Y SKIN ACTUAL
+    private String avatarId; 
+    private String skinActiva;
+
     private List<Jugador> amigos;
     private List<Notificacion> notificacionesPendientes;
     private List<Skin> misSkines;
@@ -20,7 +24,7 @@ public class Jugador {
     
     //Constructor necesario para la BD (usado por JugadorJDBC.montarJugador)
     //IMPORTANTE: Este constructor espera que la contraseña YA esté hasheada
-    public Jugador(String correo, String nombre, String passwordHash, int puntos, int cores, int partidasGanadas, int partidasJugadas){
+    public Jugador(String correo, String nombre, String passwordHash, int puntos, int cores, int partidasGanadas, int partidasJugadas, String avatarId, String skinActiva){
         this.correo = correo;
         this.nombre = nombre;
         this.password = passwordHash; // Ya está hasheada con BCrypt
@@ -28,6 +32,10 @@ public class Jugador {
         this.cores = cores;
         this.partidasGanadas = partidasGanadas;
         this.partidasJugadas = partidasJugadas;
+        // NUEVO: ASIGNAMOS AVATAR Y SKIN
+        this.avatarId = avatarId;      
+        this.skinActiva = skinActiva;
+
         amigos = new ArrayList<>();
         notificacionesPendientes = new ArrayList<>();
         misSkines = new ArrayList<>();
@@ -37,8 +45,9 @@ public class Jugador {
     
     //Constructor simplificado para registro (valores por defecto)
     //IMPORTANTE: Este constructor espera la contraseña en texto plano y la hashea automáticamente
-    public Jugador(String correo, String nombre, String passwordTextoPlano){
-        this(correo, nombre, Autenticacion.hashearPassword(passwordTextoPlano), 0, 0, 0, 0);
+    // añadidos avatarId y skin0 por defecto
+    public Jugador(String correo, String nombre, String passwordTextoPlano, String avatarId){
+        this(correo, nombre, Autenticacion.hashearPassword(passwordTextoPlano), 0, 0, 0, 0, avatarId, "Skin0");
     }
 
     public boolean registrarse(){
@@ -282,6 +291,24 @@ public class Jugador {
         }
         this.cores += coresGanados;
         actualizarBD();
+    }
+
+    // GETTERS Y SETTERS NUEVOS
+
+    public String getAvatarId() {
+        return avatarId;
+    }
+
+    public void setAvatarId(String avatarId) {
+        this.avatarId = avatarId;
+    }
+
+    public String getSkinActiva() {
+        return skinActiva;
+    }
+
+    public void setSkinActiva(String skinActiva) {
+        this.skinActiva = skinActiva;
     }
     
 }
