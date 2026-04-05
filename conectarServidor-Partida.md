@@ -231,6 +231,45 @@ Se envía cuando el jugador rechaza una invitación a partida privada.
 
 ---
 
+### 2.2.3 Pausa y reanudación de partida privada
+
+#### `SOLICITAR_PAUSA`
+Se envía cuando un jugador quiere pausar la partida. El destinatario es el rival.
+```json
+{
+  "tipo": "SOLICITAR_PAUSA",
+  "remitente": "Iron",
+  "destinatario": "Taisen",
+  "idPartida": 123
+}
+```
+
+---
+
+#### `ACEPTAR_PAUSA`
+Se envía cuando el rival acepta la solicitud de pausa. El `idNotificacion` llega en el mensaje `SOLICITUD_PAUSA` del servidor.
+```json
+{
+  "tipo": "ACEPTAR_PAUSA",
+  "idNotificacion": 47,
+  "nombre": "Taisen"
+}
+```
+
+---
+
+#### `RECHAZAR_PAUSA`
+Se envía cuando el rival rechaza la solicitud de pausa.
+```json
+{
+  "tipo": "RECHAZAR_PAUSA",
+  "idNotificacion": 47,
+  "nombre": "Taisen"
+}
+```
+
+---
+
 ### 2.2.2 Historial de partidas (publicas y privadas)
 
 #### `SOLICITAR_PARTIDAS_PRIV`
@@ -706,6 +745,40 @@ Se envía al remitente cuando el temporizador de 2 minutos expira sin que el des
 ```json
 {
   "tipo": "ERROR_NO_UNIDO"
+}
+```
+
+---
+
+### 2.3.2 Pausa y reanudación de partida privada
+
+#### `SOLICITUD_PAUSA`
+Se envía al rival cuando un jugador solicita pausar la partida.
+```json
+{
+  "tipo": "SOLICITUD_PAUSA",
+  "remitente": "Iron",
+  "idNotificacion": 47
+}
+```
+
+---
+
+#### `PARTIDA_PAUSADA`
+Se envía a ambos jugadores cuando el rival acepta la pausa. El frontend debe volver al menú principal.
+```json
+{
+  "tipo": "PARTIDA_PAUSADA"
+}
+```
+
+---
+
+#### `PAUSA_RECHAZADA`
+Se envía al jugador que solicitó la pausa cuando el rival la rechaza.
+```json
+{
+  "tipo": "PAUSA_RECHAZADA"
 }
 ```
 
