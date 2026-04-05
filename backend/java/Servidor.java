@@ -69,6 +69,18 @@ class Pareja {
     InfoJugador p1, p2;
     Partida partida;
 
+    // NUEVO
+    // constructor para reanudar partidas pausadas, y así en lugar de crear
+    // una partida nueva en BD, recibe Partida ya cargada desde la base en 
+    // gestionarRespuestaReanudar y la asigna directamente.
+    // Así los dos jugadores vuelven a estar emparejados en memoria con su
+    // partida guardada, sin tocar la base ni reasignar cartas.
+    public Pareja(InfoJugador _p1, InfoJugador _p2, Partida partidaExistente) {
+        p1 = _p1;
+        p2 = _p2;
+        partida = partidaExistente;
+    }
+
     public Pareja(InfoJugador _p1, InfoJugador _p2, String tipo) {
         p1 = _p1;
         p2 = _p2;
@@ -120,7 +132,9 @@ public class Servidor extends WebSocketServer {
     // evitando que se mande ERROR_NO_UNIDO cuando ya no hace falta.
     // El <?> indica que no nos importa el tipo de retorno de la tarea, porque solo
     // vamos a cancelarla.
+    // NUEVO: AÑADIMOS SEGUNDO MAPA DE TIMERS PARA PODER REANUDAR PARTIDAS
     private Map<Integer, ScheduledFuture<?>> timersInvitacion = new ConcurrentHashMap<>();
+    private Map<Integer, ScheduledFuture<?>> timersReanudar = new ConcurrentHashMap<>();
 
     private void cartasPartida(Pareja pj, JSONArray mazoJ1, JSONArray mazoJ2, JSONArray cola) {
         List<CartaMov> cartas = pj.partida.getCartasMovimiento();
@@ -1123,13 +1137,21 @@ public class Servidor extends WebSocketServer {
                 solicitarPartidas(conn, obj, "PRIVADA");
             } else if (tipoMSG.equals("OBTENER_CARTAS")) {
                 obtenerCartas(conn, obj);
-            // AÑADIMOS SOLICITUD DE PAUSA DE PARTIDA
+            // AÑADIMOS SOLICITUD DE PAUSA DE PARTIDA Y DE REANUDAR
+            // EN MENSAJES ACEPTAR/RECHAZAR HE AÑADIDO UN PARÁMETRO MÁS
+            // POR GESTIONARLO EN UN MISMO MÉTODO Y NO TENER QUE HACER DOS
             } else if (tipoMSG.equals("SOLICITAR_PAUSA")) {
                 gestionarSolicitudPausa(conn, obj);
             } else if (tipoMSG.equals("ACEPTAR_PAUSA")) {
                 gestionarRespuestaPausa(conn, obj, true);
             } else if (tipoMSG.equals("RECHAZAR_PAUSA")) {
                 gestionarRespuestaPausa(conn, obj, false);
+            } else if (tipoMSG.equals("SOLICITAR_REANUDAR")) {
+                gestionarSolicitudReanudar(conn, obj);
+            } else if (tipoMSG.equals("ACEPTAR_REANUDAR")) {
+                gestionarRespuestaReanudar(conn, obj, true);
+            } else if (tipoMSG.equals("RECHAZAR_REANUDAR")) {
+                gestionarRespuestaReanudar(conn, obj, false);
             }
         });
     }
@@ -1211,6 +1233,7 @@ public class Servidor extends WebSocketServer {
                 aviso.put("remitente", remitente);
                 aviso.put("idNotificacion", idNotif);
                 wsDestino.send(aviso.toString());
+                System.out.println("Solicitud pausa: " + remitente + " -> " + destinatario + " (partida " + idPartida + ")");
             }
 
         } catch (SQLException e) {
@@ -1263,11 +1286,13 @@ public class Servidor extends WebSocketServer {
                         JSONObject msg = new JSONObject().put("tipo", "PARTIDA_PAUSADA");
                         pj.p1.ws.send(msg.toString());
                         pj.p2.ws.send(msg.toString());
+                        System.out.println("Partida " + pj.partida.getIDPartida() + " pausada.");
                     }
                 }
             } else {
                 gestor.rechazarNotificacion(idNotificacion, nombreQuienResponde);
                 WebSocket wsRemitente = buscarConexion(notif.getRemitente());
+                System.out.println("Pausa rechazada por " + notif.getDestinatario());
                 if (wsRemitente != null && wsRemitente.isOpen()) {
                     wsRemitente.send(new JSONObject().put("tipo", "PAUSA_RECHAZADA").toString());
                 }
@@ -1275,6 +1300,134 @@ public class Servidor extends WebSocketServer {
 
         } catch (SQLException e) {
             System.err.println("Error al gestionar respuesta de pausa: " + e.getMessage());
+        }
+    }
+
+    private void gestionarSolicitudReanudar(WebSocket conn, JSONObject obj) {
+        try {
+            String remitente = obj.getString("remitente");
+            String destinatario = obj.getString("destinatario");
+            int idPartida = obj.getInt("idPartida");
+
+            WebSocket wsB = buscarConexion(destinatario);
+            if (wsB == null || !wsB.isOpen()) {
+                conn.send(new JSONObject().put("tipo", "ERROR_DESCONECTADO").toString());
+                return;
+            }
+
+            GestorNotificaciones gestor = new GestorNotificaciones();
+            int idNotif = gestor.enviarSolicitudReanudar(remitente, destinatario, idPartida);
+
+            JSONObject aviso = new JSONObject();
+            aviso.put("tipo", "SOLICITUD_REANUDAR");
+            aviso.put("remitente", remitente);
+            aviso.put("idNotificacion", idNotif);
+            aviso.put("idPartida", idPartida);
+            wsB.send(aviso.toString());
+
+            // timer de los 2 minutos esperando a que el amigo se una, como en partida privada desde 0
+            final int idNotifFinal = idNotif;
+            ScheduledFuture<?>[] timer = new ScheduledFuture<?>[1];
+            timer[0] = temporizador.schedule(() -> {
+                timersReanudar.remove(idNotifFinal);
+                WebSocket wsA = buscarConexion(remitente);
+                if (wsA != null && wsA.isOpen()) {
+                    wsA.send(new JSONObject().put("tipo", "ERROR_NO_UNIDO").toString());
+                }
+            }, 2, TimeUnit.MINUTES);
+
+            timersReanudar.put(idNotif, timer[0]);
+            System.out.println("Solicitud reanudar: " + remitente + " -> " + destinatario + " (notif " + idNotif + ")");
+
+        } catch (SQLException e) {
+            System.err.println("Error al gestionar solicitud de reanudar: " + e.getMessage());
+        }
+    }
+
+    private void gestionarRespuestaReanudar(WebSocket conn, JSONObject obj, boolean aceptar) {
+        try {
+            int idNotificacion = obj.getInt("idNotificacion");
+            String nombreQuienResponde = obj.getString("nombre");
+
+            // Cancelar timer
+            ScheduledFuture<?> timer = timersReanudar.remove(idNotificacion);
+            if (timer != null) timer.cancel(false);
+
+            NotificacionJDBC notifJdbc = new NotificacionJDBC();
+            Notificacion notif = notifJdbc.obtenerPorId(idNotificacion);
+            if (notif == null) return;
+
+            GestorNotificaciones gestor = new GestorNotificaciones();
+
+            if (aceptar) {
+                boolean ok = gestor.aceptarNotificacion(idNotificacion, nombreQuienResponde);
+                if (ok) {
+                    // cargamos partida de la base
+                    PartidaJDBC partidaJdbc = new PartidaJDBC();
+                    Partida partidaGuardada = partidaJdbc.buscarPorId(notif.getIdPartida());
+                    if (partidaGuardada == null) return;
+
+                    // volvemos a hacer la pareja para meterlos al juego
+                    // pero la creamos para que no haga partida nueva sino que use la existente
+                    InfoJugador j1 = buscarJugadorConectado(notif.getRemitente());
+                    InfoJugador j2 = buscarJugadorConectado(notif.getDestinatario());
+                    Pareja pj = new Pareja(j1, j2, partidaGuardada);
+                    try {
+                        mutexParejas.acquire();
+                        parejas.add(pj);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } finally {
+                        mutexParejas.release();
+                    }
+
+                    // PARTIDA_PRIVADA_ENCONTRADA con el tablero guardado
+                    JSONArray mazoJ1 = new JSONArray();
+                    JSONArray mazoJ2 = new JSONArray();
+                    JSONArray cola = new JSONArray();
+                    cartasPartida(pj, mazoJ1, mazoJ2, cola);
+
+                    JSONObject msg1 = new JSONObject();
+                    msg1.put("tipo", "PARTIDA_PRIVADA_ENCONTRADA");
+                    msg1.put("partida_id", partidaGuardada.getIDPartida());
+                    msg1.put("equipo", 1);
+                    msg1.put("oponente", j2.nombre);
+                    msg1.put("oponentePt", j2.puntos);
+                    msg1.put("oponente_avatar_id", j2.avatarId);
+                    msg1.put("cartas_jugador", mazoJ1);
+                    msg1.put("cartas_oponente", mazoJ2);
+                    msg1.put("carta_siguiente", cola);
+                    msg1.put("tablero_eq1", partidaGuardada.getPos_Fichas_Eq1());
+                    msg1.put("tablero_eq2", partidaGuardada.getPos_Fichas_Eq2());
+
+                    JSONObject msg2 = new JSONObject();
+                    msg2.put("tipo", "PARTIDA_PRIVADA_ENCONTRADA");
+                    msg2.put("partida_id", partidaGuardada.getIDPartida());
+                    msg2.put("equipo", 2);
+                    msg2.put("oponente", j1.nombre);
+                    msg2.put("oponentePt", j1.puntos);
+                    msg2.put("oponente_avatar_id", j1.avatarId);
+                    msg2.put("cartas_jugador", mazoJ2);
+                    msg2.put("cartas_oponente", mazoJ1);
+                    msg2.put("carta_siguiente", cola);
+                    msg2.put("tablero_eq1", partidaGuardada.getPos_Fichas_Eq1());
+                    msg2.put("tablero_eq2", partidaGuardada.getPos_Fichas_Eq2());
+
+                    j1.ws.send(msg1.toString());
+                    j2.ws.send(msg2.toString());
+                    System.out.println("Partida " + partidaGuardada.getIDPartida() + " reanudada: " + notif.getRemitente() + " VS " + notif.getDestinatario());
+                }
+            } else {
+                gestor.rechazarNotificacion(idNotificacion, nombreQuienResponde);
+                WebSocket wsRemitente = buscarConexion(notif.getRemitente());
+                if (wsRemitente != null && wsRemitente.isOpen()) {
+                    wsRemitente.send(new JSONObject().put("tipo", "ERROR_NO_UNIDO").toString());
+                }
+                System.out.println("Reanudar rechazado por " + notif.getDestinatario());
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Error al gestionar respuesta de reanudar: " + e.getMessage());
         }
     }
 

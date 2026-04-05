@@ -231,7 +231,7 @@ Se envía cuando el jugador rechaza una invitación a partida privada.
 
 ---
 
-### 2.2.3 Pausa y reanudación de partida privada
+### 2.2.2 Pausa y reanudación de partida privada
 
 #### `SOLICITAR_PAUSA`
 Se envía cuando un jugador quiere pausar la partida. El destinatario es el rival.
@@ -270,7 +270,44 @@ Se envía cuando el rival rechaza la solicitud de pausa.
 
 ---
 
-### 2.2.2 Historial de partidas (publicas y privadas)
+#### `SOLICITAR_REANUDAR`
+Se envía cuando un jugador quiere reanudar una partida pausada. El destinatario es el rival.
+```json
+{
+  "tipo": "SOLICITAR_REANUDAR",
+  "remitente": "Iron",
+  "destinatario": "Taisen",
+  "idPartida": 123
+}
+```
+
+---
+
+#### `ACEPTAR_REANUDAR`
+Se envía cuando el rival acepta la solicitud de reanudar. El `idNotificacion` llega en el mensaje `SOLICITUD_REANUDAR` del servidor.
+```json
+{
+  "tipo": "ACEPTAR_REANUDAR",
+  "idNotificacion": 47,
+  "nombre": "Taisen"
+}
+```
+
+---
+
+#### `RECHAZAR_REANUDAR`
+Se envía cuando el rival rechaza la solicitud de reanudar.
+```json
+{
+  "tipo": "RECHAZAR_REANUDAR",
+  "idNotificacion": 47,
+  "nombre": "Taisen"
+}
+```
+
+---
+
+### 2.2.3 Historial de partidas (publicas y privadas)
 
 #### `SOLICITAR_PARTIDAS_PRIV`
 Se envía para pedir el historial de partidas privadas contra un amigo concreto.
@@ -781,6 +818,41 @@ Se envía al jugador que solicitó la pausa cuando el rival la rechaza.
   "tipo": "PAUSA_RECHAZADA"
 }
 ```
+
+---
+
+#### `SOLICITUD_REANUDAR`
+Se envía al rival cuando un jugador solicita reanudar la partida pausada.
+```json
+{
+  "tipo": "SOLICITUD_REANUDAR",
+  "remitente": "Iron",
+  "idNotificacion": 47,
+  "idPartida": 123
+}
+```
+
+---
+
+#### `PARTIDA_PRIVADA_ENCONTRADA` (versión de reanudación!)
+Se envía a ambos jugadores cuando el rival acepta reanudar. Igual que en una partida privada nueva pero con `tablero_eq1` y `tablero_eq2` para reconstruir el estado del tablero pausado.
+```json
+{
+  "tipo": "PARTIDA_PRIVADA_ENCONTRADA",
+  "partida_id": 123,
+  "equipo": 1,
+  "oponente": "Taisen",
+  "oponentePt": 980,
+  "oponente_avatar_id": "avatar_04",
+  "cartas_jugador": [],
+  "cartas_oponente": [],
+  "carta_siguiente": [],
+  "tablero_eq1": "[3,0],(0,0),(1,0),(2,0),(4,0),(5,0),(6,0)",
+  "tablero_eq2": "[3,6],(0,6),(1,6),(2,6),(4,6),(5,6),(6,6)"
+}
+```
+
+**Nota:** `tablero_eq1` y `tablero_eq2` solo están presentes en reanudaciones. Si el front no recibe estos campos, debe usar `crearTableroInicial()` como en una partida nueva.
 
 ---
 
