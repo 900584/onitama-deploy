@@ -417,7 +417,7 @@ public class Servidor extends WebSocketServer {
                             msg.put("motivo", "FIN_PARTIDA");
                             msg.put("equipo_responsable", equipo);
                         }
-                        pj.partida.actualizarBD(); // Si se termina la partida -> actualizo la base de datos
+                        //pj.partida.actualizarBD(); // Si se termina la partida -> actualizo la base de datos
                     } else if (estado == 2) {
                         if (equipo == 2) {
                             msg.put("tipo", "DERROTA");
@@ -426,13 +426,19 @@ public class Servidor extends WebSocketServer {
                             msg.put("motivo", "FIN_PARTIDA");
                             msg.put("equipo_responsable", equipo);
                         }
-                        pj.partida.actualizarBD();
+                        //pj.partida.actualizarBD();
                     }
+
+                    // Enviamos el mensaje AL OPOONENTE ANTES DE CUALQUIER CAMBIO A LA BASE
+                    oponente.ws.send(msg.toString());
+                    System.out.println("Movimiento reenviado en la partida " + pj.partida.getIDPartida());
 
                     // Partida terminada por victoria: quitar la pareja para que ABANDONAR/MOVER
                     // no coincidan con una partida antigua si el mismo jugador empieza otra
                     // después.
                     if (estado == 1 || estado == 2) {
+                        // actualizamos todo al final, para no encadenar consultas antes que enviar mensaje de movimiento al oponente
+                        pj.partida.finalizarPartida();
                         try {
                             mutexParejas.acquire();
                             parejas.remove(pj);
@@ -443,9 +449,6 @@ public class Servidor extends WebSocketServer {
                         }
                     }
 
-                    // Enviamos el mensaje AL OPOONENTE
-                    oponente.ws.send(msg.toString());
-                    System.out.println("Movimiento reenviado en la partida " + pj.partida.getIDPartida());
                 } else {
                     if (estado == -2) {
                         msg.put("tipo", "MOVIMIENTO_INVALIDO");

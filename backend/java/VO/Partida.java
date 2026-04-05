@@ -326,12 +326,12 @@ public class Partida{
                     if (equipo == 1) {
                         j1Ganador = true;
                         muertesJ2++;
-                        finalizarPartida();
+                        //finalizarPartida();
                         return 1;
                     } else {
                         j2Ganador = true;
                         muertesJ1++;
-                        finalizarPartida();
+                        //finalizarPartida();
                         return 2;
                     }
                 }
@@ -350,11 +350,11 @@ public class Partida{
                 if (destino == tronoEnemigo) {
                     if (equipo == 1) { 
                         j1Ganador = true; 
-                        finalizarPartida();
+                        //finalizarPartida();
                         return 1; 
                     }else { 
                         j2Ganador = true; 
-                        finalizarPartida();
+                        //finalizarPartida();
                         return 2; 
                     }
                 }
