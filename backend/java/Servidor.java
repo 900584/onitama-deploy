@@ -1060,7 +1060,7 @@ public class Servidor extends WebSocketServer {
         if(pj != null){
             int estado = pj.partida.setTrampa(equipo, fila, columna);
             if (estado == -1) {
-                JSObject msg = new JSObject();
+                JSONObject msg = new JSONObject();
                 msg.put("tipo", "TRAMPA_INVALIDA");
                 conn.send(msg.toString());
             }else if(estado == 1){
