@@ -15,7 +15,7 @@ public class Partida{
 
     private int IDPartida, tiempo, muertesJ1, muertesJ2, turno;
     private String estado, tipo; //Cambiar fichas por su correspondiente clase
-    private boolean j1Ganador, j2Ganador;
+    private boolean j1Ganador, j2Ganador, trampaJ1, trampaJ2;
     private Jugador jugador1, jugador2;
     private List<CartaAccion> cartasA;
     private List<CartaMov> cartasM;
@@ -36,6 +36,8 @@ public class Partida{
         this.tipo = tipo;
         this.turno = turno;
         this.muertesJ1 = m1;
+        trampaJ1 = false; //Modificar para meter en la base de datos 
+        trampaJ2 = false;
         this.muertesJ2 = m2;
         this.j1Ganador = g1;
         this.j2Ganador = g2;
@@ -277,12 +279,34 @@ public class Partida{
         return actualizarBD();
     }
 
+    //-1 -> error
+    // 0 -> nada
+    // 1 -> todas las trampas puestas
+    public int setTrampa(int equipo, int fila, int columna){
+        Posicion p = tablero.getPosicion(fila, columna);
+        if (equipo == 1 && !trampaJ1 && p!= null) {
+            p.actibarTrampa();
+            trampaJ1 = true;
+        } else if(!trampaJ2 && p!= null){
+            p.actibarTrampa();
+            trampaJ2 = true;
+        } else{
+            return -1; //Error: ya puso su trampa o la posicion no es valida
+        }
+
+        if(trampaJ1 && trampaJ2){
+            return 1;
+        }else{
+            return 0;
+        }
+    }
+
    // 0 -> Movimiento realizado con exito
    // 1 -> equipo 1 gana
    // 2 -> equipo 2 gana
    // -1 -> carta no existente en la partida
    // -2 -> movimiento no valido
-    public int moverFicha(int equipo, Posicion origen, Posicion destino, String cartaNom) {
+    public int moverFicha(int equipo, Posicion origen, Posicion destino, String cartaNom, Posicion Trampa) {
         Ficha fOrigen = origen.getFicha();
         Ficha fDestino = destino.getFicha();
         CartaMov carta = null;
@@ -316,11 +340,30 @@ public class Partida{
                 }
             }
             //Por si acaso comprobamos que el movimiento existe
-            if (fOrigen == null || fOrigen.getEquipo() != equipo || !movExiste || destino.getX()>=7 || destino.getY()>=7 || destino.getX()<0 || destino.getY()<0) {
+            if (fOrigen == null || fOrigen.getEquipo() != equipo || !movExiste || !destino.estaActiva() || destino.getX()>=7 || destino.getY()>=7 || destino.getX()<0 || destino.getY()<0) {
                 return -2; //Movimiento no valido segun la carta
             }
+
+            //Logica de casillas trampa
+            if(destino.esTrampa()){
+                destino.desactivarCasilla();
+                boolean reyMatado = origen.matar(); // Mata la ficha que haya en la casilla trampa
+                Trampa = destino; //Devolvemos la posicion de la trampa para que el controlador pueda notificar a los jugadores
+                if (reyMatado && equipo == 1) {
+                    j2Ganador = true;
+                    j1Ganador = false;
+                    //finalizarPartida();
+                    return 2; //Gana el equipo 2 por trampa
+                } else if (reyMatado) {
+                    j1Ganador = true;
+                    j2Ganador = false;
+                    //finalizarPartida();
+                    return 1; //Gana el equipo 1 por trampa
+                }
+            }
+
             //Posibilidad de que se requiera modificaciones
-            if (fDestino != null && fDestino.getEquipo() != equipo) {
+            else if (fDestino != null && fDestino.getEquipo() != equipo) {
                 if (fDestino.matar()) { //Si se mata al rey, se acaba la partida
                     //Posible implementacion de patron observer para notificar victoria al matar al rey
                     if (equipo == 1) {

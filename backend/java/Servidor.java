@@ -32,7 +32,10 @@ import JDBC.CartasMovJDBC;
 // imports añadidos para trabajar con partidas privadas
 import gestor.GestorNotificaciones;
 import JDBC.PartidaJDBC;
+
 import java.util.Comparator;
+
+import netscape.javascript.JSObject;
 
 //POR HACER:
 // -> El xml que querias hacer: PRIORIDAD ALTA <-- Puedes empezar con esto si quieres 
@@ -442,7 +445,16 @@ public class Servidor extends WebSocketServer {
 
                 if (XO > -1 && YO > -1 && XD > -1 && YD > -1) {
                     Tablero tb = pj.partida.getTablero();
-                    estado = pj.partida.moverFicha(equipo, tb.getPosicion(XO, YO), tb.getPosicion(XD, YD), carta);
+                    Posicion Trampa = null; // Para recoger la posición de la trampa en caso de que el movimiento sea a una casilla trampa, y así poder notificarlo a los jugadores
+                    estado = pj.partida.moverFicha(equipo, tb.getPosicion(XO, YO), tb.getPosicion(XD, YD), carta, Trampa);
+                    if (Trampa != null) {
+                        JSONObject msgTrampa = new JSONObject();
+                        msgTrampa.put("tipo", "TRAMPA_ACTIVADA");
+                        msgTrampa.put("columna", Trampa.getX());
+                        msgTrampa.put("fila", Trampa.getY());
+                        conn.send(msgTrampa.toString());
+                        oponente.ws.send(msgTrampa.toString());
+                    }
                     // rotarCartas se llama internamente en moverFicha (solo en movimientos válidos)
                     // pj.partida.rotarCartas(carta, equipo);
                 }
@@ -1026,6 +1038,39 @@ public class Servidor extends WebSocketServer {
         }
     }
 
+    public void setTrampa(WebSocket conn, JSONObject obj){
+        int equipo = obj.getInt("equipo");
+        int fila = obj.getInt("fila");
+        int columna = obj.getInt("columna");
+        Pareja pj = null;
+        try {
+            mutexParejas.acquire();
+            for (Pareja pareja : parejas) {
+                if (pareja.buscar(conn)) {
+                    pj = pareja;
+                    break;
+                }
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            mutexParejas.release(); // SIGNAL
+        }
+
+        if(pj != null){
+            int estado = pj.partida.setTrampa(equipo, fila, columna);
+            if (estado == -1) {
+                JSObject msg = new JSObject();
+                msg.put("tipo", "TRAMPA_INVALIDA");
+                conn.send(msg.toString());
+            }else if(estado == 1){
+                JSONObject msg = new JSONObject();
+                msg.put("tipo", "TRAMPAS_COLOCADAS"); //AQUI
+                conn.send(msg.toString());
+            }
+        }
+    }
+
     public void solicitarPartidas(WebSocket conn, JSONObject obj, String tipo) {
         String usuario = obj.getString("usuario");
         PartidaJDBC jdbc = new PartidaJDBC();
@@ -1202,6 +1247,8 @@ public class Servidor extends WebSocketServer {
                 gestionarRespuestaReanudar(conn, obj, true);
             } else if (tipoMSG.equals("RECHAZAR_REANUDAR")) {
                 gestionarRespuestaReanudar(conn, obj, false);
+            } else if (tipoMSG.equals("PONER_TRAMPA")) {
+                setTrampa(conn, obj);
             }
         });
     }

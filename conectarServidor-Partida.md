@@ -333,6 +333,18 @@ Se envía para pedir el historial de partidas públicas del usuario.
 ---
 
 ### 2.3 Mensajes que envía el SERVIDOR al cliente 
+#### `TRAMPA_ACTIVADA`
+Lo manda si se ha activado alguna trampa
+
+```json
+{
+  "tipo": "TRAMPA_ACTIVADA",
+  "columna": 1,
+  "fila": 2
+}
+```
+
+---
 #### `ERROR_AL_BORRAR_AMIGO`
 
 ```json

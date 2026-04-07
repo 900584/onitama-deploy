@@ -2,12 +2,32 @@ package VO;
 
 public class Posicion {
     private final int x, y;
+    private boolean trampa;
+    private boolean activa;
     private Ficha ficha;
 
     public Posicion(int px, int py, Ficha F){
         x=px;
         y=py;
         ficha = F;
+        trampa = false;
+        activa = true;
+    }
+
+    public void actibarTrampa(){
+        trampa = true;
+    }
+
+    public boolean esTrampa(){
+        return trampa;
+    }
+
+    public boolean estaActiva(){
+        return activa;
+    }
+
+    public void desactivarCasilla(){
+        activa = false;
     }
 
     public int getX(){
