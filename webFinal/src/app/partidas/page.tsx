@@ -45,7 +45,7 @@ import {
 } from "@/api/social";
 import * as WS from "@/api/ws";
 import { getSkinNombre, getPiezaSrc, getSkinPrecio, normalizarSkinId, type SkinId } from "@/lib/skins";
-import { getImagenCarta } from "@/lib/cartas";
+import { getImagenCarta, TODAS_LAS_CARTAS, type CartaMovDef } from "@/lib/cartas";
 import { AvatarCircle } from "@/lib/avatar";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -1657,7 +1657,101 @@ function PanelNotificaciones({
   );
 }
 
+// ─── Mini cuadrícula de la carta ─────────────────────────────────────────────
+
+function MiniGrid({
+  carta, colorDots = "#3b82f6", size = 5,
+}: {
+  carta: CartaMovDef; colorDots?: string; size?: number;
+}) {
+  const DIM = 7;
+  const CENTRO = 3;
+  const activas = new Set<string>();
+  // Para la vista de Mis cartas, usamos la perspectiva del jugador 2 (signo = 1)
+  for (const { dc, df } of carta.movimientos) {
+    const gf = CENTRO - df;
+    const gc = CENTRO + dc;
+    if (gf >= 0 && gf < DIM && gc >= 0 && gc < DIM) activas.add(`${gf},${gc}`);
+  }
+  return (
+    <div
+      className="grid shrink-0"
+      style={{
+        gridTemplateColumns: `repeat(${DIM}, 1fr)`,
+        gap: "1px",
+        width: size * DIM + (DIM - 1),
+        height: size * DIM + (DIM - 1),
+      }}
+      aria-hidden
+    >
+      {Array.from({ length: DIM }, (_, f) =>
+        Array.from({ length: DIM }, (_, c) => {
+          const esC = f === CENTRO && c === CENTRO;
+          const esA = activas.has(`${f},${c}`);
+          return (
+            <div
+              key={`${f}-${c}`}
+              className={`rounded-[1px] ${esC ? "bg-[#9a8a72]" : "bg-[#c8bba8]"}`}
+              style={{
+                width: size,
+                height: size,
+                ...(esA
+                  ? {
+                      background: colorDots,
+                      boxShadow:
+                        colorDots === "#f8fafc"
+                          ? "inset 0 0 0 1px rgba(15,23,42,0.45)"
+                          : undefined,
+                    }
+                  : {}),
+              }}
+            />
+          );
+        })
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
+
+const FRASES_EPICAS: Record<string, string> = {
+  Tigre: "Feroz como la bestia, salta sobre su presa sin piedad.",
+  Dragon: "El señor de los cielos, desata su furia con movimientos legendarios.",
+  Rana: "Ágil e impredecible, esquiva los ataques saltando en el loto.",
+  Conejo: "Veloz como el viento, cambia de posición en un parpadeo.",
+  Cangrejo: "Defensa inquebrantable, avanza de lado cortando con sus pinzas.",
+  Elefante: "Imparable y gigantesco, aplasta las defensas enemigas con su peso.",
+  Ganso: "Elegante y silencioso, cruza el estanque en el momento perfecto.",
+  Gallo: "Orgulloso y certero, ataca con espolones antes del amanecer.",
+  Mono: "Juguetón e incansable, ataca desde ángulos inesperados.",
+  Mantis: "Paciencia mortal, ataca con una velocidad que la vista no persigue.",
+  Caballo: "Rápido y contundente, carga en línea rompiendo las filas.",
+  Buey: "Fuerte como la roca, no retrocede ante ninguna embestida.",
+  Grulla: "Equilibrio perfecto, se eleva con gracia y pica al descender.",
+  Oso: "Fuerza abrumadora, protege su territorio con zarpazos brutales.",
+  Aguila: "Desde los cielos domina todo, cae en picado y no deja escapatoria.",
+  Cobra: "Letal y sigilosa, un solo toque basta para acabar el combate."
+};
+
+const ENFOQUES_CARTAS: Record<string, { enfoque: string; alcance: string; icon: string }> = {
+  Tigre: { enfoque: "Simétrico", alcance: "Largo", icon: "⚖️" }, // df: 2
+  Dragon: { enfoque: "Simétrico", alcance: "Largo", icon: "⚖️" }, // dc: 2, df: 1
+  Rana: { enfoque: "Flanco Izquierdo", alcance: "Largo", icon: "⬅️" }, // dc: -2
+  Conejo: { enfoque: "Flanco Derecho", alcance: "Largo", icon: "➡️" }, // dc: 2
+  Cangrejo: { enfoque: "Simétrico", alcance: "Largo", icon: "⚖️" }, // dc: 2 / -2
+  Elefante: { enfoque: "Simétrico", alcance: "Corto", icon: "⚖️" },
+  Ganso: { enfoque: "Flanco Izquierdo", alcance: "Corto", icon: "⬅️" },
+  Gallo: { enfoque: "Flanco Derecho", alcance: "Corto", icon: "➡️" },
+  Mono: { enfoque: "Simétrico", alcance: "Corto", icon: "⚖️" },
+  Mantis: { enfoque: "Flanco Derecho", alcance: "Corto", icon: "➡️" },
+  Caballo: { enfoque: "Flanco Izquierdo", alcance: "Corto", icon: "⬅️" },
+  Buey: { enfoque: "Flanco Derecho", alcance: "Corto", icon: "➡️" },
+  Grulla: { enfoque: "Simétrico", alcance: "Corto", icon: "⚖️" },
+  Oso: { enfoque: "Simétrico", alcance: "Corto", icon: "⚖️" },
+  Aguila: { enfoque: "Flanco Izquierdo", alcance: "Corto", icon: "⬅️" },
+  Cobra: { enfoque: "Flanco Derecho", alcance: "Corto", icon: "➡️" },
+};
 
 interface PanelMisCartasProps {
   jugador: DatosSesion;
@@ -1670,86 +1764,394 @@ function PanelMisCartas({
   cartas,
   cargando,
 }: PanelMisCartasProps) {
-  // Las cartas disponibles en partida son aquellas donde puntos jugador >= puntos necesarios
-  const desbloqueadas = cartas.filter((c) => jugador.puntos >= c.puntos_necesarios);
-  const bloqueadas = cartas.filter((c) => jugador.puntos < c.puntos_necesarios);
+  const [cartaAmpliada, setCartaAmpliada] = useState<CartaEstado | null>(null);
+  const [tabCartas, setTabCartas] = useState<"movimientos" | "poderes">("movimientos");
+  const [mostrarInfoMovimientos, setMostrarInfoMovimientos] = useState(false);
+  const [filtroTexto, setFiltroTexto] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<"todas" | "desbloqueadas" | "bloqueadas">("todas");
+
+  // Maestría
+  const cartasDesbloqueadasOriginal = cartas.filter((c) => jugador.puntos >= c.puntos_necesarios);
+  const porcentajeDesbloqueado = cartas.length > 0 ? (cartasDesbloqueadasOriginal.length / cartas.length) * 100 : 0;
+  
+  const tituloMaestria = (() => {
+    const p = porcentajeDesbloqueado;
+    if (p === 100) return "Gran Maestro del Templo";
+    if (p >= 75) return "Maestro de las Artes";
+    if (p >= 50) return "Discípulo Aventajado";
+    if (p >= 25) return "Estudiante Prometedor";
+    return "Aprendiz de la Arena";
+  })();
+
+  const cartasFiltradasGlobal = cartas.filter(c => c.nombre.toLowerCase().includes(filtroTexto.toLowerCase()));
+
+  // Las cartas disponibles limitadas al ELO del jugador (ordenadas de mayor exigencia a menor)
+  const desbloqueadas = cartasFiltradasGlobal
+    .filter((c) => jugador.puntos >= c.puntos_necesarios)
+    .sort((a, b) => b.puntos_necesarios - a.puntos_necesarios);
+  
+  // Las cartas bloqueadas (ordenadas para ver cuáles serán las siguientes en conseguirse)
+  const bloqueadas = cartasFiltradasGlobal
+    .filter((c) => jugador.puntos < c.puntos_necesarios)
+    .sort((a, b) => a.puntos_necesarios - b.puntos_necesarios);
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
-      <h2 className="text-xl font-bold text-stone-800 uppercase tracking-widest mb-2">Mis cartas</h2>
-      <p className="text-stone-500 text-sm mb-6 flex items-center gap-2">
-        <span>Cartas que pueden aparecer en tus partidas según tu ELO actual (</span>
-        <Image src="/katanas.png" alt="Katanas" width={16} height={16} className="object-contain" />
-        <span className="font-semibold">{jugador.puntos.toLocaleString()}</span>
-        <span>):</span>
-      </p>
-      
-      {cargando ? (
-        <p className="text-stone-500 animate-pulse">Cargando catálogo...</p>
+      <div className="flex items-end justify-between mb-2">
+        <h2 className="text-xl font-bold text-stone-800 uppercase tracking-widest">Mis cartas</h2>
+      </div>
+
+      {/* Tabs para seleccionar el tipo de carta */}
+      <div className="flex gap-6 border-b border-stone-200 mb-8">
+        <button
+          onClick={() => setTabCartas("movimientos")}
+          className={`pb-3 uppercase tracking-wider text-sm font-bold transition-all relative ${
+            tabCartas === "movimientos"
+              ? "text-stone-800"
+              : "text-stone-400 hover:text-stone-600"
+          }`}
+        >
+          Movimientos
+          {tabCartas === "movimientos" && (
+            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-stone-800 rounded-t-full" />
+          )}
+        </button>
+        <button
+          onClick={() => setTabCartas("poderes")}
+          className={`pb-3 uppercase tracking-wider text-sm font-bold transition-all relative flex items-center gap-2 ${
+            tabCartas === "poderes"
+              ? "text-stone-800"
+              : "text-stone-400 hover:text-stone-600"
+          }`}
+        >
+          <span>Poderes</span>
+          <span className="bg-yellow-100 text-yellow-800 text-[9px] px-1.5 py-0.5 rounded uppercase tracking-widest">Pronto</span>
+          {tabCartas === "poderes" && (
+            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-stone-800 rounded-t-full" />
+          )}
+        </button>
+      </div>
+
+      {tabCartas === "poderes" ? (
+         <div className="flex flex-col items-center justify-center p-12 text-center bg-stone-50 rounded-3xl border border-stone-200 border-dashed animate-in fade-in duration-300">
+            <h3 className="text-xl font-bold text-stone-700 uppercase tracking-wider mb-2">Poderes y Habilidades</h3>
+            <p className="text-stone-500 max-w-sm">
+              Próximamente podrás desbloquear cartas que alterarán las leyes del combate. ¡Mantén tu nivel de ELO alto!
+            </p>
+         </div>
       ) : (
-        <div className="space-y-10">
-          
-          {/* Cartas Desbloqueadas */}
-          <div>
-            <h3 className="text-lg font-bold text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-300 pb-2">
-              Disponibles ({desbloqueadas.length})
-            </h3>
-            {desbloqueadas.length === 0 ? (
-              <p className="text-stone-500 text-sm">Aún no tienes cartas disponibles.</p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {desbloqueadas.map((c) => (
-                  <div key={c.nombre} className="rounded-2xl border border-emerald-200 bg-emerald-50/30 p-4 shadow-sm flex flex-col items-center">
-                    <p className="text-sm font-bold text-stone-800 uppercase tracking-wider mb-2">{c.nombre}</p>
-                    <div className="bg-white rounded-lg p-2 shadow-inner w-full flex justify-center">
-                      <Image 
-                        src={getImagenCarta(c.nombre)} 
-                        alt={c.nombre} 
-                        width={80} 
-                        height={80} 
-                        className="object-contain hover:scale-105 transition-transform" 
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        <>
+          <div className="flex items-start md:items-center justify-between mb-6 gap-4">
+            <p className="text-stone-500 text-sm flex flex-wrap items-center gap-2">
+              <span>Cartas que pueden aparecer en tus partidas según tu ELO actual (</span>
+              <Image src="/katanas.png" alt="Katanas" width={16} height={16} className="object-contain" />
+              <span className="font-semibold">{jugador.puntos.toLocaleString()}</span>
+              <span>):</span>
+            </p>
+            <button 
+              onClick={() => setMostrarInfoMovimientos(true)}
+              className="text-stone-400 hover:text-stone-700 transition-colors bg-white border border-stone-200 rounded-full p-1.5 shadow-sm hover:shadow shrink-0"
+              title="Información sobre la aparición de cartas"
+              aria-label="Información sobre la aparición de cartas"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
           </div>
+          
+          {cargando ? (
+            <p className="text-stone-500 animate-pulse">Cargando catálogo...</p>
+          ) : (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              
+              {/* Barra de Progreso de Maestría */}
+              <div className="bg-white px-4 py-3 rounded-xl shadow-sm border border-stone-200">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-stone-800 font-bold uppercase tracking-widest text-xs">Maestría</h4>
+                    <span className="text-stone-300 text-[10px] hidden sm:inline">|</span>
+                    <p className="text-stone-500 text-xs">{tituloMaestria}</p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <span className="font-extrabold text-emerald-600">{cartasDesbloqueadasOriginal.length}</span>
+                    <span className="text-stone-400 font-semibold text-[10px]"> / {cartas.length}</span>
+                  </div>
+                </div>
+                <div className="w-full bg-stone-100 rounded-full h-1.5 overflow-hidden shadow-inner">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-1000 ease-in-out relative"
+                    style={{ width: `${porcentajeDesbloqueado}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_2s_infinite]"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Buscador y Filtros */}
+              <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 flex flex-col md:flex-row gap-4 justify-between items-center">
+                <div className="relative w-full md:w-64">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input 
+                    type="text" 
+                    placeholder="Buscar carta..." 
+                    value={filtroTexto}
+                    onChange={(e) => setFiltroTexto(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-semibold text-stone-700" 
+                  />
+                </div>
+                
+                <div className="flex bg-white rounded-lg border border-stone-300 p-1 shadow-sm w-full md:w-auto">
+                  <button 
+                    onClick={() => setFiltroEstado("todas")}
+                    className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-colors ${filtroEstado === 'todas' ? 'bg-stone-800 text-white shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'}`}
+                  >
+                    Todas
+                  </button>
+                  <button 
+                    onClick={() => setFiltroEstado("desbloqueadas")}
+                    className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-colors ${filtroEstado === 'desbloqueadas' ? 'bg-emerald-600 text-white shadow' : 'text-stone-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
+                  >
+                    Desbloqueadas
+                  </button>
+                  <button 
+                    onClick={() => setFiltroEstado("bloqueadas")}
+                    className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-colors ${filtroEstado === 'bloqueadas' ? 'bg-stone-300 text-stone-800 shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'}`}
+                  >
+                    Bloqueadas
+                  </button>
+                </div>
+              </div>
+          
+              {/* Cartas Desbloqueadas */}
+              {(filtroEstado === "todas" || filtroEstado === "desbloqueadas") && (
+              <div>
+                <h3 className="text-lg font-bold text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-300 pb-2 flex justify-between items-center">
+                  <span>Disponibles</span>
+                  <span className="bg-stone-200 text-stone-600 px-2 py-0.5 rounded text-xs">{desbloqueadas.length}</span>
+                </h3>
+                {desbloqueadas.length === 0 ? (
+                  <p className="text-stone-500 text-sm">No hay cartas que coincidan con la búsqueda.</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {desbloqueadas.map((c) => {
+                      const cartaDef = TODAS_LAS_CARTAS.find(cd => cd.nombre === c.nombre);
+                      return (
+                      <button 
+                        key={c.nombre} 
+                        type="button"
+                        onClick={() => setCartaAmpliada(c)}
+                        className="rounded-2xl border border-emerald-200 bg-emerald-50/30 p-4 shadow-sm flex flex-col items-center hover:scale-[1.03] hover:shadow-md transition-all cursor-pointer text-left relative overflow-hidden group"
+                      >
+                        <div className="absolute top-0 left-0 w-1 h-0 bg-emerald-500 transition-all duration-300 group-hover:h-full"></div>
+                        <p className="text-sm font-bold text-stone-800 uppercase tracking-wider mb-3 flex items-center justify-between w-full">
+                          <span>{c.nombre}</span>
+                          <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-100 px-1.5 py-0.5 rounded whitespace-nowrap flex items-center gap-1">
+                            Desbloqueo: {c.puntos_necesarios.toLocaleString()} <Image src="/katanas.png" alt="Katanas" width={10} height={10} className="object-contain" />
+                          </span>
+                        </p>
+                        <div className="bg-white rounded-lg p-3 shadow-inner w-full flex flex-col md:flex-row items-center justify-center gap-4">
+                          <Image 
+                            src={getImagenCarta(c.nombre)} 
+                            alt={c.nombre} 
+                            width={68} 
+                            height={68} 
+                            className="object-contain" 
+                          />
+                          {cartaDef && (
+                            <div className="flex flex-col items-center md:border-l md:border-stone-200 md:pl-4">
+                              <MiniGrid carta={cartaDef} size={6} colorDots="#10b981" />
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    )})}
+                  </div>
+                )}
+              </div>
+              )}
 
           {/* Cartas Bloqueadas */}
-          {bloqueadas.length > 0 && (
+          {(filtroEstado === "todas" || filtroEstado === "bloqueadas") && (
             <div>
-              <h3 className="text-lg font-bold text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-300 pb-2">
-                Bloqueadas ({bloqueadas.length})
+              <h3 className="text-lg font-bold text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-300 pb-2 flex items-center justify-between">
+                <span>Bloqueadas</span>
+                <span className="bg-stone-200 text-stone-600 px-2 py-0.5 rounded text-xs">{bloqueadas.length}</span>
               </h3>
+              {bloqueadas.length === 0 ? (
+                <p className="text-stone-500 text-sm">No hay cartas bloqueadas.</p>
+              ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {bloqueadas.map((c) => (
-                  <div key={c.nombre} className="rounded-2xl border border-stone-200 bg-stone-100 p-4 shadow-sm flex flex-col items-center opacity-80 grayscale">
-                    <p className="text-sm font-bold text-stone-600 uppercase tracking-wider mb-2">{c.nombre}</p>
-                    <div className="bg-stone-200 rounded-lg p-2 shadow-inner mb-4 w-full flex justify-center relative">
+                {bloqueadas.map((c) => {
+                  const cartaDef = TODAS_LAS_CARTAS.find(cd => cd.nombre === c.nombre);
+                  return (
+                  <button 
+                    key={c.nombre} 
+                    type="button"
+                    onClick={() => setCartaAmpliada(c)}
+                    className="rounded-2xl border border-stone-200 bg-stone-100 p-4 shadow-sm flex flex-col items-center opacity-80 grayscale hover:opacity-100 hover:scale-[1.03] hover:shadow-md transition-all cursor-pointer text-left relative overflow-hidden group"
+                  >
+                    <div className="absolute top-0 left-0 w-1 h-0 bg-stone-400 transition-all duration-300 group-hover:h-full z-20"></div>
+                    <p className="text-sm font-bold text-stone-600 uppercase tracking-wider mb-3 flex items-center justify-between w-full">
+                      <span>{c.nombre}</span>
+                      <span className="text-[10px] text-stone-500 font-semibold bg-stone-200 px-1.5 py-0.5 rounded whitespace-nowrap flex items-center gap-1">
+                        Desbloqueo: {c.puntos_necesarios.toLocaleString()} <Image src="/katanas.png" alt="Katanas" width={10} height={10} className="object-contain opacity-60" />
+                      </span>
+                    </p>
+                    <div className="bg-stone-200 rounded-lg p-3 shadow-inner w-full flex flex-col md:flex-row items-center justify-center gap-4 relative overflow-hidden">
+                      <div className="absolute inset-0 flex items-center justify-center z-10 bg-stone-200/40">
+                        <span className="text-4xl drop-shadow-md group-hover:scale-110 transition-transform" aria-label="Bloqueada">🔒</span>
+                      </div>
                       <Image 
                         src={getImagenCarta(c.nombre)} 
                         alt={c.nombre} 
-                        width={80} 
-                        height={80} 
+                        width={68} 
+                        height={68} 
                         className="object-contain opacity-50" 
                       />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-3xl" aria-label="Bloqueada">🔒</span>
-                      </div>
+                      {cartaDef && (
+                        <div className="flex flex-col items-center md:border-l md:border-stone-300 md:pl-4 opacity-50">
+                          <MiniGrid carta={cartaDef} size={6} colorDots="#64748b" />
+                        </div>
+                      )}
                     </div>
-                    <div className="w-full px-3 py-2 rounded-lg border border-stone-300 bg-stone-200 text-stone-500 text-center flex flex-col items-center justify-center gap-1">
-                      <span className="text-[10px] uppercase font-bold tracking-widest leading-none">Requiere ELO</span>
-                      <span className="text-xs font-bold flex items-center gap-1">
-                        {c.puntos_necesarios.toLocaleString()} pts
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  </button>
+                )})}
               </div>
+              )}
             </div>
           )}
 
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Modal Información Movimientos */}
+      {mostrarInfoMovimientos && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-stone-100 rounded-3xl shadow-2xl p-6 md:p-8 relative animate-in fade-in zoom-in duration-200 border border-stone-200">
+            <button
+              type="button"
+              onClick={() => setMostrarInfoMovimientos(false)}
+              className="absolute right-6 top-6 text-2xl leading-none text-stone-400 hover:text-stone-800 transition-colors focus:outline-none"
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-stone-800 rounded-lg text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-extrabold text-stone-800 uppercase tracking-widest">
+                El Destino y los Maestros
+              </h3>
+            </div>
+            
+            <div className="space-y-4 text-base text-stone-600 leading-relaxed bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
+              <p>
+                En el templo de Onitama, el azar reparte cinco cartas entre ambos contendientes, pero las leyes de los maestros imponen una restricción sagrada: <strong>jamás recibirás una carta que aún no hayas logrado desbloquear en tu camino.</strong>
+              </p>
+              <div className="bg-emerald-50 border-emerald-500 border rounded-xl p-4 mt-2">
+                <h4 className="font-bold text-emerald-900 uppercase tracking-wider text-sm flex items-center gap-2 mb-2">
+                  La Regla del Oponente
+                </h4>
+                <p className="text-emerald-800 text-sm">
+                  Las cartas disponibles en una batalla están limitadas por el maestro con menor rango. Puesto que <strong>ambos</strong> contendientes deben poseer la carta para que esta pueda formar parte del reparto, <strong>aquellas con mayores requisitos de Katanas serán más raras de ver</strong>, requiriendo que te enfrentes a oponentes igual de experimentados.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8 flex justify-end">
+              <button 
+                type="button"
+                onClick={() => setMostrarInfoMovimientos(false)}
+                className="px-6 py-3 bg-stone-800 text-stone-100 font-bold uppercase tracking-widest text-sm rounded-xl hover:bg-stone-700 hover:scale-[1.02] transition-all shadow-md"
+              >
+                Comprendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Carta Ampliada */}
+      {cartaAmpliada && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm sm:max-w-md md:max-w-lg bg-white rounded-3xl shadow-2xl p-6 md:p-8 relative flex flex-col items-center animate-in fade-in zoom-in duration-200">
+            <button
+              type="button"
+              onClick={() => setCartaAmpliada(null)}
+              className="absolute right-5 top-4 text-3xl leading-none text-stone-400 hover:text-stone-700 focus:outline-none"
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+            <h3 className="text-3xl font-extrabold text-stone-800 uppercase tracking-wider mb-2 mt-4">
+              {cartaAmpliada.nombre}
+            </h3>
+            <p className="text-sm text-stone-500 font-semibold mb-6 italic text-center px-4">
+              "{FRASES_EPICAS[cartaAmpliada.nombre] ?? "Una carta misteriosa que esconde un poder oculto."}"
+            </p>
+            
+            <div className="w-full bg-stone-100 rounded-2xl p-6 flex flex-col items-center justify-center gap-8 shadow-inner mb-6">
+              <div className="flex flex-col md:flex-row items-center justify-center gap-8 w-full">
+                <Image 
+                  src={getImagenCarta(cartaAmpliada.nombre)} 
+                  alt={cartaAmpliada.nombre} 
+                  width={160} 
+                  height={160} 
+                  className="object-contain drop-shadow-2xl" 
+                />
+                {TODAS_LAS_CARTAS.find(cd => cd.nombre === cartaAmpliada.nombre) && (
+                  <div className="bg-white p-4 rounded-xl shadow-md border border-stone-200">
+                    <MiniGrid carta={TODAS_LAS_CARTAS.find(cd => cd.nombre === cartaAmpliada.nombre)!} size={10} colorDots="#1a2d4a" />
+                  </div>
+                )}
+              </div>
+              
+              {/* Estadísticas / Lore Generado */}
+              {ENFOQUES_CARTAS[cartaAmpliada.nombre] && (
+                <div className="flex flex-wrap gap-3 w-full justify-center">
+                  <div className="bg-white px-4 py-2 border border-stone-200 rounded-lg flex items-center gap-2 shadow-sm text-xs font-bold text-stone-600 uppercase tracking-widest">
+                    <span>Enfoque:</span>
+                    <span className="text-stone-800">{ENFOQUES_CARTAS[cartaAmpliada.nombre].enfoque}</span>
+                    <span>{ENFOQUES_CARTAS[cartaAmpliada.nombre].icon}</span>
+                  </div>
+                  <div className="bg-white px-4 py-2 border border-stone-200 rounded-lg flex items-center gap-2 shadow-sm text-xs font-bold text-stone-600 uppercase tracking-widest">
+                    <span>Alcance:</span>
+                    <span className="text-stone-800">{ENFOQUES_CARTAS[cartaAmpliada.nombre].alcance}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="text-xs text-stone-400 uppercase tracking-widest font-bold flex items-center justify-between w-full">
+              <div className="flex items-center gap-2 bg-stone-100 px-3 py-2 rounded-lg border border-stone-200">
+                <span className="text-stone-500">Desbloqueo:</span> 
+                <Image src="/katanas.png" alt="Katanas" width={14} height={14} /> 
+                <span className="text-stone-800">{cartaAmpliada.puntos_necesarios.toLocaleString()}</span>
+              </div>
+              
+              {jugador.puntos >= cartaAmpliada.puntos_necesarios ? (
+                <div className="flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Disponible
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-stone-500 bg-stone-100 px-3 py-2 rounded-lg border border-stone-200">
+                  <span className="text-sm">🔒</span>
+                  Bloqueada
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
