@@ -4,6 +4,11 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,7 +35,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +49,7 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -107,7 +115,8 @@ class PartidaActivity: AppCompatActivity() {
         val datosUsuario by AutoLogin.sesion.collectAsState()
         val authClient: Auth = Auth()
         val context = LocalContext.current
-        var partida = Partida()
+        val partida = Partida()
+        var vermazo by remember { mutableStateOf(false) }
 
         val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
 
@@ -116,6 +125,7 @@ class PartidaActivity: AppCompatActivity() {
             val equipo = viewModel.equipoPropio
             val winner = estado.ganador
             val victoria = winner == equipo
+
             AlertDialog(
                 // Evita que el jugador cierre el popup pulsando fuera de él
                 onDismissRequest = { },
@@ -192,6 +202,8 @@ class PartidaActivity: AppCompatActivity() {
                         )
                     )
             )
+
+
 
             Column(
                 horizontalAlignment = Alignment.Companion.Start,
@@ -347,7 +359,8 @@ class PartidaActivity: AppCompatActivity() {
                         CartaBoton(
                             carta = carta,
                             seleccionada = false,
-                            onClick = {}
+                            onClick = {},
+                            true
                         )
                     }
 
@@ -370,17 +383,22 @@ class PartidaActivity: AppCompatActivity() {
                         CartaBoton(
                             carta = carta,
                             seleccionada = estado.cartaSeleccionada == carta,
-                            onClick = {cambiarEstadoCarta(carta, estado)}
+                            onClick = {cambiarEstadoCarta(carta, estado)},
+                            false
                         )
                     }
 
                 }
+
+
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Companion.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.Companion.End)
                 ) {
+
+
 
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
@@ -418,6 +436,65 @@ class PartidaActivity: AppCompatActivity() {
                     }
                 }
             }
+            Box(
+                Modifier
+                    .fillMaxSize(),
+                contentAlignment = Alignment.BottomStart,
+            ){
+                Column {
+                    Button(
+                        onClick = { vermazo = !vermazo },
+                        shape = RoundedCornerShape(15.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
+                        modifier = Modifier.size(50.dp)
+                    ){
+                        Text(
+                            text = if (vermazo) "v" else "^", // Un pequeño truco para que la flecha cambie
+                            fontSize = 25.sp,
+                            textAlign = TextAlign.Center,
+                            color = Color.Black
+                        )
+                    }
+
+                    AnimatedVisibility(
+                        visible = vermazo,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 300.dp, height = 500.dp)
+                                .clip(RoundedCornerShape(16.dp)) // Cambiado para que no corte tu lista
+                                .background(Color.DarkGray)
+                        ) {
+                            Column (
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ){
+                                Text(
+                                    "CARTAS SIGUIENTES",
+                                    fontSize = 25.sp,
+                                    fontFamily = quattrocentoBold,
+                                    textAlign = TextAlign.Center,
+                                    color = Color.White
+
+                                )
+                                estado.cartasSiguientes.forEach { carta ->
+                                    CartaBoton(
+                                        carta = carta,
+                                        seleccionada = estado.cartaSeleccionada == carta,
+                                        onClick = { Unit },
+                                        false
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -430,7 +507,7 @@ class PartidaActivity: AppCompatActivity() {
         }
     }
     @Composable
-    fun CartaBoton(carta: Carta, seleccionada: Boolean, onClick: () -> Unit) {
+    fun CartaBoton(carta: Carta, seleccionada: Boolean, onClick: () -> Unit, isEnemy: Boolean) {
 
         val ancho = if (seleccionada) 192.dp else 170.dp
         val alto = if (seleccionada) 120.dp else 100.dp
@@ -456,7 +533,6 @@ class PartidaActivity: AppCompatActivity() {
                 .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
                 // 3. 🎨 Feedback visual: Si está seleccionada, se pone azul
                 .background(if (seleccionada) Color(0xFFBBDEFB) else Color.LightGray)
-                // 4. 👆 INTERACTIVIDAD: Si no pones esto, ¡la carta no hace nada al tocarla!
                 .clickable { onClick() }
         ) {
             Row(
@@ -483,13 +559,13 @@ class PartidaActivity: AppCompatActivity() {
                     )
                 }
 
-                Minigrid(carta.movimientos)
+                Minigrid(carta.movimientos, isEnemy)
             }
         }
     }
 
     @Composable
-    fun Minigrid(movimientos: List<Movimiento>){
+    fun Minigrid(movimientos: List<Movimiento>, isEnemy: Boolean){
         val tamanoGrid = 7
         val centro = tamanoGrid / 2
 
@@ -503,8 +579,8 @@ class PartidaActivity: AppCompatActivity() {
                     for (c in 0 until tamanoGrid) {
                         // Calculamos el desplazamiento relativo de esta celda respecto al centro
                         // En Onitama: df es filas (y), dc es columnas (x)
-                        val dfRelativo = centro - f
-                        val dcRelativo = c - centro
+                        val dfRelativo =  if (isEnemy) (centro - (6 - f)) else centro - f
+                        val dcRelativo = if (isEnemy) (6 - c - centro) else c - centro
 
                         // Verificamos si este punto coincide con algún movimiento de la carta
                         val esMovimiento = movimientos.any { it.df == dfRelativo && it.dc == dcRelativo }
@@ -518,7 +594,7 @@ class PartidaActivity: AppCompatActivity() {
                                 .background(
                                     when {
                                         esCentro -> Color.Black
-                                        esMovimiento -> Color(0xFF2196F3) // Azul para movimientos
+                                        esMovimiento -> if(isEnemy)Color.Red else Color(0xFF2196F3) // Azul para nuestros, rojo para el enemigo
                                         else -> Color.White.copy(alpha = 0.3f) // Fondo tenue
                                     }
                                 )
@@ -565,7 +641,7 @@ class PartidaActivity: AppCompatActivity() {
                                 .background(
                                     when {
                                         estado.fichaSeleccionada == posLogica -> Color.Yellow
-                                        estado.movimientosValidos.contains(posLogica) -> Color.LightGray
+                                        estado.movimientosValidos.contains(posLogica) -> Color.Green
                                         celda.esTrono -> Color.DarkGray
                                         else -> Color.White.copy(alpha = 0.3f)
                                     }

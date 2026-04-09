@@ -237,6 +237,8 @@ class PartidaViewModel : ViewModel() {
                 equipoLocal = equipoPropio,
                 dificultad = nivelDificultadBot
             )
+            Log.i("LOG BOT", "Jugada calculada: $jugada")
+
 
             // 3. Aplicamos la jugada en el hilo principal
             if (jugada != null) {
