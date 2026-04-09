@@ -316,19 +316,26 @@ public class Partida{
     //true -> exito en la accion
     //false -> error (carta no del equipo, carta ya usada ...)
     public boolean jugarAccion(String nomCartaAcc, int x, int y, int equipo, int xOp, int yOp, String nomCarta) {
+        boolean cartaEncontrada = false;
+        CartaAccion cartaA = null;
         if(equipo - 1 == turno % 2) { //Comprobamos que el equipo que juega es el correcto segun el turno
             for (CartaAccion ca : cartasA) {
                 if (ca.getNombre().equals(nomCartaAcc)) {
                     if (ca.jugarCarta(this, x, y, equipo, xOp, yOp, nomCarta)) {
                         turno++; //Cambiamos de turno (tambien lo utilizamos para saber cuantas rondas se han jugado)
-                        return true;
+                        cartaEncontrada = true;
                     } else {
-                        return false;
+                        cartaEncontrada = false;
                     }
+                }else if (ca.getEquipo() == equipo) {
+                    cartaA = ca; 
                 }
             }
         }
-        return false;
+        if (cartaEncontrada && cartaA != null) {
+            cartaA.setEstado("USADA"); //Marcamos la otra carta como usada porque solo se puede usar una carta de accion por partida y equipo
+        }
+        return cartaEncontrada;
     }
 
    // 0 -> Movimiento realizado con exito

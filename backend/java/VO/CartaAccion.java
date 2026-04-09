@@ -3,6 +3,13 @@ package VO;
 import java.sql.SQLException;
 
 import ACCIONES.Accion;
+import ACCIONES.Espejo;
+import ACCIONES.Revivir;
+import ACCIONES.Robar;
+import ACCIONES.Sacrificio;
+import ACCIONES.SalvarRey;
+import ACCIONES.SoloAdelante;
+import ACCIONES.SoloAtras;
 import JDBC.CartasAccionJDBC;
 
 public class CartaAccion {
@@ -35,14 +42,8 @@ public class CartaAccion {
             case "SOLO_PARA_ADELANTE":
                 accionEjecutable = new SoloAdelante();
                 break;
-            case "VENGANZA":
-                accionEjecutable = new Venganza();
-                break;
             case "ROBAR":
                 accionEjecutable = new Robar();
-                break;
-            case "CEGAR":
-                accionEjecutable = new Cegar();
                 break;
             case "SOLO_PARA_ATRAS":
                 accionEjecutable = new SoloAtras();
@@ -115,7 +116,7 @@ public class CartaAccion {
     }
 
     public boolean jugarCarta(Partida partida, int x, int y, int equipo, int xOp, int yOp, String nomCarta){
-        if (accionEjecutable != null && equipo == this.equipo) {
+        if (estado.equals("USABLE") && accionEjecutable != null && equipo == this.equipo) {
             if(accionEjecutable.ejecutar(partida, x, y, equipo, xOp, yOp, nomCarta)) {
                 estado = "USADA";
                 return true;
