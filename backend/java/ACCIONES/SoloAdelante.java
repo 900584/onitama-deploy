@@ -7,10 +7,9 @@ import VO.CartaMov;
 import VO.Posicion;
 
 public class SoloAdelante extends Accion {
-    List<CartaMov> movimientosSinModificar;
+    List<CartaMov> movimientosSinModificar = new ArrayList<>();
 
     public SoloAdelante() {
-        movimientosSinModificar = new ArrayList<>();
         super("SOLO_PARA_ADELANTE");
     }
 

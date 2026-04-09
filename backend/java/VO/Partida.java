@@ -13,10 +13,11 @@ public class Partida{
     private static final int BASE_PUNTOS_VICTORIA = 30;
     private static final int BASE_PUNTOS_DERROTA = 30;
 
-    private int IDPartida, tiempo, muertesJ1, muertesJ2, turno;
+    private int IDPartida, tiempo, muertesJ1, muertesJ2, turno, turnoAccionJ1, turnoAccionJ2;
     private String estado, tipo; //Cambiar fichas por su correspondiente clase
     private boolean j1Ganador, j2Ganador, trampaJ1, trampaJ2;
     private Jugador jugador1, jugador2;
+    private CartaAccion cartaAccionActivaJ1, cartaAccionActivaJ2;
     private List<CartaAccion> cartasA;
     private List<CartaMov> cartasM;
     private Tablero tablero;
@@ -31,6 +32,10 @@ public class Partida{
         this.jdbcAccion = new CartasAccionJDBC();
         this.jdbcMov = new CartasMovJDBC();
         this.jdbcJugador = new JugadorJDBC();
+        cartaAccionActivaJ1 = null;
+        cartaAccionActivaJ2 = null;
+        turnoAccionJ1 = -1;
+        turnoAccionJ2 = -1;
         this.estado = estado;
         this.tiempo = tiempo;
         this.tipo = tipo;
@@ -318,12 +323,16 @@ public class Partida{
     public boolean jugarAccion(String nomCartaAcc, int x, int y, int equipo, int xOp, int yOp, String nomCarta) {
         boolean cartaEncontrada = false;
         CartaAccion cartaA = null;
-        if(equipo - 1 == turno % 2) { //Comprobamos que el equipo que juega es el correcto segun el turno
+        if(equipo - 1 == turno % 2 && (cartaAccionActivaJ1 ==null && equipo == 1) || (cartaAccionActivaJ2 ==null && equipo == 2)) { //Comprobamos que el equipo que juega es el correcto segun el turno
             for (CartaAccion ca : cartasA) {
                 if (ca.getNombre().equals(nomCartaAcc)) {
                     if (ca.jugarCarta(this, x, y, equipo, xOp, yOp, nomCarta)) {
                         turno++; //Cambiamos de turno (tambien lo utilizamos para saber cuantas rondas se han jugado)
                         cartaEncontrada = true;
+                        cartaAccionActivaJ1 = (equipo == 1) ? ca : null;
+                        cartaAccionActivaJ2 = (equipo == 2) ? ca : null;
+                        turnoAccionJ1 = (equipo == 1) ? turno : turnoAccionJ1;
+                        turnoAccionJ2 = (equipo == 2) ? turno : turnoAccionJ2;
                     } else {
                         cartaEncontrada = false;
                     }
@@ -443,6 +452,14 @@ public class Partida{
 
             rotarCartas(carta.getNombre(), equipo);
             turno++; //Cambiamos de turno (tambien lo utilizamos para saber cuantas rondas se han jugado)
+            if (turnoAccionJ1 != -1 && turno > turnoAccionJ1 && equipo - 1 != (turno-1)%2) {
+                cartaAccionActivaJ1.deshacerCarta(this);
+                turnoAccionJ1 = -1;
+            }
+            if (turnoAccionJ2 != -1 && turno > turnoAccionJ2 && equipo - 1 != (turno-1)%2) { //Deshacemos la accion solo si ha movido el rival despues de activar la accion
+                cartaAccionActivaJ2.deshacerCarta(this);
+                turnoAccionJ2 = -1;
+            }
             return 0; //Movimiento realizado con exito
         }else{
             return -1;

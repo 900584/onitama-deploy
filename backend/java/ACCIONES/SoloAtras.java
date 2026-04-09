@@ -8,10 +8,9 @@ import VO.Partida;
 import VO.Posicion;
 
 public class SoloAtras extends Accion {
-    List<CartaMov> movimientosSinModificar;
+    List<CartaMov> movimientosSinModificar = new ArrayList<>();
 
     public SoloAtras() {
-        movimientosSinModificar = new ArrayList<>();
         super("SOLO_PARA_ATRAS");
     }
 

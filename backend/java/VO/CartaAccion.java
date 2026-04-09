@@ -125,6 +125,12 @@ public class CartaAccion {
         return false;
     }
 
+    public void deshacerCarta(Partida partida){
+        if (accionEjecutable != null) {
+            accionEjecutable.deshacer(partida);
+        }
+    }
+
     public boolean actualizarBD(){
         try {
             return jdbc.updatePuntosMin(nombre, puntosMin) | jdbc.updateAccion(nombre, accion);

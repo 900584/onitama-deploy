@@ -2,15 +2,15 @@ package ACCIONES;
 
 import java.util.ArrayList;
 import java.util.List;
-import VO.Partida;
+
 import VO.CartaMov;
+import VO.Partida;
 import VO.Posicion;
 
 public class Espejo extends Accion {
-    List<CartaMov> movimientosSinModificar;
+    List<CartaMov> movimientosSinModificar = new ArrayList<>();
 
     public Espejo() {
-        movimientosSinModificar = new ArrayList<>();
         super("ESPEJO");
     }
 
