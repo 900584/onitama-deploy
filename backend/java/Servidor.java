@@ -1483,7 +1483,8 @@ public class Servidor extends WebSocketServer {
                     Pareja pj = buscarParejaPorNombre(notif.getRemitente());
                     if (pj == null) pj = buscarParejaPorNombre(notif.getDestinatario());
                     if (pj != null) {
-                        pj.partida.actualizarBD(); // guardamos tablero, cartas y turno
+                        pj.partida.pausarPartida(); // cambia estado a PAUSADA y lo persiste
+                        pj.partida.actualizarBD();  // guarda tablero, fichas y turno
                         try {
                             mutexParejas.acquire();
                             parejas.remove(pj); // liberamos de memoria
