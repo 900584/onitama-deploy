@@ -1083,6 +1083,49 @@ public class Servidor extends WebSocketServer {
         }
     }
 
+    public void jugarCartaAccion(WebSocket conn, JSONObject obj){
+        String nomCartaAcc = obj.getString("cartaAccion");
+        int equipo = obj.getInt("equipo");
+        int x = obj.getInt("x");
+        int y = obj.getInt("y");
+        String cartaRobar = obj.getString("cartaRobar");
+        int xOp = obj.getInt("x_op");
+        int yOp = obj.getInt("y_op");
+        Pareja pj = null;
+        try {
+            mutexParejas.acquire();
+            for (Pareja pareja : parejas) {
+                if (pareja.buscar(conn)) {
+                    pj = pareja;
+                    break;
+                }
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            mutexParejas.release(); // SIGNAL
+        }
+
+        if(pj != null){
+            boolean estado = pj.partida.jugarAccion(nomCartaAcc, x, y, equipo, xOp, yOp, cartaRobar);
+            if(!estado){
+                JSONObject msg = new JSONObject();
+                msg.put("tipo", "CARTA_ACCION_INVALIDA");
+                conn.send(msg.toString());
+            }else{
+                JSONObject msg = new JSONObject();
+                msg.put("tipo", "CARTA_ACCION_JUGADA");
+                msg.put("carta_accion", nomCartaAcc);
+                msg.put("x", x);
+                msg.put("y", y);
+                msg.put("x_op", xOp);
+                msg.put("y_op", yOp);
+                msg.put("carta_robar", cartaRobar);
+                pj.getOponente(conn).ws.send(msg.toString()); //Avisamos al oponente de la carta que se ha jugado
+            }
+        }
+    }
+
     public void seleccionarCartaAccion(WebSocket conn, JSONObject obj){
         String carta = obj.getString("carta");
         int equipo = obj.getInt("equipo");
@@ -1316,6 +1359,8 @@ public class Servidor extends WebSocketServer {
                 setTrampa(conn, obj);
             } else if (tipoMSG.equals("CARTA_ACCION")) {
                 seleccionarCartaAccion(conn, obj);
+            } else if (tipoMSG.equals("JUGAR_CARTA_ACCION")) {
+                jugarCartaAccion(conn, obj);
             }
         });
     }

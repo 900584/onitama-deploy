@@ -34,6 +34,24 @@ Si esta variable no está definida (o el servidor no responde), el frontend usa 
 ---
 
 ### 2.2 Mensajes que envía el CLIENTE al servidor
+
+#### `JUGAR_CARTA_ACCION`
+Le dice al servidor que carta jugar (no siempre se necesitan todos los campos, eso depende de la carta jugada)
+
+```json
+{
+  "tipo": "JUGAR_CARTA_ACCION",
+  "equipo": 1,
+  "cartaAccion": "La Dama del Mar",
+  "x": 4,
+  "y": 3,
+  "x_op": 2,
+  "y_op": 1,
+  "cartaRobar": "Caballo"
+}
+```
+
+---
 #### `CARTA_ACCION`
 Le dice al servidor cual ha sido la seleccion del jugador
 
@@ -358,6 +376,34 @@ Se envía para pedir el historial de partidas públicas del usuario.
 ---
 
 ### 2.3 Mensajes que envía el SERVIDOR al cliente 
+
+#### `CARTA_ACCION_JUGADA`
+Lo envia el servidor para avisar al oponente de que carta de accion se ha jugado con sus parametros para que aplique los cambios al tablero/cartas
+
+```json
+{
+  "tipo": "CARTA_ACCION_JUGADA",
+  "equipo": 1,
+  "cartaAccion": "La Dama del Mar",
+  "x": 4,
+  "y": 3,
+  "x_op": 2,
+  "y_op": 1,
+  "cartaRobar": "Caballo"
+}
+```
+
+---
+
+#### `CARTA_ACCION_INVALIDA`
+
+```json
+{
+  "tipo": "CARTA_ACCION_INVALIDA"
+}
+```
+
+---
 #### `PARTIDA_LISTA`
 Lo manda cuando ambos equipos han elegido carta de accion (marca el comienzo de los movimientos)
 

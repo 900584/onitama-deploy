@@ -116,7 +116,9 @@ public class CartaAccion {
     }
 
     public boolean jugarCarta(Partida partida, int x, int y, int equipo, int xOp, int yOp, String nomCarta){
-        if (estado.equals("USABLE") && accionEjecutable != null && equipo == this.equipo) {
+        if (estado.equals("USABLE") &&  equipo == this.equipo && accion.equals("CEGAR")) {
+            return true; //Como es un efecto visual, se manejara en el front (solo se mandara el mensaje avisando que se ha jugado)
+        }else if (estado.equals("USABLE") && accionEjecutable != null && equipo == this.equipo) {
             if(accionEjecutable.ejecutar(partida, x, y, equipo, xOp, yOp, nomCarta)) {
                 estado = "USADA";
                 return true;
@@ -161,69 +163,5 @@ public class CartaAccion {
     public boolean marcarComoUsada(int IDPartida){
         this.estado = "USADA";
         return actualizarDatosPartida(IDPartida);
-    }
-
-    //Ejecuta la accion de la carta sobre el tablero de la partida
-    //Devuelve true si la accion se ejecuto correctamente
-    public boolean ejecutarAccion(Tablero tablero, int equipoQueUsa){
-        if (!puedeUsarse()) {
-            return false; //No se puede usar una carta que ya fue usada o no esta disponible
-        }
-
-        switch (accion) {
-            case "ESPEJO":
-                //Refleja los movimientos del oponente igual iria al turno
-                marcarComoUsada();
-                return true;
-
-            case "REVIVIR":
-                //Revive un peon muerto (meter en el trono propio si esta vacio)
-                Posicion trono = (equipoQueUsa == 1) ? tablero.trono1 : tablero.trono2;
-                if (trono.ocupado() == -1) {
-                    trono.setFicha(new Ficha(false, equipoQueUsa));
-                    marcarComoUsada();
-                    return true;
-                }
-                return false; //Trono ocupado, no se puede revivir
-
-            case "SALVAR_REY":
-                //Salva al rey de una captura igual iria al turno
-                marcarComoUsada();
-                return true;
-
-            case "SACRIFICIO":
-                //Se sacrifica un peon tuyo para matar a otro del enemigo
-                //La seleccion de peones se haría externamente, aqui solo se marca
-                marcarComoUsada();
-                return true;
-
-            case "SOLO_PARA_ADELANTE":
-                //El oponente solo puede mover hacia adelante este turno
-                marcarComoUsada();
-                return true;
-
-            case "VENGANZA":
-                //Si te matan al rey antes de 5 min, empate 
-                marcarComoUsada();
-                return true;
-
-            case "ROBAR":
-                //Roba una carta de movimiento al enemigo
-                marcarComoUsada();
-                return true;
-
-            case "CEGAR":
-                //El oponente no ve el tablero durante un turno
-                marcarComoUsada();
-                return true;
-
-            case "SOLO_PARA_ATRAS":
-                //El oponente solo puede mover hacia atras este turno
-                marcarComoUsada();
-                return true;
-
-            default:
-                return false; //Accion no reconocida
-        }
     }
 }
