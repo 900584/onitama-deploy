@@ -20,6 +20,7 @@ import java.util.Map;
 
 import VO.Partida;
 import VO.CartaMov;
+import VO.CartaAccion;
 import VO.Posicion;
 import VO.Tablero;
 import VO.Jugador;
@@ -73,6 +74,7 @@ class InfoJugador {
 class Pareja {
     InfoJugador p1, p2;
     Partida partida;
+    int eleccion;
 
     // NUEVO
     // constructor para reanudar partidas pausadas, y así en lugar de crear
@@ -87,6 +89,7 @@ class Pareja {
     }
 
     public Pareja(InfoJugador _p1, InfoJugador _p2, String tipo) {
+        eleccion = 0; //Para las cartas de accion
         p1 = _p1;
         p2 = _p2;
         // De momento solo existe partidas Publicas
@@ -1065,8 +1068,70 @@ public class Servidor extends WebSocketServer {
                 conn.send(msg.toString());
             }else if(estado == 1){
                 JSONObject msg = new JSONObject();
-                msg.put("tipo", "TRAMPAS_COLOCADAS"); //AQUI
+                msg.put("tipo", "SELECCIONE_CARTA_ACCION"); //Iniciamos la seleccion de cartas de Accion
+                JSONArray cartasJSON = new JSONArray();
+                for (CartaAccion ca : pj.partida.getCartasAccion()) {
+                    if (ca.getEquipo()==-equipo) {
+                        JSONObject cartaJSON = new JSONObject();
+                        cartaJSON.put("nombre", ca.getNombre());
+                        cartasJSON.put(cartaJSON);
+                    }
+                }
+                msg.put("cartas_accion", cartasJSON);
                 conn.send(msg.toString());
+            }
+        }
+    }
+
+    public void seleccionarCartaAccion(WebSocket conn, JSONObject obj){
+        String carta = obj.getString("carta");
+        int equipo = obj.getInt("equipo");
+        Pareja pj = null;
+        try {
+            mutexParejas.acquire();
+            for (Pareja pareja : parejas) {
+                if (pareja.buscar(conn)) {
+                    pj = pareja;
+                    break;
+                }
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            mutexParejas.release(); // SIGNAL
+        }
+
+        if(pj != null){
+            boolean estado = pj.partida.setEquipoCartaAccion(carta, equipo);
+            if(!estado){
+                JSONObject msg = new JSONObject();
+                msg.put("tipo", "CARTA_ACCION_INVALIDA");
+                conn.send(msg.toString());
+            }else{
+                pj.eleccion++;
+                if(pj.eleccion == 2){
+                    JSONObject msg1 = new JSONObject();
+                    JSONObject msg2 = new JSONObject();
+                    msg1.put("tipo", "PARTIDA_LISTA"); 
+                    msg2.put("tipo", "PARTIDA_LISTA");
+                    JSONArray cartasJSON1 = new JSONArray();
+                    JSONArray cartasJSON2 = new JSONArray();
+                    for (CartaAccion ca : pj.partida.getCartasAccion()) {
+                        if (ca.getEquipo()==1) {
+                            JSONObject cartaJSON1 = new JSONObject();
+                            cartaJSON1.put("nombre", ca.getNombre());
+                            cartasJSON1.put(cartaJSON1);
+                        } else if (ca.getEquipo()==2) {
+                            JSONObject cartaJSON2 = new JSONObject();
+                            cartaJSON2.put("nombre", ca.getNombre());
+                            cartasJSON2.put(cartaJSON2);
+                        }
+                    }
+                    msg1.put("cartas_accion", cartasJSON1);
+                    msg2.put("cartas_accion", cartasJSON2);
+                    conn.send(msg1.toString());
+                    pj.getOponente(conn).ws.send(msg2.toString());
+                }
             }
         }
     }
@@ -1249,6 +1314,8 @@ public class Servidor extends WebSocketServer {
                 gestionarRespuestaReanudar(conn, obj, false);
             } else if (tipoMSG.equals("PONER_TRAMPA")) {
                 setTrampa(conn, obj);
+            } else if (tipoMSG.equals("CARTA_ACCION")) {
+                seleccionarCartaAccion(conn, obj);
             }
         });
     }

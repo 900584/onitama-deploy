@@ -34,6 +34,18 @@ Si esta variable no está definida (o el servidor no responde), el frontend usa 
 ---
 
 ### 2.2 Mensajes que envía el CLIENTE al servidor
+#### `CARTA_ACCION`
+Le dice al servidor cual ha sido la seleccion del jugador
+
+```json
+{
+  "tipo": "CARTA_ACCION",
+  "equipo": 1,
+  "carta": "La Dama del Mar"
+}
+```
+
+---
 #### `PONER_TRAMPA`
 Pone la trampa en la posicion correspondiente
 
@@ -346,6 +358,34 @@ Se envía para pedir el historial de partidas públicas del usuario.
 ---
 
 ### 2.3 Mensajes que envía el SERVIDOR al cliente 
+#### `PARTIDA_LISTA`
+Lo manda cuando ambos equipos han elegido carta de accion (marca el comienzo de los movimientos)
+
+```json
+{
+  "tipo": "PARTIDA_LISTA"
+  "cartas_accion": [
+    {
+      "nombre": "Atrapasueños"
+    },
+    {
+      "nombre": "La Dama del Mar"
+    }
+  ]
+}
+```
+
+---
+#### `CARTA_ACCION_INVALIDA`
+Lo manda si la eleccion de carta de accion no es valida
+
+```json
+{
+  "tipo": "CARTA_ACCION_INVALIDA"
+}
+```
+
+---
 #### `TRAMPA_INVALIDA`
 Lo manda si la trampa no es valida
 
@@ -356,12 +396,20 @@ Lo manda si la trampa no es valida
 ```
 
 ---
-#### `TRAMPAS_COLOCADAS`
-Lo manda si ambas trampas se han colocado (marca el verdadero inicio de la partida)
+#### `SELECCIONE_CARTA_ACCION`
+Lo manda si ambas trampas se han colocado, marca el verdadero inicio de la partida y la eleccion de las cartas de accion
 
 ```json
 {
-  "tipo": "TRAMPAS_COLOCADAS"
+  "tipo": "SELECCIONE_CARTA_ACCION"
+  "cartas_accion": [
+    {
+      "nombre": "Atrapasueños"
+    },
+    {
+      "nombre": "La Dama del Mar"
+    }
+  ]
 }
 ```
 

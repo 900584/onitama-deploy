@@ -15,7 +15,7 @@ public class Partida{
 
     private int IDPartida, tiempo, muertesJ1, muertesJ2, turno, turnoAccionJ1, turnoAccionJ2;
     private String estado, tipo; //Cambiar fichas por su correspondiente clase
-    private boolean j1Ganador, j2Ganador, trampaJ1, trampaJ2;
+    private boolean j1Ganador, j2Ganador, trampaJ1, trampaJ2, eleccionCartaAccionJ1, eleccionCartaAccionJ2;
     private Jugador jugador1, jugador2;
     private CartaAccion cartaAccionActivaJ1, cartaAccionActivaJ2;
     private List<CartaAccion> cartasA;
@@ -36,6 +36,8 @@ public class Partida{
         cartaAccionActivaJ2 = null;
         turnoAccionJ1 = -1;
         turnoAccionJ2 = -1;
+        eleccionCartaAccionJ1 = false;
+        eleccionCartaAccionJ2 = false; 
         this.estado = estado;
         this.tiempo = tiempo;
         this.tipo = tipo;
@@ -177,11 +179,33 @@ public class Partida{
         this.jugador2 = j;
     }
 
+    public boolean setEquipoCartaAccion(String nomCarta, int equipo){
+        boolean cartaEncontrada = false;
+        CartaAccion cartaA = null;
+        for (CartaAccion ca : cartasA) {
+            if (ca.getNombre().equals(nomCarta) && ca.getEquipo() == -equipo) { //Comprobamos que la carta es del mazo (equipo -1 o -2) y que el equipo que la quiere coger es el correcto
+                ca.setEquipo(equipo);
+                ca.setEstado("USABLE");
+                cartaEncontrada = true;
+            }else if (ca.getNombre().equals(nomCarta)) {
+                cartaA = ca; 
+            }
+        }
+        int equipoOp = (equipo == 1) ? 2 : 1;
+        if (cartaEncontrada && cartaA != null) { //Asignamos la otra carta al oponente
+            cartaA.setEquipo(equipoOp);
+            cartaA.setEstado("USABLE");
+        }
+        eleccionCartaAccionJ1 = (equipo == 1) ? true : eleccionCartaAccionJ1;
+        eleccionCartaAccionJ2 = (equipo == 2) ? true : eleccionCartaAccionJ2;
+        return cartaEncontrada;
+    }
+
     public void repartirCartas() {
         int i = 0;
         for (CartaAccion ca : cartasA) {
-            ca.setEquipo((i%2)+1);
-            ca.setEstado("USABLE"); //Que se puede jugar (si se juega -> USADA)
+            ca.setEquipo(-(i%2 + 1)); //Sin equipo (el - representa que se le da la opcion de elegirla a ese equipo)
+            ca.setEstado("ESPERANDO"); //Esperando a ser seleccionada al inicio
             i++;
             ca.actualizarDatosPartida(IDPartida);    
         }
@@ -386,7 +410,7 @@ public class Partida{
                 }
             }
             //Por si acaso comprobamos que el movimiento existe y que se hayan puesto las trampas, aunque el controlador no deberia dejar llegar aqui si no se han puesto las trampas o si el movimiento no es valido
-            if ((equipo - 1 != turno % 2) || !trampaJ1 || !trampaJ2 || fOrigen == null || fOrigen.getEquipo() != equipo || !movExiste || !destino.estaActiva() || destino.getX()>=7 || destino.getY()>=7 || destino.getX()<0 || destino.getY()<0) {
+            if ((equipo - 1 != turno % 2) || !trampaJ1 || !trampaJ2 || !eleccionCartaAccionJ1 || !eleccionCartaAccionJ2 || fOrigen == null || fOrigen.getEquipo() != equipo || !movExiste || !destino.estaActiva() || destino.getX()>=7 || destino.getY()>=7 || destino.getX()<0 || destino.getY()<0) {
                 return -2; //Movimiento no valido
             }
 
@@ -507,13 +531,5 @@ public class Partida{
         nuevaDelMazo.actualizarDatosPartida(IDPartida);
 
         return true;
-    }
-
-    //FALTA EL TEMA DE LOS TURNOS REVISAR
-    public boolean jugarAccion(CartaAccion carta) {
-        //Yo esperaria a tener hecha una partida normal para implementar las cartas de accion, 
-        //porque pueden ser muy variadas y no se me ocurre una implementacion general que sirva 
-        //para todas, habria que ir viendo carta por carta
-        return false;
     }
 }
