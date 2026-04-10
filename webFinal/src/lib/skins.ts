@@ -70,9 +70,10 @@ export function getEquipoNombre(skinId: SkinId, equipo: 1 | 2): string {
 export function getEquipoClaseTexto(skinId: SkinId, equipo: 1 | 2): string {
   switch (skinId) {
     case "Skin1":
-      return equipo === 1 ? "text-stone-200" : "text-stone-900";
+      // Blancas → gris claro visible en fondos oscuros; Negras → gris neutro (no negro puro)
+      return equipo === 1 ? "text-stone-200" : "text-zinc-300";
     case "Skin2":
-      return equipo === 1 ? "text-indigo-200" : "text-slate-100";
+      return equipo === 1 ? "text-blue-200" : "text-slate-100";
     case "Skin5":
       return equipo === 1 ? "text-emerald-300" : "text-yellow-300";
     case "Skin6":
@@ -87,7 +88,8 @@ export function getEquipoGlow(skinId: SkinId, equipo: 1 | 2): string {
     case "Skin1":
       return equipo === 1 ? "rgba(226,232,240,0.45)" : "rgba(15,23,42,0.45)";
     case "Skin2":
-      return equipo === 1 ? "rgba(99,102,241,0.45)" : "rgba(226,232,240,0.45)";
+      // Azulgrana → azul royal; Blanco → blanco suave
+      return equipo === 1 ? "rgba(30,58,138,0.45)" : "rgba(226,232,240,0.45)";
     case "Skin5":
       return equipo === 1 ? "rgba(16,185,129,0.45)" : "rgba(250,204,21,0.45)";
     case "Skin6":
@@ -114,6 +116,42 @@ export function getPiezaSrc(
     return `/peon${color}${sufijo}.png`;
   }
   return `/${tipo}${color}${sufijo}.png`;
+}
+
+/** Color CSS principal del equipo para bordes, fondos y sombras temáticas. */
+export function getEquipoColorBase(skinId: SkinId, equipo: 1 | 2): string {
+  switch (skinId) {
+    case "Skin1": return equipo === 1 ? "#e2e8f0" : "#1e293b";
+    case "Skin2": return equipo === 1 ? "#1e3a8a" : "#f8fafc";
+    case "Skin5": return equipo === 1 ? "#10b981" : "#facc15";
+    case "Skin6": return equipo === 1 ? "#a855f7" : "#f97316";
+    default:      return equipo === 1 ? "#3b82f6" : "#ef4444";
+  }
+}
+
+/**
+ * Devuelve true cuando el fondo del banner de ese equipo es suficientemente claro
+ * como para necesitar texto oscuro. Solo aplica a Skin2-Blanco en la práctica,
+ * ya que el resto de banners siguen siendo visualmente oscuros aunque tengan un tinte claro.
+ */
+export function equipoFondoEsClaro(skinId: SkinId, equipo: 1 | 2): boolean {
+  return skinId === "Skin2" && equipo === 2;  // Solo Blanco
+}
+
+/** Fondo CSS del banner (soporta gradiente para Azulgrana). */
+export function getEquipoBannerBg(skinId: SkinId, equipo: 1 | 2): string {
+  if (skinId === "Skin2" && equipo === 1) {
+    return "linear-gradient(to right, rgba(30,58,138,0.45) 50%, rgba(127,29,29,0.38) 50%)";
+  }
+  return getEquipoColorBase(skinId, equipo) + "33";
+}
+
+/** Box-shadow del banner (doble color para Azulgrana). */
+export function getEquipoBannerSombra(skinId: SkinId, equipo: 1 | 2): string {
+  if (skinId === "Skin2" && equipo === 1) {
+    return "0 0 22px rgba(30,58,138,0.45), 0 0 14px rgba(127,29,29,0.35)";
+  }
+  return `0 0 20px ${getEquipoColorBase(skinId, equipo)}4D`;
 }
 
 export function getColorMovimiento(skinId: SkinId, equipo: 1 | 2): string {

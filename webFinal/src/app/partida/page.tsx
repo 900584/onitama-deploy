@@ -309,6 +309,16 @@ function Celda({
             fill
             sizes="(max-width: 768px) 100vw, 100px"
             className="object-contain drop-shadow-md"
+            style={
+              normalizarSkinId(skinActiva) === "Skin1"
+                ? {
+                    filter:
+                      ficha.equipo === 1
+                        ? "drop-shadow(0 0 3px rgba(0,0,0,0.95)) drop-shadow(0 0 1px rgba(0,0,0,0.9))"
+                        : "drop-shadow(0 0 4px rgba(255,255,255,0.95)) drop-shadow(0 0 2px rgba(255,255,255,0.9))",
+                  }
+                : undefined
+            }
           />
 
         </div>
@@ -1483,7 +1493,7 @@ function PartidaInterna({
                 const esBlanca = (fila + col) % 2 === 0;
                 const baseClase =
                   boardStyle === "ajedrez"
-                    ? (esBlanca ? "bg-stone-900 hover:bg-stone-800" : "bg-stone-100 hover:bg-stone-200")
+                    ? (esBlanca ? "bg-[#3a3a3a] hover:bg-[#4a4a4a]" : "bg-[#c8c5c1] hover:bg-[#b8b5b1]")
                     : boardStyle === "clasico-futbol"
                       ? "bg-emerald-700/90 hover:bg-emerald-600/90"
                       : "bg-gray-100 hover:bg-gray-200";

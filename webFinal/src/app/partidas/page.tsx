@@ -1183,7 +1183,9 @@ export default function PartidasPage() {
                 <div className="flex items-center gap-2">
                   <span>Coste:</span>
                   <Image src="/core.png" alt="Cores" width={16} height={16} />
-                  <span className="font-semibold">{getSkinPrecio(confirmacionSkin.skinId)}</span>
+                  <span className="font-semibold">
+                    {skins.find((s) => s.skin_id === confirmacionSkin.skinId)?.precio ?? getSkinPrecio(confirmacionSkin.skinId)}
+                  </span>
                 </div>
               </div>
             )}

@@ -20,7 +20,11 @@ import FondoPantalla from "@/components/FondoPantalla";
 import { buscarPartida, type RespuestaBuscarPartida } from "@/api/buscarpartida";
 import { obtenerJugadorActivo } from "@/lib/sesion";
 import {
+  equipoFondoEsClaro,
+  getEquipoBannerBg,
+  getEquipoBannerSombra,
   getEquipoClaseTexto,
+  getEquipoColorBase,
   getEquipoGlow,
   getEquipoNombre,
   getPiezaSrc,
@@ -111,13 +115,16 @@ export default function BuscarPartidaPage() {
     const claseJugadorPuntos = getEquipoClaseTexto(skinActiva, esAzul ? 1 : 2);
     const claseOponentePuntos = getEquipoClaseTexto(skinActiva, esAzul ? 2 : 1);
 
-    // Colores del panel del jugador y del oponente
-    const borderJugador  = esAzul ? "border-blue-500/40"  : "border-red-500/40";
-    const glowJugador = getEquipoGlow(skinActiva, esAzul ? 1 : 2);
-    const shadowJugador = getEquipoGlow(skinActiva, esAzul ? 1 : 2).replace("0.45", "0.2");
-    const borderOponente = esAzul ? "border-red-500/40"   : "border-blue-500/40";
-    const glowOponente = getEquipoGlow(skinActiva, esAzul ? 2 : 1);
-    const shadowOponente = getEquipoGlow(skinActiva, esAzul ? 2 : 1).replace("0.45", "0.2");
+    // Colores del panel del jugador y del oponente (adaptativos a la skin)
+    const colorJugador    = getEquipoColorBase(skinActiva, esAzul ? 1 : 2);
+    const colorOponente   = getEquipoColorBase(skinActiva, esAzul ? 2 : 1);
+    const fondoClaroLocal = equipoFondoEsClaro(skinActiva, esAzul ? 1 : 2);
+    const glowJugador     = getEquipoGlow(skinActiva, esAzul ? 1 : 2);
+    const shadowJugador   = getEquipoGlow(skinActiva, esAzul ? 1 : 2).replace("0.45", "0.2");
+    const glowOponente    = getEquipoGlow(skinActiva, esAzul ? 2 : 1);
+    const shadowOponente  = getEquipoGlow(skinActiva, esAzul ? 2 : 1).replace("0.45", "0.2");
+    const bannerBg        = getEquipoBannerBg(skinActiva, esAzul ? 1 : 2);
+    const bannerSombra    = getEquipoBannerSombra(skinActiva, esAzul ? 1 : 2);
 
     return (
       <div className="min-h-screen flex flex-col relative overflow-hidden bg-[#111d2c]">
@@ -130,14 +137,18 @@ export default function BuscarPartidaPage() {
 
         {/* Mensaje de equipo y turno */}
         <div className="relative z-10 flex justify-center px-4">
-          <div className={`flex flex-col items-center gap-1 px-8 py-3 rounded-xl border-2 backdrop-blur-sm
-            ${esAzul
-              ? "border-blue-400/60 bg-blue-900/30 shadow-[0_0_20px_rgba(59,130,246,0.3)]"
-              : "border-red-400/60 bg-red-900/30 shadow-[0_0_20px_rgba(239,68,68,0.3)]"}`}>
-            <span className={`font-bold text-lg uppercase tracking-widest ${claseEquipoLocal}`}>
+          <div
+            className="flex flex-col items-center gap-1 px-8 py-3 rounded-xl border-2 backdrop-blur-sm"
+            style={{
+              borderColor: colorJugador + "99",
+              background: bannerBg,
+              boxShadow: bannerSombra,
+            }}
+          >
+            <span className={`font-bold text-lg uppercase tracking-widest ${fondoClaroLocal ? "text-stone-800" : claseEquipoLocal}`}>
               ⚔ Eres el Equipo {nombreEquipoLocal}
             </span>
-            <span className="text-white/60 text-sm tracking-wide">
+            <span className={fondoClaroLocal ? "text-stone-700 text-sm tracking-wide" : "text-white/60 text-sm tracking-wide"}>
               {esAzul ? "¡Tú comienzas la partida!" : `El equipo ${nombreEquipoInicial} comienza`}
             </span>
           </div>
@@ -156,8 +167,8 @@ export default function BuscarPartidaPage() {
                 <Image src={imgOponenteIz} alt="Oponente" fill className="object-contain" priority />
               </div>
               <div
-                className={`bg-[#1a2d4a]/80 backdrop-blur-md px-7 py-3 rounded-xl border-2 ${borderOponente} flex flex-col items-center`}
-                style={{ boxShadow: `0 0 15px ${shadowOponente}` }}
+                className="bg-[#1a2d4a]/80 backdrop-blur-md px-7 py-3 rounded-xl border-2 flex flex-col items-center"
+                style={{ borderColor: colorOponente + "66", boxShadow: `0 0 15px ${shadowOponente}` }}
               >
                 <span className="text-white font-bold text-lg tracking-wider">@{respuesta.oponente ?? "Oponente"}</span>
                 <div className="flex items-center gap-2 mt-1">
@@ -185,8 +196,8 @@ export default function BuscarPartidaPage() {
                 <Image src={imgJugadorDr} alt="Mi luchador" fill className="object-contain" priority />
               </div>
               <div
-                className={`bg-[#1a2d4a]/80 backdrop-blur-md px-7 py-3 rounded-xl border-2 ${borderJugador} flex flex-col items-center`}
-                style={{ boxShadow: `0 0 15px ${shadowJugador}` }}
+                className="bg-[#1a2d4a]/80 backdrop-blur-md px-7 py-3 rounded-xl border-2 flex flex-col items-center"
+                style={{ borderColor: colorJugador + "66", boxShadow: `0 0 15px ${shadowJugador}` }}
               >
                 <span className="text-white font-bold text-lg tracking-wider">@{jugador.nombre}</span>
                 <div className="flex items-center gap-2 mt-1">
