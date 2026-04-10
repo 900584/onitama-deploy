@@ -841,6 +841,8 @@ public class Servidor extends WebSocketServer {
         }, 2, TimeUnit.MINUTES);
 
         timersInvitacion.put(idNotificacion, timer[0]);
+        // Informar al remitente del id de notificación (para que pueda cancelar)
+        conn.send(new JSONObject().put("tipo", "NOTIFICACION_ENVIADA").put("idNotificacion", idNotificacion).toString());
         System.out.println(
                 "Invitación privada: " + remitente + " -> " + destinatario + " (notif " + idNotificacion + ")");
     }
@@ -1364,6 +1366,8 @@ public class Servidor extends WebSocketServer {
             // AÑADIMOS SOLICITUD DE PAUSA DE PARTIDA Y DE REANUDAR
             // EN MENSAJES ACEPTAR/RECHAZAR HE AÑADIDO UN PARÁMETRO MÁS
             // POR GESTIONARLO EN UN MISMO MÉTODO Y NO TENER QUE HACER DOS
+            } else if (tipoMSG.equals("CANCELAR_NOTIFICACION")) {
+                cancelarNotificacion(conn, obj);
             } else if (tipoMSG.equals("SOLICITAR_PAUSA")) {
                 gestionarSolicitudPausa(conn, obj);
             } else if (tipoMSG.equals("ACEPTAR_PAUSA")) {
@@ -1444,6 +1448,32 @@ public class Servidor extends WebSocketServer {
         } catch (SQLException e) {
             System.err.println("Error al obtener cartas: " + e.getMessage());
             conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
+        }
+    }
+
+    private void cancelarNotificacion(WebSocket conn, JSONObject obj) {
+        try {
+            int idNotificacion = obj.getInt("idNotificacion");
+
+            // Cancelar timer de invitación o de reanudar si existe
+            ScheduledFuture<?> timer = timersInvitacion.remove(idNotificacion);
+            if (timer == null) timer = timersReanudar.remove(idNotificacion);
+            if (timer != null) timer.cancel(false);
+
+            // Marcar notificación como rechazada en BD
+            NotificacionJDBC notifJdbc = new NotificacionJDBC();
+            VO.Notificacion notif = notifJdbc.obtenerPorId(idNotificacion);
+            if (notif != null) {
+                notifJdbc.actualizarEstado(idNotificacion, VO.Notificacion.ESTADO_RECHAZADA);
+                // Notificar al destinatario que fue cancelada
+                WebSocket wsDestino = buscarConexion(notif.getDestinatario());
+                if (wsDestino != null && wsDestino.isOpen()) {
+                    wsDestino.send(new JSONObject().put("tipo", "NOTIFICACION_CANCELADA").put("idNotificacion", idNotificacion).toString());
+                }
+            }
+            System.out.println("Notificación " + idNotificacion + " cancelada por el remitente.");
+        } catch (Exception e) {
+            System.err.println("Error al cancelar notificación: " + e.getMessage());
         }
     }
 
@@ -1580,6 +1610,8 @@ public class Servidor extends WebSocketServer {
             }, 2, TimeUnit.MINUTES);
 
             timersReanudar.put(idNotif, timer[0]);
+            // Informar al remitente del id de notificación (para que pueda cancelar)
+            conn.send(new JSONObject().put("tipo", "NOTIFICACION_ENVIADA").put("idNotificacion", idNotif).toString());
             System.out.println("Solicitud reanudar: " + remitente + " -> " + destinatario + " (notif " + idNotif + ")");
 
         } catch (SQLException e) {

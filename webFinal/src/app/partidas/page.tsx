@@ -125,9 +125,11 @@ export default function PartidasPage() {
   const [tabPartidaPrivada, setTabPartidaPrivada] = useState<"crear" | "reanudar">("crear");
   const [invitacionPrivadaEnCurso, setInvitacionPrivadaEnCurso] = useState<{
     destinatario: string;
+    idNotificacion: number | null;
   } | null>(null);
   const [mensajePrivada, setMensajePrivada] = useState<string | null>(null);
   const [tiempoEsperaPrivada, setTiempoEsperaPrivada] = useState(120);
+  const [tiempoEsperaReanudar, setTiempoEsperaReanudar] = useState(120);
 
   // ── Reanudar partida pausada ─────────────────────────────────────────────────
   /** Solicitud de reanudar entrante desde el amigo */
@@ -140,6 +142,7 @@ export default function PartidasPage() {
   const [reanudarEnCurso, setReanudarEnCurso] = useState<{
     amigo: string;
     idPartida: number;
+    idNotificacion: number | null;
   } | null>(null);
   /** Amigo seleccionado en la pestaña Reanudar */
   const [amigoSeleccionadoReanudar, setAmigoSeleccionadoReanudar] = useState<InfoAmigo | null>(null);
@@ -219,6 +222,14 @@ export default function PartidasPage() {
       );
     });
 
+    // El remitente canceló la notificación antes de que respondiésemos
+    const unsubNotifCancelada = WS.suscribir("NOTIFICACION_CANCELADA", (msg) => {
+      const id = msg.idNotificacion as number;
+      eliminarNotificacion(id);
+      setNotificaciones((prev) => prev.filter((n) => n.idNotificacion !== id));
+      setSolicitudReanudarEntrante((prev) => prev?.idNotificacion === id ? null : prev);
+    });
+
     // Cuando se acepta una amistad, añadirla a la lista local
     const unsubAmistad = WS.suscribir("AMISTAD_ACEPTADA", (msg) => {
       const amigo = msg.amigo as string;
@@ -233,6 +244,7 @@ export default function PartidasPage() {
     return () => {
       unsubSolicitud();
       unsubInvitacionPartida();
+      unsubNotifCancelada();
       unsubAmistad();
     };
   }, []);
@@ -357,6 +369,13 @@ export default function PartidasPage() {
       setMensajePrivada("Tu amigo no está conectado en este momento.");
     });
 
+    // El servidor confirma el id de notificación creada (invitación o reanudar)
+    const unsubNotifEnviada = WS.suscribir("NOTIFICACION_ENVIADA", (msg) => {
+      const id = msg.idNotificacion as number;
+      setInvitacionPrivadaEnCurso((prev) => prev ? { ...prev, idNotificacion: id } : prev);
+      setReanudarEnCurso((prev) => prev ? { ...prev, idNotificacion: id } : prev);
+    });
+
     // Solicitud de reanudar recibida de un amigo
     const unsubSolicitudReanudar = WS.suscribir("SOLICITUD_REANUDAR", (msg) => {
       setSolicitudReanudarEntrante({
@@ -377,6 +396,7 @@ export default function PartidasPage() {
       unsubRechazada();
       unsubTimeout();
       unsubDesconectado();
+      unsubNotifEnviada();
       unsubSolicitudReanudar();
       unsubErrorNoUnido();
     };
@@ -397,6 +417,19 @@ export default function PartidasPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [invitacionPrivadaEnCurso]);
+
+  /** Countdown visual de espera de reanudar (2 minutos). */
+  useEffect(() => {
+    if (!reanudarEnCurso) return;
+    setTiempoEsperaReanudar(120);
+    const interval = setInterval(() => {
+      setTiempoEsperaReanudar((t) => {
+        if (t <= 1) { clearInterval(interval); return 0; }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [reanudarEnCurso]);
 
   /** Debounce: enviar búsqueda al servidor 400 ms después de que el usuario deje de escribir. */
   useEffect(() => {
@@ -529,7 +562,7 @@ export default function PartidasPage() {
         setMensajePrivada("No se pudo enviar la invitación. Revisa la conexión.");
         return;
       }
-      setInvitacionPrivadaEnCurso({ destinatario: amigo.nombre });
+      setInvitacionPrivadaEnCurso({ destinatario: amigo.nombre, idNotificacion: null });
       setMostrarModalPartidaPrivada(false);
     },
     [jugador.nombre]
@@ -543,11 +576,20 @@ export default function PartidasPage() {
         setMensajePrivada("No se pudo enviar la solicitud. Revisa la conexión.");
         return;
       }
-      setReanudarEnCurso({ amigo: amigo.nombre, idPartida });
+      setReanudarEnCurso({ amigo: amigo.nombre, idPartida, idNotificacion: null });
       setMostrarModalPartidaPrivada(false);
     },
     [jugador.nombre]
   );
+
+  /** Cancela una notificación pendiente (invitación o reanudar) enviada por nosotros. */
+  const handleCancelarNotificacion = useCallback((idNotificacion: number | null) => {
+    if (idNotificacion !== null) {
+      WS.enviar({ tipo: "CANCELAR_NOTIFICACION", idNotificacion });
+    }
+    setInvitacionPrivadaEnCurso(null);
+    setReanudarEnCurso(null);
+  }, []);
 
   /** Acepta la solicitud de reanudar del amigo. */
   const handleAceptarReanudar = useCallback(() => {
@@ -1066,13 +1108,16 @@ export default function PartidasPage() {
               <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
             </svg>
             <p className="text-white font-bold uppercase tracking-widest text-center">Esperando a @{reanudarEnCurso.amigo}…</p>
-            <p className="text-white/50 text-xs text-center">Tu amigo tiene 2 minutos para aceptar.</p>
+            <p className="font-mono text-3xl text-yellow-300">
+              {String(Math.floor(tiempoEsperaReanudar / 60)).padStart(2, "0")}:
+              {String(tiempoEsperaReanudar % 60).padStart(2, "0")}
+            </p>
             <button
               type="button"
-              onClick={() => setReanudarEnCurso(null)}
-              className="text-white/40 text-xs hover:text-white/70 transition-colors"
+              onClick={() => handleCancelarNotificacion(reanudarEnCurso.idNotificacion)}
+              className="px-5 py-2 rounded-xl font-bold uppercase tracking-widest text-sm border border-red-500/50 text-red-400 hover:bg-red-500/20 transition-colors"
             >
-              Cancelar
+              Cancelar solicitud
             </button>
           </div>
         </div>
@@ -1162,18 +1207,26 @@ export default function PartidasPage() {
 
       {invitacionPrivadaEnCurso && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b1522]/90 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg bg-[#1a2d4a] rounded-2xl border border-white/10 p-8 text-white text-center shadow-2xl">
+          <div className="w-full max-w-lg bg-[#1a2d4a] rounded-2xl border border-white/10 p-8 text-white text-center shadow-2xl flex flex-col items-center gap-5">
+            <svg className="animate-spin h-10 w-10 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
             <h3 className="text-2xl font-bold uppercase tracking-widest">Esperando respuesta</h3>
-            <p className="text-white/70 mt-3">
+            <p className="text-white/70">
               Has invitado a <span className="font-semibold">@{invitacionPrivadaEnCurso.destinatario}</span> a una partida privada.
             </p>
-            <p className="text-white/60 text-sm mt-2">
-              Tienes 2 minutos para que acepte la solicitud.
-            </p>
-            <p className="font-mono text-4xl mt-6 text-yellow-300">
+            <p className="font-mono text-4xl text-yellow-300">
               {String(Math.floor(tiempoEsperaPrivada / 60)).padStart(2, "0")}:
               {String(tiempoEsperaPrivada % 60).padStart(2, "0")}
             </p>
+            <button
+              type="button"
+              onClick={() => handleCancelarNotificacion(invitacionPrivadaEnCurso.idNotificacion)}
+              className="px-5 py-2 rounded-xl font-bold uppercase tracking-widest text-sm border border-red-500/50 text-red-400 hover:bg-red-500/20 transition-colors"
+            >
+              Cancelar solicitud
+            </button>
           </div>
         </div>
       )}

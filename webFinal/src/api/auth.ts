@@ -23,7 +23,7 @@
  */
 
 import { DatosSesion, obtenerJugadorActivo } from "@/lib/sesion";
-import { guardarNotificacion } from "@/lib/notificaciones";
+import { guardarNotificacion, eliminarNotificacion } from "@/lib/notificaciones";
 import * as WS from "./ws";
 
 export const usarServidor = WS.usarServidor;
@@ -61,6 +61,12 @@ function configurarListenerNotificaciones(): void {
       remitente: msg.remitente as string,
       avatar_id: (msg.avatar_id as string | undefined) ?? null,
     });
+  });
+
+  // Si el remitente cancela la notificación antes de que respondamos,
+  // la eliminamos del sessionStorage inmediatamente (en cualquier página)
+  WS.suscribir("NOTIFICACION_CANCELADA", (msg) => {
+    eliminarNotificacion(msg.idNotificacion as number);
   });
 }
 
