@@ -43,9 +43,9 @@ export type FasePartida = "COLOCAR_TRAMPA" | "ELEGIR_CARTA_ACCION" | "JUGANDO" |
 
 export interface EstadoJuego {
   fasePartida: FasePartida;
-  opcionesCartasAccion: { nombre: string }[];
-  cartaAccionPropia: string | null;
-  cartaAccionRival: string | null;
+  opcionesCartasAccion: { nombre: string; accion: string }[];
+  cartaAccionPropia: { nombre: string; accion: string } | null;
+  cartaAccionRival: { nombre: string; accion: string } | null;
   /** Estado de interacción visual para jugar una carta de acción */
   modoAccion?: "REVIVIR" | "SALVAR_REY" | "SACRIFICIO_PROPIO" | "SACRIFICIO_RIVAL" | "ROBAR" | null;
   /** Datos temporales recogidos durante el modoAccion */
@@ -77,6 +77,10 @@ export interface EstadoJuego {
     origen: { fila: number; col: number };
     destino: { fila: number; col: number };
   } | null;
+  /** Contador de turnos para el efecto de ceguera (Acción CEGAR) */
+  cegueraContador: number;
+  /** Quién está ciego (null, 1 o 2) */
+  equipoCiego: EquipoID | null;
 }
 
 // ─── Creación del estado inicial ──────────────────────────────────────────────
@@ -120,6 +124,8 @@ export function crearEstadoInicial(): EstadoJuego {
     movimientosValidos: [],
     ganador: null,
     ultimoMovimiento: null,
+    cegueraContador: 0,
+    equipoCiego: null,
   };
 }
 
@@ -285,6 +291,8 @@ export function crearEstadoDesdeServidor(datos: {
     movimientosValidos: [],
     ganador: null,
     ultimoMovimiento: null,
+    cegueraContador: 0,
+    equipoCiego: null,
   };
 }
 
@@ -403,6 +411,12 @@ export function ejecutarMovimiento(
       origen: { fila: origenFila, col: origenCol },
       destino: { fila: destinoFila, col: destinoCol },
     },
+    cegueraContador: (estado.cegueraContador > 0 && estado.equipoCiego === equipoActual) 
+      ? estado.cegueraContador - 1 
+      : estado.cegueraContador,
+    equipoCiego: (estado.cegueraContador === 1 && estado.equipoCiego === equipoActual)
+      ? null
+      : estado.equipoCiego,
   };
 
   return { nuevoEstado, capturado, esReyCapturado, victoriaPortrono };

@@ -169,6 +169,20 @@ public final class PartidaJDBC {
         }
     }
 
+    public void terminarPartidasEnCurso(String j1, String j2) {
+        final String sql = "UPDATE Partida SET Estado = 'FINALIZADA' WHERE (J1 = ? OR J2 = ? OR J1 = ? OR J2 = ?) AND Estado = 'JUGANDOSE'";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement p = conn.prepareStatement(sql)) {
+            p.setString(1, j1);
+            p.setString(2, j1);
+            p.setString(3, j2);
+            p.setString(4, j2);
+            p.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error limpiando partidas en curso: " + e.getMessage());
+        }
+    }
+
     public boolean updatePosFichas2(int ID, String nuevoF2) throws SQLException {
         try(Connection c = dataSource.getConnection(); 
             PreparedStatement p = c.prepareStatement("UPDATE Partida SET Pos_Fichas_Eq2 = ? WHERE ID_Partida = ?")) { 

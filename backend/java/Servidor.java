@@ -92,6 +92,10 @@ class Pareja {
         eleccion = 0; //Para las cartas de accion
         p1 = _p1;
         p2 = _p2;
+
+        // Limpiamos partidas fantasma (abandonos por desconexión) antes de intentar crear una nueva
+        new JDBC.PartidaJDBC().terminarPartidasEnCurso(_p1.nombre, _p2.nombre);
+
         partida = new Partida(0, "JUGANDOSE", 0, tipo, null, null, 0, 0, _p1.nombre, _p2.nombre, false, false, 0);
         if (!partida.registrarPartida()) {
             throw new RuntimeException("No se pudo registrar la partida: " + _p1.nombre + " o " + _p2.nombre + " ya tiene una partida activa (JUGANDOSE) en la BD.");
@@ -1132,6 +1136,7 @@ public class Servidor extends WebSocketServer {
                     if (ca.getEquipo() == -1) {
                         JSONObject cartaJSON = new JSONObject();
                         cartaJSON.put("nombre", ca.getNombre());
+                        cartaJSON.put("accion", ca.getAccion());
                         cartasJSON1.put(cartaJSON);
                     }
                 }
@@ -1146,6 +1151,7 @@ public class Servidor extends WebSocketServer {
                     if (ca.getEquipo() == -2) {
                         JSONObject cartaJSON = new JSONObject();
                         cartaJSON.put("nombre", ca.getNombre());
+                        cartaJSON.put("accion", ca.getAccion());
                         cartasJSON2.put(cartaJSON);
                     }
                 }
@@ -1235,10 +1241,12 @@ public class Servidor extends WebSocketServer {
                         if (ca.getEquipo()==1) {
                             JSONObject cartaJSON1 = new JSONObject();
                             cartaJSON1.put("nombre", ca.getNombre());
+                            cartaJSON1.put("accion", ca.getAccion());
                             cartasJSON1.put(cartaJSON1);
                         } else if (ca.getEquipo()==2) {
                             JSONObject cartaJSON2 = new JSONObject();
                             cartaJSON2.put("nombre", ca.getNombre());
+                            cartaJSON2.put("accion", ca.getAccion());
                             cartasJSON2.put(cartaJSON2);
                         }
                     }

@@ -27,7 +27,7 @@ export function AvatarCircle({
   }, []);
 
   const src = getAvatarSrc(avatarId);
-  const inicial = (nombre?.charAt(0) ?? "?").toUpperCase();
+  const inicial = mounted ? (nombre?.charAt(0) ?? "?").toUpperCase() : "?";
 
   return (
     <div className={`${sizeClass} rounded-full overflow-hidden ${bgClass} flex items-center justify-center`}>

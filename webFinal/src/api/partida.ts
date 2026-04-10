@@ -119,12 +119,12 @@ export interface RespuestaTerminarPartida {
 
 export interface RespuestaSeleccioneCartaAccion {
   tipo: "SELECCIONE_CARTA_ACCION";
-  cartas_accion: { nombre: string }[];
+  cartas_accion: { nombre: string; accion: string }[];
 }
 
 export interface RespuestaPartidaLista {
   tipo: "PARTIDA_LISTA";
-  cartas_accion: { nombre: string }[];
+  cartas_accion: { nombre: string; accion: string }[];
 }
 
 export interface RespuestaCartaAccionJugada {

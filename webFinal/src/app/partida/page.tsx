@@ -519,13 +519,15 @@ function PartidaInterna({
   // Ejecución local de efectos de la Carta de Acción para mantener estado sincrónico
   const aplicarCartaAccionLocal = useCallback((
     equipoEjecutor: number, cartaNombre: string,
-    x: number, y: number, x_op: number, y_op: number, cartaRobar: string
+    x: number, y: number, x_op: number, y_op: number, cartaRobar: string,
+    accionForzada?: string // Útil si recibimos la acción desde el servidor
   ) => {
     setEstado((prev) => {
       const nuevoTablero = prev.tablero.map((f) => f.map((c) => ({ ...c, ficha: c.ficha ? { ...c.ficha } : null })));
       let nuevaAccionPropia = prev.cartaAccionPropia;
       
-      const c = cartaNombre.toUpperCase();
+      const c = (accionForzada || (equipoEjecutor === miEquipoActual ? prev.cartaAccionPropia?.accion : prev.cartaAccionRival?.accion) || "").toUpperCase();
+      
       if (c === "REVIVIR") {
         if (y >= 0 && x >= 0) {
            nuevoTablero[y][x].ficha = { equipo: equipoEjecutor as 1 | 2, esRey: false };
@@ -539,8 +541,9 @@ function PartidaInterna({
             }
         }));
         if (reyPos.f !== -1 && y >= 0 && x >= 0) {
-            nuevoTablero[y][x].ficha = nuevoTablero[reyPos.f][reyPos.c].ficha;
-            nuevoTablero[reyPos.f][reyPos.c].ficha = null;
+            const temp = nuevoTablero[reyPos.f][reyPos.c].ficha;
+            nuevoTablero[reyPos.f][reyPos.c].ficha = nuevoTablero[y][x].ficha;
+            nuevoTablero[y][x].ficha = temp;
         }
       } else if (c === "SACRIFICIO") {
         if (y >= 0 && x >= 0) nuevoTablero[y][x].ficha = null;
@@ -576,7 +579,45 @@ function PartidaInterna({
            }
         }
       } else if (c === "CEGAR") {
-          // Efecto visual: por ahora solo registrar
+          const rival = equipoEjecutor === 1 ? 2 : 1;
+          return { ...prev, cegueraContador: 2, equipoCiego: rival, cartaAccionPropia: equipoEjecutor === miEquipoActual ? null : prev.cartaAccionPropia };
+      } else if (c === "ESPEJO") {
+          // Invertir horizontalmente los movimientos de TODAS las cartas
+          const invertir = (cartas: CartaMovDef[]) => cartas.map(ca => ({
+              ...ca,
+              listaMovimientos: (ca.listaMovimientos || []).map(pos => ({ ...pos, x: -pos.x }))
+          }));
+          return {
+              ...prev,
+              cartasJugador: invertir(prev.cartasJugador),
+              cartasOponente: invertir(prev.cartasOponente),
+              cartasSiguientes: invertir(prev.cartasSiguientes),
+              cartaAccionPropia: equipoEjecutor === miEquipoActual ? null : prev.cartaAccionPropia
+          };
+      } else if (c === "SOLO_PARA_ADELANTE") {
+          const filtrar = (cartas: CartaMovDef[]) => cartas.map(ca => ({
+              ...ca,
+              listaMovimientos: (ca.listaMovimientos || []).filter(pos => pos.y >= 0)
+          }));
+          return {
+              ...prev,
+              cartasJugador: filtrar(prev.cartasJugador),
+              cartasOponente: filtrar(prev.cartasOponente),
+              cartasSiguientes: filtrar(prev.cartasSiguientes),
+              cartaAccionPropia: equipoEjecutor === miEquipoActual ? null : prev.cartaAccionPropia
+          };
+      } else if (c === "SOLO_PARA_ATRAS") {
+          const filtrar = (cartas: CartaMovDef[]) => cartas.map(ca => ({
+              ...ca,
+              listaMovimientos: (ca.listaMovimientos || []).filter(pos => pos.y <= 0)
+          }));
+          return {
+              ...prev,
+              cartasJugador: filtrar(prev.cartasJugador),
+              cartasOponente: filtrar(prev.cartasOponente),
+              cartasSiguientes: filtrar(prev.cartasSiguientes),
+              cartaAccionPropia: equipoEjecutor === miEquipoActual ? null : prev.cartaAccionPropia
+          };
       }
       
       if (equipoEjecutor === miEquipoActual) {
@@ -704,6 +745,27 @@ function PartidaInterna({
           window.setTimeout(() => setMensajePausaPendiente(null), 3500);
           break;
 
+        case "PARTIDA_LISTA": {
+          const res = msg as RespuestaPartidaLista;
+          setAguardandoInicio(false);
+          setEstado((prev) => ({
+            ...prev,
+            fasePartida: "JUGANDO",
+            cartaAccionPropia: res.cartas_accion.length > 0 ? res.cartas_accion[0] : prev.cartaAccionPropia,
+          }));
+          break;
+        }
+
+        case "SELECCIONE_CARTA_ACCION": {
+          const res = msg as RespuestaSeleccioneCartaAccion;
+          setEstado((prev) => ({
+             ...prev,
+             fasePartida: "ELEGIR_CARTA_ACCION",
+             opcionesCartasAccion: res.cartas_accion
+          }));
+          break;
+        }
+
         case "TRAMPA_INVALIDA":
           alert("Posición inválida para colocar la trampa.");
           setEstado((prev) => {
@@ -712,16 +774,6 @@ function PartidaInterna({
           });
           break;
 
-        case "SELECCIONE_CARTA_ACCION": {
-          const resp = msg as import("@/api/partida").RespuestaSeleccioneCartaAccion;
-          setEstado((prev) => ({
-            ...prev,
-            fasePartida: "ELEGIR_CARTA_ACCION",
-            opcionesCartasAccion: resp.cartas_accion,
-          }));
-          break;
-        }
-
         case "TRAMPA_ACTIVADA":
           // feedback visual? 
           break;
@@ -729,16 +781,6 @@ function PartidaInterna({
         case "CARTA_ACCION_INVALIDA":
           alert("Carta de acción seleccionada/jugada es inválida.");
           break;
-
-        case "PARTIDA_LISTA": {
-          const resp = msg as import("@/api/partida").RespuestaPartidaLista;
-          setEstado((prev) => ({
-            ...prev,
-            fasePartida: "JUGANDO",
-            cartaAccionPropia: resp.cartas_accion.length > 0 ? resp.cartas_accion[0].nombre : prev.cartaAccionPropia,
-          }));
-          break;
-        }
 
         case "CARTA_ACCION_JUGADA": {
           const m = msg as import("@/api/partida").RespuestaCartaAccionJugada;
@@ -880,22 +922,46 @@ function PartidaInterna({
       const m = estado.modoAccion;
       const p = estado.accionParams || {};
       
-      if (m === "REVIVIR" || m === "SALVAR_REY") {
-        if (celda.ficha) {
-          alert("Debe ser una casilla vacía.");
+      if (m === "REVIVIR") {
+        const tronoCol = Math.floor(DIM / 2);
+        const tronoFila = miEquipo === 1 ? 0 : DIM - 1;
+        if (fila !== tronoFila || col !== tronoCol) {
+          alert("Debes seleccionar TU TRONO para revivir al peón.");
           return;
         }
-        const enMiMitad = (miEquipo === 1 && fila < 3) || (miEquipo === 2 && fila >= 4);
-        if (!enMiMitad) {
-          alert("Debe ser en tu mitad del tablero (3 primeras filas).");
+        if (celda.ficha) {
+          alert("Tu trono debe estar vacío para poder revivir un peón.");
+          return;
+        }
+        // Comprobar visualmente (frontal) si faltan peones propios
+        let misPeones = 0;
+        estado.tablero.forEach(f => f.forEach(c => {
+           if (c.ficha && c.ficha.equipo === miEquipo) misPeones++;
+        }));
+        if (misPeones >= 5) {
+          alert("No puedes revivir, no has perdido ningún peón.");
+          return;
+        }
+        
+        enviarJugarCartaAccion({
+          equipo: miEquipo,
+          cartaAccion: estado.cartaAccionPropia.nombre,
+          x: col, y: fila, x_op: -1, y_op: -1, cartaRobar: "ninguna"
+        });
+        aplicarCartaAccionLocal(miEquipoActual, estado.cartaAccionPropia.nombre, col, fila, -1, -1, "ninguna", m);
+        setEstado(curr => ({...curr, modoAccion: null, accionParams: {}}));
+        return;
+      } else if (m === "SALVAR_REY") {
+        if (!celda.ficha || celda.ficha.equipo !== miEquipo || celda.ficha.esRey) {
+          alert("Debes seleccionar un PEÓN ALIADO para intercambiarlo con tu rey.");
           return;
         }
         enviarJugarCartaAccion({
-          partida_id: partidaId,
-          cartaAccion: estado.cartaAccionPropia,
+          equipo: miEquipo,
+          cartaAccion: estado.cartaAccionPropia.nombre,
           x: col, y: fila, x_op: -1, y_op: -1, cartaRobar: "ninguna"
         });
-        aplicarCartaAccionLocal(miEquipoActual, estado.cartaAccionPropia, col, fila, -1, -1, "ninguna");
+        aplicarCartaAccionLocal(miEquipoActual, estado.cartaAccionPropia.nombre, col, fila, -1, -1, "ninguna", m);
         setEstado(curr => ({...curr, modoAccion: null, accionParams: {}}));
         return;
       } else if (m === "SACRIFICIO_PROPIO") {
@@ -909,15 +975,15 @@ function PartidaInterna({
           alert("Debes seleccionar un PEÓN RIVAL para destruir."); return;
         }
         enviarJugarCartaAccion({
-          partida_id: partidaId,
-          cartaAccion: estado.cartaAccionPropia,
+          equipo: miEquipo,
+          cartaAccion: estado.cartaAccionPropia.nombre,
           x: p.x!, y: p.y!, x_op: col, y_op: fila, cartaRobar: "ninguna"
         });
-        aplicarCartaAccionLocal(miEquipoActual, estado.cartaAccionPropia, p.x!, p.y!, col, fila, "ninguna");
+        aplicarCartaAccionLocal(miEquipoActual, estado.cartaAccionPropia.nombre, p.x!, p.y!, col, fila, "ninguna", "SACRIFICIO");
         setEstado(curr => ({...curr, modoAccion: null, accionParams: {}}));
         return;
       } else if (m === "ROBAR") {
-        alert("Debes seleccionar una carta del rival para robársela.");
+        alert("Debes hacer click en la CARTA AL LADO DEL PERFIL del rival para robarla.");
         return;
       }
     }
@@ -1252,7 +1318,7 @@ function PartidaInterna({
               <button
                 type="button"
                 onClick={handleConfirmarPausa}
-                className="flex-1 py-3 rounded-xl font-bold uppercase tracking-widest text-sm bg-amber-700 text-white hover:bg-amber-600 transition-colors"
+                className="flex-1 py-3 rounded-xl font-bold uppercase tracking-widest text-sm bg-amber-700 text-white hover:amber-600 transition-colors"
               >
                 Solicitar pausa
               </button>
@@ -1319,29 +1385,34 @@ function PartidaInterna({
           <div className="flex flex-col gap-1.5 shrink-0">
             <p className="text-white/40 text-[9px] uppercase tracking-widest text-center">Cartas del oponente</p>
             {estado.cartasOponente.map((c, i) => (
-              // equipo={1}: movimientos invertidos (perspectiva del rival)
-              // colorDots: color del rival (opuesto al jugador local)
-              <CartaBtn
-                key={`${c.nombre}-oponente-${i}`}
-                carta={c}
-                equipo={1}
-                colorDots={getColorMovimiento(
-                  skinActiva,
-                  miEquipoActual === 1 ? 2 : 1
+              <div key={`${c.nombre}-oponente-${i}`} className="relative">
+                <CartaBtn
+                  carta={c}
+                  equipo={1}
+                  colorDots={getColorMovimiento(
+                    skinActiva,
+                    miEquipoActual === 1 ? 2 : 1
+                  )}
+                  desactivada={estado.modoAccion !== "ROBAR" && estado.turnoActual !== (miEquipoActual === 1 ? 2 : 1)}
+                  onClick={() => {
+                    if (estado.modoAccion === "ROBAR") {
+                      enviarJugarCartaAccion({
+                        equipo: miEquipoActual,
+                        cartaAccion: estado.cartaAccionPropia!.nombre,
+                        x: -1, y: -1, x_op: -1, y_op: -1, cartaRobar: c.nombre
+                      });
+                      aplicarCartaAccionLocal(miEquipoActual, estado.cartaAccionPropia!.nombre, -1, -1, -1, -1, c.nombre, "ROBAR");
+                      setEstado(curr => ({ ...curr, modoAccion: null, accionParams: {} }));
+                    }
+                  }}
+                />
+                {estado.cegueraContador > 0 && estado.equipoCiego === miEquipoActual && estado.turnoActual === miEquipoActual && (
+                  <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center rounded-xl border border-white/20 z-10 transition-all duration-500">
+                    <span className="text-2xl animate-pulse">👁️‍🗨️</span>
+                    <span className="text-[8px] text-white/40 uppercase tracking-tighter">Oculto</span>
+                  </div>
                 )}
-                desactivada={estado.modoAccion !== "ROBAR"}
-                onClick={() => {
-                  if (estado.modoAccion === "ROBAR") {
-                    enviarJugarCartaAccion({
-                         partida_id: partidaId,
-                         cartaAccion: estado.cartaAccionPropia!,
-                         x: -1, y: -1, x_op: -1, y_op: -1, cartaRobar: c.nombre
-                    });
-                    aplicarCartaAccionLocal(miEquipoActual, estado.cartaAccionPropia!, -1, -1, -1, -1, c.nombre);
-                    setEstado(curr => ({...curr, modoAccion: null, accionParams: {}}));
-                  }
-                }}
-              />
+              </div>
             ))}
           </div>
 
@@ -1421,11 +1492,13 @@ function PartidaInterna({
                 let esZonaAcc = false;
                 let esObjAcc = false;
                 if (estado.modoAccion === "REVIVIR" || estado.modoAccion === "SALVAR_REY") {
-                    esZonaAcc = (miEquipoActual === 1 && fila < 3) || (miEquipoActual === 2 && fila >= 4);
+                    const enMiMitad = (miEquipoActual === 1 && fila < 3) || (miEquipoActual === 2 && fila >= 4);
+                    esZonaAcc = enMiMitad && !celda.ficha;
                 } else if (estado.modoAccion === "SACRIFICIO_PROPIO") {
                     esZonaAcc = celda.ficha?.equipo === miEquipoActual && !celda.ficha?.esRey;
                 } else if (estado.modoAccion === "SACRIFICIO_RIVAL") {
                     esObjAcc = celda.ficha?.equipo !== miEquipoActual && !!celda.ficha && !celda.ficha.esRey;
+                    // Resaltar el peón que vamos a sacrificar para recordarlo
                     esZonaAcc = estado.accionParams?.x === col && estado.accionParams?.y === fila;
                 }
 
@@ -1524,31 +1597,35 @@ function PartidaInterna({
                  type="button"
                  disabled={!esTurnoJugador || estado.fasePartida !== "JUGANDO" || !!estado.modoAccion}
                  onClick={() => {
-                   const c = estado.cartaAccionPropia!;
-                   const sinParams = ["ESPEJO", "SOLO_PARA_ADELANTE", "SOLO_PARA_ATRAS", "CEGAR"];
-                   if (sinParams.includes(c)) {
-                      // Acción inmediata sin parámetros
-                      enviarJugarCartaAccion({
-                        partida_id: partidaId,
-                        cartaAccion: c,
-                        x: -1, y: -1, x_op: -1, y_op: -1, cartaRobar: "ninguna"
-                      });
-                      aplicarCartaAccionLocal(miEquipoActual, c, -1, -1, -1, -1, "ninguna");
-                   } else if (c === "REVIVIR" || c === "SALVAR_REY") {
-                      setEstado(curr => ({ ...curr, modoAccion: c as any, accionParams: {} }));
-                   } else if (c === "SACRIFICIO") {
-                      setEstado(curr => ({ ...curr, modoAccion: "SACRIFICIO_PROPIO", accionParams: {} }));
-                   } else if (c === "ROBAR") {
-                      setEstado(curr => ({ ...curr, modoAccion: "ROBAR", accionParams: {} }));
-                   } else {
-                     // Fallback por si la backend envía otra cosa
-                     setEstado(curr => ({ ...curr, modoAccion: "REVIVIR", accionParams: {} }));
-                   }
+                    if (!estado.cartaAccionPropia) return;
+                    const n = typeof estado.cartaAccionPropia === "string" ? estado.cartaAccionPropia : (estado.cartaAccionPropia as any).nombre; const c = (typeof estado.cartaAccionPropia === "string" ? estado.cartaAccionPropia : (estado.cartaAccionPropia as any).accion || n).toUpperCase();
+                    const sinParams = ["ESPEJO", "SOLO_PARA_ADELANTE", "SOLO_PARA_ATRAS", "CEGAR"];
+                    
+                    if (sinParams.includes(c)) {
+                       enviarJugarCartaAccion({
+                         equipo: miEquipoActual,
+                         cartaAccion: n,
+                         x: -1, y: -1, x_op: -1, y_op: -1, cartaRobar: "ninguna"
+                       });
+                       aplicarCartaAccionLocal(miEquipoActual, n, -1, -1, -1, -1, "ninguna", c);
+                    } else if (c === "REVIVIR" || c === "SALVAR_REY") {
+                       // Condición: Solo si ha perdido al menos un peón (menos de 5 piezas en total)
+                       const piezas = estado.tablero.flat().filter(celda => celda.ficha?.equipo === miEquipoActual);
+                       if (piezas.length >= 5) {
+                          alert("Aún tienes todas tus piezas. No puedes usar el Santo Grial.");
+                          return;
+                       }
+                       setEstado(curr => ({ ...curr, modoAccion: c as any, accionParams: {} }));
+                    } else if (c === "SACRIFICIO") {
+                       setEstado(curr => ({ ...curr, modoAccion: "SACRIFICIO_PROPIO", accionParams: {} }));
+                    } else if (c === "ROBAR") {
+                       setEstado(curr => ({ ...curr, modoAccion: "ROBAR", accionParams: {} }));
+                    }
                  }}
                  className={`w-full py-6 rounded-xl border-2 ${estado.modoAccion ? 'border-yellow-400 bg-yellow-400/20' : 'border-[#16a34a] bg-[#16a34a]/20 hover:bg-[#16a34a]/40'} flex flex-col items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed`}
                >
                  <span className="text-2xl">🌟</span>
-                 <span className="text-[#22c55e] font-bold uppercase tracking-widest text-xs text-center px-1 break-words">{estado.cartaAccionPropia}</span>
+                 <span className="text-[#22c55e] font-bold uppercase tracking-widest text-xs text-center px-1 break-words">{estado.cartaAccionPropia.nombre}</span>
                </button>
                {estado.modoAccion && (
                  <button
@@ -1597,15 +1674,15 @@ function PartidaInterna({
               : "bg-red-900/60 border-red-400/40"
               }`}>
               <AvatarCircle
-                nombre={jugadorActual.nombre}
-                avatarId={jugadorActual.avatar_id}
+                nombre={mounted ? jugadorActual.nombre : "IronMaster"}
+                avatarId={mounted ? jugadorActual.avatar_id : null}
                 sizeClass="w-full h-full"
                 textClass="text-xs"
                 bgClass="bg-transparent"
               />
             </div>
-            <span className="text-white/60 text-[10px]">@{jugadorActual.nombre}</span>
-            <span className="text-white/30 text-[9px]">{jugadorActual.puntos} pts</span>
+            <span className="text-white/60 text-[10px]">@{mounted ? jugadorActual.nombre : "IronMaster"}</span>
+            <span className="text-white/30 text-[9px]">{mounted ? jugadorActual.puntos : 1372} pts</span>
           </div>
         </aside>
       </div>

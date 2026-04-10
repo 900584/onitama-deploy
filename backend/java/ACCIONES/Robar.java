@@ -19,12 +19,14 @@ public class Robar extends Accion {
             boolean esOponente = (carta.getEstado().equals("EQ1") && equipo == 2) || (carta.getEstado().equals("EQ2") && equipo == 1);
             if (esOponente && carta.getNombre().equals(nomCarta)) {
                 carta.setEstado("EQ"+equipo);
+                carta.actualizarDatosPartida(partida.getIDPartida());
                 encontrada = true;
             }
             if (carta.getEstado().equals("MAZO")) {
                 if (encontrada) {
                     int equipoOp = (equipo == 1) ? 2 : 1;
                     carta.setEstado("EQ"+equipoOp);
+                    carta.actualizarDatosPartida(partida.getIDPartida());
                 }
                 break;
             }

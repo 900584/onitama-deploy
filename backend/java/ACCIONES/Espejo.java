@@ -1,14 +1,16 @@
 package ACCIONES;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import VO.CartaMov;
 import VO.Partida;
 import VO.Posicion;
 
 public class Espejo extends Accion {
-    List<CartaMov> movimientosSinModificar = new ArrayList<>();
+    private Map<CartaMov, List<Posicion>> movimientosOriginales = new HashMap<>();
 
     public Espejo() {
         super("ESPEJO");
@@ -17,24 +19,28 @@ public class Espejo extends Accion {
     @Override
     public boolean ejecutar(Partida partida, int x, int y, int equipo, int xOp, int yOp, String nomCarta) {
         System.out.println("Ejecutando acción: " + getNombre());
-        movimientosSinModificar = partida.getCartasMovimiento();
-        List<CartaMov> movimientosNuevos = new ArrayList<>();
-        for (CartaMov carta : movimientosSinModificar) {
-            List<Posicion> movimientosEspejo = new ArrayList<>();
-            for (Posicion pos : carta.getListaMovimientos()) {
-                Posicion posEspejo = new Posicion(-pos.getX(), pos.getY(), null);
-                movimientosEspejo.add(pos);
+        List<CartaMov> cartas = partida.getCartasMovimiento();
+        movimientosOriginales.clear();
+
+        for (CartaMov carta : cartas) {
+            List<Posicion> posOriginales = new ArrayList<>(carta.getListaMovimientos());
+            movimientosOriginales.put(carta, posOriginales);
+
+            List<Posicion> posEspejo = new ArrayList<>();
+            for (Posicion pos : posOriginales) {
+                posEspejo.add(new Posicion(-pos.getX(), pos.getY(), null));
             }
-            carta.setListaMovimientos(movimientosEspejo);
-            movimientosNuevos.add(carta);
+            carta.setListaMovimientos(posEspejo);
         }
-        partida.setCartasMovimiento(movimientosNuevos);
         return true;
     }
 
     @Override
     public void deshacer(Partida partida) {
         System.out.println("Deshaciendo acción: " + getNombre());
-        partida.setCartasMovimiento(movimientosSinModificar);
+        for (Map.Entry<CartaMov, List<Posicion>> entry : movimientosOriginales.entrySet()) {
+            entry.getKey().setListaMovimientos(entry.getValue());
+        }
+        movimientosOriginales.clear();
     }
 }
