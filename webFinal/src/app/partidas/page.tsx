@@ -65,7 +65,7 @@ const TIPOS_PARTIDA = [
   {
     id: "entrenamiento",
     nombre: "Partida Entrenamiento",
-    descripcion: "Lucha contra el robot Iron.",
+    descripcion: "Lucha contra el robot Iron sin cartas de acción ni casillas trampa.",
     imagen: "/pEntrenamiento.png",
   },
   {
