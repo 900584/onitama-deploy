@@ -891,6 +891,14 @@ public class Servidor extends WebSocketServer {
         ScheduledFuture<?>[] timer = new ScheduledFuture<?>[1];
         timer[0] = temporizador.schedule(() -> {
             timersInvitacion.remove(idNotifFinal);
+            // arreglado: al terminar el timer, actualiza el estado a RECHAZADA
+            // para que aceptarInvitacion() rechace cualquier intento de aceptar
+            // después de los 2 minutos.
+            try {
+                new NotificacionJDBC().actualizarEstado(idNotifFinal, Notificacion.ESTADO_RECHAZADA);
+            } catch (SQLException e) {
+                System.err.println("Error al marcar invitación expirada: " + e.getMessage());
+            }
             WebSocket wsA = buscarConexion(remitente);
             if (wsA != null && wsA.isOpen()) {
                 wsA.send(new JSONObject().put("tipo", "ERROR_NO_UNIDO").toString());
@@ -922,6 +930,17 @@ public class Servidor extends WebSocketServer {
             if (notif == null) {
                 System.err.println("aceptarInvitacion: notificación no encontrada id=" + idNotificacion);
                 conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
+                return;
+            }
+            // arreglado: verifica que la notificación esté PENDIENTE y
+            // si está RECHAZADA (porque expiró), rechaza la aceptación con ERROR_NO_UNIDO. 
+            if (!Notificacion.ESTADO_PENDIENTE.equals(notif.getEstado())) {
+                conn.send(new JSONObject().put("tipo", "ERROR_NO_UNIDO").toString());
+                return;
+            }
+            if (notif.haExpirado()) {
+                notifJdbc.actualizarEstado(idNotificacion, Notificacion.ESTADO_RECHAZADA);
+                conn.send(new JSONObject().put("tipo", "ERROR_NO_UNIDO").toString());
                 return;
             }
             System.out.println("Invitación aceptada: " + notif.getRemitente() + " -> " + notif.getDestinatario());
