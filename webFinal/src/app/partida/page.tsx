@@ -47,6 +47,7 @@ import { obtenerJugadorActivo, guardarSesion } from "@/lib/sesion";
 import { obtenerPerfil } from "@/api/auth";
 import { calcularMejorMovimientoIA, type Dificultad } from "@/lib/ia";
 import { getBoardStyle, getColorMovimiento, getEquipoNombre, getPiezaSrc, normalizarSkinId } from "@/lib/skins";
+import { CartaAccionFicha } from "@/lib/cartasAccionVisual";
 import { AvatarCircle } from "@/lib/avatar";
 import { usarServidor } from "@/api/ws";
 import {
@@ -280,7 +281,7 @@ function Celda({
   const esMia = esTrampaEquipo === miEquipoActual && !esDisparada;
 
   let bg = baseClase;
-  if (esDisparada) bg = "bg-zinc-600/70 cursor-not-allowed";
+  if (esDisparada) bg = `${baseClase} cursor-not-allowed ring-1 ring-inset ring-stone-700/40`;
   else if (esSeleccionada) bg = "bg-yellow-300";
   else if (esMovimientoValido) bg = "bg-[#93c5fd] cursor-pointer hover:bg-blue-300";
   else if (esZonaAccion && !ficha) bg = "bg-green-300/80 cursor-pointer hover:bg-green-400";
@@ -295,17 +296,33 @@ function Celda({
       disabled={esDisparada}
       className={`aspect-square flex items-center justify-center relative border transition-colors duration-100 ${bordeClase} ${bg} overflow-hidden ${esMia ? "ring-2 ring-inset ring-red-600" : ""}`}
     >
-      {/* Casilla disparada: calavera gris con filtro blur */}
+      {/* Casilla disparada: lápida (casilla sigue injugable) */}
       {esDisparada && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <span className="text-zinc-400/80 text-2xl/none" style={{ filter: "blur(0.5px)" }}>☠️</span>
+          <div className="relative h-[min(78%,3.25rem)] w-[min(78%,3.25rem)]">
+            <Image
+              src="/lapida.png"
+              alt=""
+              fill
+              sizes="64px"
+              className="object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]"
+            />
+          </div>
         </div>
       )}
 
-      {/* Indicador de Trampa propia (bomba, solo visible si es tuya y no disparada) */}
+      {/* Trampa propia aún no disparada — arte en public/casillaTrampa.png */}
       {esMia && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 opacity-50">
-          <span className="text-2xl/none">💣</span>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 opacity-55">
+          <div className="relative h-[min(70%,2.85rem)] w-[min(70%,2.85rem)]">
+            <Image
+              src="/casillaTrampa.png"
+              alt=""
+              fill
+              sizes="56px"
+              className="object-contain drop-shadow-sm"
+            />
+          </div>
         </div>
       )}
 
@@ -1852,48 +1869,28 @@ function PartidaInterna({
             {/* Cartas de acción */}
             {(estado.cartaAccionPropia || estado.cartaAccionRival) && (
               <div className="flex flex-col gap-1.5 shrink-0 pb-1">
-                <p className="text-[#22c55e] text-[9px] uppercase tracking-widest text-center font-bold">
+                <p className="text-white/80 text-[9px] uppercase tracking-widest text-center font-bold">
                   Cartas de acción
                 </p>
                 {estado.cartaAccionPropia && (
-                  <button
-                    type="button"
+                  <CartaAccionFicha
+                    variante="mano"
+                    nombre={estado.cartaAccionPropia.nombre}
+                    descripcion={getDescripcionCartaAccion(estado.cartaAccionPropia.accion)}
                     disabled={!esTurnoJugador || estado.fasePartida !== "JUGANDO" || !!estado.modoAccion}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      iniciarAccionDesdeCarta(estado.cartaAccionPropia!);
-                    }}
-                    className={`w-full py-2.5 rounded-lg border-2 ${estado.modoAccion ? "border-yellow-400 bg-yellow-400/20" : "border-[#16a34a] bg-[#16a34a]/20 hover:bg-[#16a34a]/40"} flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed`}
-                  >
-                    <span className="text-2xl leading-none">🌟</span>
-                    <span className="text-[#22c55e] font-bold uppercase tracking-widest text-[10px] text-center px-1 break-words leading-tight">
-                      {estado.cartaAccionPropia.nombre}
-                    </span>
-                    <span className="text-white/50 text-[8px] text-center leading-tight px-1">
-                      {getDescripcionCartaAccion(estado.cartaAccionPropia.accion)}
-                    </span>
-                  </button>
+                    modoAccionActivo={!!estado.modoAccion}
+                    onClick={() => iniciarAccionDesdeCarta(estado.cartaAccionPropia!)}
+                  />
                 )}
                 {estado.cartaAccionRival && (
-                  <button
-                    type="button"
+                  <CartaAccionFicha
+                    variante="mano"
+                    nombre={estado.cartaAccionRival.nombre}
+                    descripcion={getDescripcionCartaAccion(estado.cartaAccionRival.accion)}
                     disabled={!esTurnoJugador || estado.fasePartida !== "JUGANDO" || !!estado.modoAccion}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      iniciarAccionDesdeCarta(estado.cartaAccionRival!);
-                    }}
-                    className={`w-full py-2.5 rounded-lg border-2 ${estado.modoAccion ? "border-yellow-400 bg-yellow-400/20" : "border-purple-500/50 bg-purple-950/35 hover:bg-purple-900/50"} flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed`}
-                  >
-                    <span className="text-2xl leading-none">🌟</span>
-                    <span className="text-purple-200 font-bold uppercase tracking-widest text-[10px] text-center px-1 break-words leading-tight">
-                      {estado.cartaAccionRival.nombre}
-                    </span>
-                    <span className="text-purple-200/55 text-[8px] text-center leading-tight px-1">
-                      {getDescripcionCartaAccion(estado.cartaAccionRival.accion)}
-                    </span>
-                  </button>
+                    modoAccionActivo={!!estado.modoAccion}
+                    onClick={() => iniciarAccionDesdeCarta(estado.cartaAccionRival!)}
+                  />
                 )}
                 {estado.modoAccion && (
                   <button
@@ -1982,21 +1979,21 @@ function PartidaInterna({
             <h2 className="text-xl font-bold text-[#f5ede0] uppercase tracking-widest text-center shadow-sm">
               Selecciona tu Carta de Acción
             </h2>
-            <div className="flex gap-4 w-full justify-center">
+            <div className="flex flex-wrap gap-4 w-full justify-center">
               {estado.opcionesCartasAccion.map((cartaCa, idx) => (
-                <button
-                   key={idx}
-                   onClick={() => {
-                     cartaElegidaNombreRef.current = cartaCa.nombre;
-                     cartaNoElegidaRef.current = estado.opcionesCartasAccion.find(c => c.nombre !== cartaCa.nombre) ?? null;
-                     enviarSeleccionCartaAccion(miEquipoActual, cartaCa.nombre);
-                     setEstado(curr => ({ ...curr, opcionesCartasAccion: [] }));
-                   }}
-                   className="w-44 bg-[#f5ede0] border-2 border-[#a8906a] rounded-xl flex flex-col items-center justify-start gap-2 p-4 text-[#2d1a0a] hover:scale-105 hover:bg-[#ede0cc] transition-all shadow-md cursor-pointer"
-                >
-                  <span className="uppercase text-sm font-bold leading-tight text-center break-words">{cartaCa.nombre}</span>
-                  <span className="text-[11px] font-normal text-[#5a3a1a]/80 leading-snug text-center">{getDescripcionCartaAccion(cartaCa.accion)}</span>
-                </button>
+                <CartaAccionFicha
+                  key={`${cartaCa.nombre}-${idx}`}
+                  variante="elegir"
+                  nombre={cartaCa.nombre}
+                  descripcion={getDescripcionCartaAccion(cartaCa.accion)}
+                  onClick={() => {
+                    cartaElegidaNombreRef.current = cartaCa.nombre;
+                    cartaNoElegidaRef.current =
+                      estado.opcionesCartasAccion.find((c) => c.nombre !== cartaCa.nombre) ?? null;
+                    enviarSeleccionCartaAccion(miEquipoActual, cartaCa.nombre);
+                    setEstado((curr) => ({ ...curr, opcionesCartasAccion: [] }));
+                  }}
+                />
               ))}
             </div>
             {estado.opcionesCartasAccion.length === 0 && (
