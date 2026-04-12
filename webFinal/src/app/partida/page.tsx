@@ -85,7 +85,7 @@ const DESCRIPCION_CARTA_ACCION: Record<string, string> = {
   SALVAR_REY: "Mueve a tu Rey a una casilla vacía de tu mitad del campo.",
   SACRIFICIO: "Selecciona un peón tuyo y un peón rival; ambos mueren.",
   SOLO_PARA_ADELANTE:
-    "Solo se pueden hacer movimientos para  adelante. Dura hasta que el rival realice un movimiento..",
+    "Solo se pueden hacer movimientos para  adelante. Dura hasta que el rival realice un movimiento.",
   SOLO_PARA_ATRAS:
     "Solo se pueden hacer movimientos para atrás. Dura hasta que el rival realice un movimiento.",
   ROBAR: "Elige una carta de movimiento del oponente y añádela a tu mano.",
