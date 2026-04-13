@@ -36,6 +36,7 @@ INSERT INTO Cartas_Accion (Nombre, Accion, Puntos_min) VALUES ('Santo Grial', 'R
 INSERT INTO Cartas_Accion (Nombre, Accion, Puntos_min) VALUES ('Illusia', 'SALVAR_REY', 0);-- Puntos a 0 para probar(originales 500)
 INSERT INTO Cartas_Accion (Nombre, Accion, Puntos_min) VALUES ('Requiem', 'SACRIFICIO', 0); -- Puntos a 0 para probar(originales 1000)--Se sacrifica un peon tuyo para matar a otro del enemigo
 INSERT INTO Cartas_Accion (Nombre, Accion, Puntos_min) VALUES ('La Dama del Mar', 'SOLO_PARA_ADELANTE', 0);
-INSERT INTO Cartas_Accion (Nombre, Accion, Puntos_min) VALUES ('Atrapasueños', 'ROBAR', 0);-- Puntos a 0 para probar(originales 1000)
+-- U&'...\00F1...' evita que PowerShell/Get-Content (ANSI) corrompa la ñ al canalizar a psql
+INSERT INTO Cartas_Accion (Nombre, Accion, Puntos_min) VALUES (U&'Atrapasue\00F1os', 'ROBAR', 0);-- Puntos a 0 para probar(originales 1000)
 INSERT INTO Cartas_Accion (Nombre, Accion, Puntos_min) VALUES ('Brujeria', 'CEGAR', 0);
 INSERT INTO Cartas_Accion (Nombre, Accion, Puntos_min) VALUES ('Finisterra', 'SOLO_PARA_ATRAS', 0);
