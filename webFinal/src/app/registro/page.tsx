@@ -26,6 +26,8 @@ import { registrarUsuario } from "@/api/auth";
 import { guardarSesion } from "@/lib/sesion";
 
 type Paso = 1 | 2 | 3;
+/** Sin elección aún (no se puede confirmar). `null` = explícitamente sin foto. */
+type EleccionAvatar = "sin_elegir" | string | null;
 const AVATARES = Array.from({ length: 12 }, (_, i) =>
   `avatar_${String(i + 1).padStart(2, "0")}`
 );
@@ -42,7 +44,7 @@ export default function RegistroPage() {
   const [errorRegistro, setErrorRegistro] = useState("");
   const [cargando, setCargando] = useState(false);
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
-  const [avatarSeleccionado, setAvatarSeleccionado] = useState<string | null>(null);
+  const [avatarSeleccionado, setAvatarSeleccionado] = useState<EleccionAvatar>("sin_elegir");
 
   // ─── Paso 1: validar datos y pasar a confirmación ─────────────────────────
   const handleContinuar = (e: React.FormEvent) => {
@@ -76,6 +78,7 @@ export default function RegistroPage() {
 
   // ─── Paso 3: enviar al servidor ───────────────────────────────────────────
   const handleFinalizar = async () => {
+    if (avatarSeleccionado === "sin_elegir") return;
     setErrorRegistro("");
     setCargando(true);
     try {
@@ -255,7 +258,10 @@ export default function RegistroPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaso(3)}
+                  onClick={() => {
+                    setAvatarSeleccionado("sin_elegir");
+                    setPaso(3);
+                  }}
                   disabled={cargando}
                   className="flex-1 py-3 rounded-xl font-semibold uppercase bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
                 >
@@ -271,20 +277,6 @@ export default function RegistroPage() {
               <p className="text-gray-600 text-sm text-center">
                 Último paso: elige tu foto de perfil para completar el registro.
               </p>
-
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setAvatarSeleccionado(null)}
-                  className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
-                    avatarSeleccionado === null
-                      ? "border-[#1a2d4a] bg-[#1a2d4a]/10 text-[#1a2d4a]"
-                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  No elegir foto (usar inicial del nombre)
-                </button>
-              </div>
 
               <div className="grid grid-cols-3 md:grid-cols-4 gap-4 md:gap-5 justify-items-center">
                 {AVATARES.map((avatarId) => {
@@ -316,6 +308,26 @@ export default function RegistroPage() {
                 })}
               </div>
 
+              <div className="flex flex-col items-center gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setAvatarSeleccionado(null)}
+                  className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
+                    avatarSeleccionado === null
+                      ? "border-[#1a2d4a] bg-[#1a2d4a]/10 text-[#1a2d4a]"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  No elegir foto (usar inicial del nombre)
+                </button>
+              </div>
+
+              {avatarSeleccionado === "sin_elegir" && (
+                <p className="text-center text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded-lg">
+                  Selecciona una foto o la opción sin foto para poder confirmar el registro.
+                </p>
+              )}
+
               {errorRegistro && (
                 <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
                   {errorRegistro}
@@ -334,7 +346,7 @@ export default function RegistroPage() {
                 <button
                   type="button"
                   onClick={handleFinalizar}
-                  disabled={cargando}
+                  disabled={cargando || avatarSeleccionado === "sin_elegir"}
                   className="flex-1 py-3 rounded-xl font-semibold uppercase bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
                 >
                   {cargando ? "Registrando…" : "Confirmar registro"}
