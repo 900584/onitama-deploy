@@ -11,11 +11,12 @@ import ACCIONES.SalvarRey;
 import ACCIONES.SoloAdelante;
 import ACCIONES.SoloAtras;
 import JDBC.CartasAccionJDBC;
+import DAO.CartasAccionDAO;
 
 public class CartaAccion {
     private String nombre, accion, estado, img;
     private int puntosMin, equipo;
-    private CartasAccionJDBC jdbc;
+    private CartasAccionDAO dao;
     private Accion accionEjecutable;
     
     public CartaAccion(String nombre, String accion, int puntosMin, String img){
@@ -25,7 +26,7 @@ public class CartaAccion {
         this.img = img;
         this.estado = "VISION"; //Esta en modo vision (Para ver en la tienda)
         this.equipo = -1;
-        jdbc = new CartasAccionJDBC();
+        dao = new CartasAccionJDBC();
         switch (accion) {
             case "ESPEJO":
                 accionEjecutable = new Espejo();
@@ -60,7 +61,7 @@ public class CartaAccion {
         this.img = img;
         this.estado = estado;
         this.equipo = equipo;
-        jdbc = new CartasAccionJDBC();
+        dao = new CartasAccionJDBC();
     }
 
     //Comprueba si la carta puede ser usada (estado USABLE y no usada previamente)
@@ -118,7 +119,7 @@ public class CartaAccion {
 
     public boolean registrarCartaAccion(){
         try {
-            return jdbc.crearCarta(this);
+            return dao.crearCarta(this);
         } catch (SQLException e) {
             return false;
         }
@@ -168,7 +169,7 @@ public class CartaAccion {
 
     public boolean actualizarBD(){
         try {
-            return jdbc.updatePuntosMin(nombre, puntosMin) | jdbc.updateAccion(nombre, accion);
+            return dao.updatePuntosMin(nombre, puntosMin) | dao.updateAccion(nombre, accion);
         } catch (SQLException e) {
             return false;
         }
@@ -176,7 +177,7 @@ public class CartaAccion {
 
     public boolean actualizarDatosPartida(int IDPartida){
         try {
-            return jdbc.updateEstadoEnPartida(IDPartida, nombre, estado) | jdbc.asignarEquipo(IDPartida, nombre, equipo);
+            return dao.updateEstadoEnPartida(IDPartida, nombre, estado) | dao.asignarEquipo(IDPartida, nombre, equipo);
         } catch (SQLException e) {
             return false;
         }

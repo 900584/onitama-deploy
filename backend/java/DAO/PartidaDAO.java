@@ -1,8 +1,9 @@
 package DAO;
 
-import VO.Partida;
 import java.sql.SQLException;
 import java.util.List;
+
+import VO.Partida;
 
 public interface PartidaDAO {
     int registrarPartida(Partida partida) throws SQLException;
@@ -11,7 +12,7 @@ public interface PartidaDAO {
     List<Partida> buscarPartidasJugadorPrivadas(String miNombre, String nombreUS) throws SQLException;
     boolean updateEstado(int ID, String nuevoEstado) throws SQLException;
     boolean updateTurno(int ID, int turno) throws SQLException;
-    boolean updateTiempo(int ID, int nuevoTiempo);
+    boolean updateTiempo(int ID, int nuevoTiempo) throws SQLException;
     void terminarPartidasEnCurso(String j1, String j2);
     boolean updatePosFichas1(int ID, String nuevoF1) throws SQLException;
     boolean updatePosFichas2(int ID, String nuevoF2) throws SQLException;
