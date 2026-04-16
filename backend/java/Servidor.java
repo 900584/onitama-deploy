@@ -1507,7 +1507,7 @@ public class Servidor extends WebSocketServer {
             mutexConectados.release();
         }
     }
-
+/* 
     @Override
     public void onMessage(WebSocket conn, String message) {
         System.out.println("Mensaje recibido: " + message);
@@ -1583,6 +1583,54 @@ public class Servidor extends WebSocketServer {
                 comprarSkin(conn, obj);
             } else if (tipoMSG.equals("ACTIVAR_SKIN")) {
                 activarSkin(conn, obj);
+            }
+        });
+    }
+
+*/
+
+// VERSIÓN PARA JAVA 14 O SUPERIORES QUE CON -> EVITA FALL THROUGH EN LUGAR DE CASE "HOLA": funcion(); break;
+        @Override
+        public void onMessage(WebSocket conn, String message) {
+        System.out.println("Mensaje recibido: " + message);
+
+        hilos.submit(() -> {
+            JSONObject obj = new JSONObject(message);
+            String tipoMSG = obj.getString("tipo");
+            System.out.println("HOLA");
+            switch (tipoMSG) {
+                case "BUSCAR_PARTIDA"        -> gestionarBusquedaPartida(conn, obj);
+                case "MOVER"                 -> gestionarPartida(conn, obj);
+                case "INICIAR_SESION"        -> iniciarSesion(conn, obj);
+                case "REGISTRARSE"           -> registrarJugador(conn, obj);
+                case "ABANDONAR"             -> abandonarPartida(conn, obj);
+                case "CANCELAR"              -> cancelarBusqueda(conn);
+                case "SOLICITUD_AMISTAD"     -> notificarAmistad(conn, obj);
+                case "ACEPTAR_AMISTAD"       -> aceptarAmistad(conn, obj);
+                case "RECHAZAR_AMISTAD"      -> rechazarAmistad(conn, obj);
+                case "INVITACION_PARTIDA"    -> gestionarInvitacionPartida(conn, obj);
+                case "ACEPTAR_INVITACION"    -> aceptarInvitacion(conn, obj);
+                case "RECHAZAR_INVITACION"   -> rechazarInvitacion(conn, obj);
+                case "OBTENER_PERFIL"        -> obtenerPerfil(conn, obj);
+                case "BUSCAR_JUGADORES"      -> buscarJugadores(conn, obj);
+                case "OBTENER_AMIGOS"        -> buscarAmigos(conn, obj);
+                case "BORRAR_AMIGO"          -> borrarAmigo(conn, obj);
+                case "SOLICITAR_PARTIDAS_PUB"-> solicitarPartidas(conn, obj, "PUBLICA");
+                case "SOLICITAR_PARTIDAS_PRIV"-> solicitarPartidas(conn, obj, "PRIVADA");
+                case "OBTENER_CARTAS"        -> obtenerCartas(conn, obj);
+                case "CANCELAR_NOTIFICACION" -> cancelarNotificacion(conn, obj);
+                case "SOLICITAR_PAUSA"       -> gestionarSolicitudPausa(conn, obj);
+                case "ACEPTAR_PAUSA"         -> gestionarRespuestaPausa(conn, obj, true);
+                case "RECHAZAR_PAUSA"        -> gestionarRespuestaPausa(conn, obj, false);
+                case "SOLICITAR_REANUDAR"    -> gestionarSolicitudReanudar(conn, obj);
+                case "ACEPTAR_REANUDAR"      -> gestionarRespuestaReanudar(conn, obj, true);
+                case "RECHAZAR_REANUDAR"     -> gestionarRespuestaReanudar(conn, obj, false);
+                case "PONER_TRAMPA"          -> setTrampa(conn, obj);
+                case "CARTA_ACCION"          -> seleccionarCartaAccion(conn, obj);
+                case "JUGAR_CARTA_ACCION"    -> jugarCartaAccion(conn, obj);
+                case "OBTENER_TIENDA_SKINS"  -> obtenerTiendaSkins(conn, obj);
+                case "COMPRAR_SKIN"          -> comprarSkin(conn, obj);
+                case "ACTIVAR_SKIN"          -> activarSkin(conn, obj);
             }
         });
     }
