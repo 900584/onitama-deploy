@@ -34,6 +34,9 @@ import JDBC.CartasMovJDBC;
 
 // imports añadidos para trabajar con partidas privadas
 import gestor.GestorNotificaciones;
+import gestor.GestorSkin;
+import gestor.GestorJugador;
+
 import JDBC.PartidaJDBC;
 
 import java.util.Comparator;
@@ -257,7 +260,7 @@ public class Servidor extends WebSocketServer {
             // consultamos la base para obtener el avatarId del jugador
             String avatarId = null;
             try {
-                Jugador j = new JugadorJDBC().buscarJugador(nombre);
+                Jugador j = new GestorJugador().buscarJugador(nombre);
                 if (j != null) avatarId = j.getAvatarId();
             } catch (SQLException e) {
                 System.err.println("Error al obtener avatarId en búsqueda: " + e.getMessage());
@@ -667,10 +670,10 @@ public class Servidor extends WebSocketServer {
     }
 
     public void iniciarSesion(WebSocket conn, JSONObject obj) {
-        JugadorJDBC jdbc = new JugadorJDBC();
+        GestorJugador gestorJugador = new GestorJugador();
         String nombre = obj.getString("nombre");
         try {
-            Jugador j = jdbc.buscarJugador(nombre);
+            Jugador j = gestorJugador.buscarJugador(nombre);
 
             if (j == null || estaConectado(nombre)) {
                 conn.send(new JSONObject().put("tipo", "ERROR_SESION_USS").toString());
@@ -826,8 +829,8 @@ public class Servidor extends WebSocketServer {
         NotificacionJDBC notificacionJDBC = new NotificacionJDBC();
         try {
             notificacionJDBC.borrar(obj.getInt("idNotificacion")); // DUDA, ARREGLAR
-            JugadorJDBC jugadorJDBC = new JugadorJDBC();
-            if (jugadorJDBC.insertarAmistad(obj.getString("remitente"), obj.getString("destinatario"))) {
+            GestorJugador gestorJugador = new GestorJugador();
+            if (gestorJugador.insertarAmistad(obj.getString("remitente"), obj.getString("destinatario"))) {
                 System.out.println("Amistad registrada entre " + obj.getString("remitente") + " y "
                         + obj.getString("destinatario"));
                 WebSocket ws = buscarConexion(obj.getString("remitente"));
@@ -1099,8 +1102,8 @@ public class Servidor extends WebSocketServer {
     public void buscarJugadores(WebSocket conn, JSONObject obj) {
         String raiz = obj.getString("raiz");
         try {
-            JugadorJDBC jdbc = new JugadorJDBC();
-            List<Jugador> jugadores = jdbc.buscarJugadoresPorRaiz(raiz);
+            GestorJugador gestorJugador = new GestorJugador();
+            List<Jugador> jugadores = gestorJugador.buscarJugadoresPorRaiz(raiz);
             if (jugadores.isEmpty()) {
                 conn.send(new JSONObject().put("tipo", "NO_ENCONTRADOS").toString());
                 return;
@@ -1130,8 +1133,8 @@ public class Servidor extends WebSocketServer {
     public void buscarAmigos(WebSocket conn, JSONObject obj) {
         String usuario = obj.getString("usuario");
         try {
-            JugadorJDBC jdbc = new JugadorJDBC();
-            List<Jugador> jugadores = jdbc.sacarAmigos(usuario);
+            GestorJugador gestorJugador = new GestorJugador();
+            List<Jugador> jugadores = gestorJugador.sacarAmigos(usuario);
             if (jugadores.isEmpty()) {
                 conn.send(new JSONObject().put("tipo", "NO_AMIGOS").toString());
                 return;
@@ -1162,9 +1165,9 @@ public class Servidor extends WebSocketServer {
         String usuario = obj.getString("usuario");
         String amigo = obj.getString("amigo");
         try {
-            JugadorJDBC jdbc = new JugadorJDBC();
+            GestorJugador gestorJugador = new GestorJugador();
             JSONObject msg = new JSONObject();
-            if (jdbc.borrarAmigo(usuario, amigo)) {
+            if (gestorJugador.borrarAmigo(usuario, amigo)) {
                 msg.put("tipo", "AMIGO_BORRADO");
                 conn.send(msg.toString());
             } else {
@@ -1648,7 +1651,7 @@ public class Servidor extends WebSocketServer {
     private void obtenerPerfil(WebSocket conn, JSONObject obj) {
         try {
             String nombre = obj.getString("nombre");
-            Jugador j = new JugadorJDBC().buscarJugador(nombre);
+            Jugador j = new GestorJugador().buscarJugador(nombre);
             if (j == null) {
                 System.out.println("OBTENER_PERFIL: jugador no encontrado -> " + nombre);
                 return;
@@ -1983,17 +1986,17 @@ public class Servidor extends WebSocketServer {
     private void obtenerTiendaSkins(WebSocket conn, JSONObject obj) {
         String usuario = obj.getString("usuario");
         try {
-            JugadorJDBC jugadorJdbc = new JugadorJDBC();
-            SkinJDBC skinJdbc = new SkinJDBC();
+            GestorJugador gestorJugador = new GestorJugador();
+            GestorSkin gestorSkin = new GestorSkin();
 
-            Jugador j = jugadorJdbc.buscarJugador(usuario);
+            Jugador j = gestorJugador.buscarJugador(usuario);
             if (j == null) {
                 conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
                 return;
             }
 
-            List<Skin> todasLasSkins = skinJdbc.sacarSkinDisp();
-            List<Skin> skinsDelJugador = skinJdbc.sacarSkinJugador(usuario);
+            List<Skin> todasLasSkins = gestorSkin.sacarSkinDisp();
+            List<Skin> skinsDelJugador = gestorSkin.sacarSkinJugador(usuario);
 
             JSONArray skinsJSON = new JSONArray();
             for (Skin s : todasLasSkins) {
@@ -2027,72 +2030,28 @@ public class Servidor extends WebSocketServer {
         String usuario = obj.getString("usuario");
         String skinId = obj.getString("skin_id");
         try {
-            JugadorJDBC jugadorJdbc = new JugadorJDBC();
-            SkinJDBC skinJdbc = new SkinJDBC();
+            GestorSkin gestorSkin = new GestorSkin();
+            String resultado = gestorSkin.comprarSkin(skinId, usuario);
 
-            Jugador j = jugadorJdbc.buscarJugador(usuario);
-            if (j == null) {
+            // ahora que se gestiona toda la lógica con gestores, solo toca enviar el mensaje
+            // correspondiente a raíz de lo que devuelve la llamada a comprarSkin, método
+            // implementado en gestorSKin
+            if (resultado.equals("OK")) {
+                Jugador jActualizado = new GestorJugador().buscarJugador(usuario);
+                int nuevosCores = jActualizado != null ? jActualizado.getCores() : -1;
+                JSONObject msg = new JSONObject();
+                msg.put("tipo", "COMPRA_SKIN_OK");
+                msg.put("skin_id", skinId);
+                msg.put("cores", nuevosCores);
+                conn.send(msg.toString());
+                System.out.println("COMPRA_SKIN_OK: " + usuario + " compró " + skinId + " | cores restantes: " + nuevosCores);
+            } else {
                 conn.send(new JSONObject()
                         .put("tipo", "COMPRA_SKIN_ERROR")
                         .put("skin_id", skinId)
-                        .put("codigo", "ERROR_BD")
+                        .put("codigo", resultado)
                         .toString());
-                return;
             }
-
-            Skin skin = skinJdbc.buscarSkin(skinId);
-            if (skin == null) {
-                conn.send(new JSONObject()
-                        .put("tipo", "COMPRA_SKIN_ERROR")
-                        .put("skin_id", skinId)
-                        .put("codigo", "SKIN_NO_EXISTE")
-                        .toString());
-                return;
-            }
-
-            // Comprobar si ya la posee
-            List<Skin> skinsDelJugador = skinJdbc.sacarSkinJugador(usuario);
-            boolean yaComprada = skinsDelJugador.stream()
-                    .anyMatch(sk -> sk.getNombre().equals(skinId));
-            if (yaComprada) {
-                conn.send(new JSONObject()
-                        .put("tipo", "COMPRA_SKIN_ERROR")
-                        .put("skin_id", skinId)
-                        .put("codigo", "YA_COMPRADA")
-                        .toString());
-                return;
-            }
-
-            // Comprobar cores suficientes
-            if (j.getCores() < skin.getPrecio()) {
-                conn.send(new JSONObject()
-                        .put("tipo", "COMPRA_SKIN_ERROR")
-                        .put("skin_id", skinId)
-                        .put("codigo", "CORES_INSUFICIENTES")
-                        .toString());
-                return;
-            }
-
-            // Realizar la compra: descontar cores y registrar relación
-            int nuevosCores = j.getCores() - skin.getPrecio();
-            boolean coresOk = jugadorJdbc.updateCores(usuario, nuevosCores);
-            boolean skinOk = jugadorJdbc.desbloquearSkin(usuario, skinId);
-
-            if (!coresOk || !skinOk) {
-                conn.send(new JSONObject()
-                        .put("tipo", "COMPRA_SKIN_ERROR")
-                        .put("skin_id", skinId)
-                        .put("codigo", "ERROR_BD")
-                        .toString());
-                return;
-            }
-
-            JSONObject msg = new JSONObject();
-            msg.put("tipo", "COMPRA_SKIN_OK");
-            msg.put("skin_id", skinId);
-            msg.put("cores", nuevosCores);
-            conn.send(msg.toString());
-            System.out.println("COMPRA_SKIN_OK: " + usuario + " compró " + skinId + " | cores restantes: " + nuevosCores);
 
         } catch (SQLException e) {
             System.err.println("Error al comprar skin: " + e.getMessage());
@@ -2108,12 +2067,11 @@ public class Servidor extends WebSocketServer {
         String usuario = obj.getString("usuario");
         String skinId = obj.getString("skin_id");
         try {
-            JugadorJDBC jugadorJdbc = new JugadorJDBC();
-            SkinJDBC skinJdbc = new SkinJDBC();
+            GestorJugador gestorJugador = new GestorJugador();
+            GestorSkin gestorSkin = new GestorSkin();
 
             // Comprobar que la skin existe
-            Skin skin = skinJdbc.buscarSkin(skinId);
-            if (skin == null) {
+            if (gestorSkin.buscarSkin(skinId) == null) {
                 conn.send(new JSONObject()
                         .put("tipo", "ACTIVAR_SKIN_ERROR")
                         .put("skin_id", skinId)
@@ -2122,27 +2080,13 @@ public class Servidor extends WebSocketServer {
                 return;
             }
 
-            // Comprobar que el jugador la posee (Skin0 siempre disponible)
-            if (!skinId.equals("Skin0")) {
-                List<Skin> skinsDelJugador = skinJdbc.sacarSkinJugador(usuario);
-                boolean posee = skinsDelJugador.stream()
-                        .anyMatch(sk -> sk.getNombre().equals(skinId));
-                if (!posee) {
-                    conn.send(new JSONObject()
-                            .put("tipo", "ACTIVAR_SKIN_ERROR")
-                            .put("skin_id", skinId)
-                            .put("codigo", "NO_POSEIDA")
-                            .toString());
-                    return;
-                }
-            }
-
-            boolean ok = jugadorJdbc.updateSkinActiva(usuario, skinId);
+            // updateSkinActiva ya comprueba internamente que el jugador posee la skin
+            boolean ok = gestorJugador.updateSkinActiva(usuario, skinId);
             if (!ok) {
                 conn.send(new JSONObject()
                         .put("tipo", "ACTIVAR_SKIN_ERROR")
                         .put("skin_id", skinId)
-                        .put("codigo", "ERROR_BD")
+                        .put("codigo", "NO_POSEIDA")
                         .toString());
                 return;
             }
