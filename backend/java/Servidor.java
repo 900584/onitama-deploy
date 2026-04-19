@@ -29,6 +29,7 @@ import VO.Autenticacion;
 import JDBC.JugadorJDBC;
 import JDBC.SkinJDBC;
 import JDBC.NotificacionJDBC;
+import JDBC.CartasAccionJDBC;
 import VO.Notificacion;
 import JDBC.CartasMovJDBC;
 import JDBC.PartidaJDBC;
@@ -1621,6 +1622,7 @@ public class Servidor extends WebSocketServer {
                 case "SOLICITAR_PARTIDAS_PUB"-> solicitarPartidas(conn, obj, "PUBLICA");
                 case "SOLICITAR_PARTIDAS_PRIV"-> solicitarPartidas(conn, obj, "PRIVADA");
                 case "OBTENER_CARTAS"        -> obtenerCartas(conn, obj);
+                case "OBTENER_CARTAS_ACCION" -> obtenerCartasAccion(conn, obj);
                 case "CANCELAR_NOTIFICACION" -> cancelarNotificacion(conn, obj);
                 case "SOLICITAR_PAUSA"       -> gestionarSolicitudPausa(conn, obj);
                 case "ACEPTAR_PAUSA"         -> gestionarRespuestaPausa(conn, obj, true);
@@ -1695,6 +1697,28 @@ public class Servidor extends WebSocketServer {
             conn.send(msg.toString());
         } catch (SQLException e) {
             System.err.println("Error al obtener cartas: " + e.getMessage());
+            conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
+        }
+    }
+
+    private void obtenerCartasAccion(WebSocket conn, JSONObject obj) {
+        try {
+            CartasAccionJDBC jdbc = new CartasAccionJDBC();
+            List<CartaAccion> cartasData = jdbc.sacarCartas();
+            JSONArray arregloCartas = new JSONArray();
+            for (CartaAccion c : cartasData) {
+                JSONObject cJson = new JSONObject();
+                cJson.put("nombre", c.getNombre());
+                cJson.put("puntos_necesarios", c.getPuntosMin());
+                cJson.put("descripcion", c.getAccion());
+                arregloCartas.put(cJson);
+            }
+            JSONObject msg = new JSONObject();
+            msg.put("tipo", "LISTA_CARTAS_ACCION");
+            msg.put("cartas", arregloCartas);
+            conn.send(msg.toString());
+        } catch (SQLException e) {
+            System.err.println("Error al obtener cartas de accion: " + e.getMessage());
             conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
         }
     }
