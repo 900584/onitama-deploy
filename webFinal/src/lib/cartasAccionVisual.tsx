@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 const DESCRIPCION_CARTA_ACCION: Record<string, string> = {
-  ESPEJO: "Invierte en espejo los movimientos de todas las cartas del tablero durante este turno.",
+  ESPEJO: "Invierte en espejo los movimientos de todas las cartas del tablero. Dura hasta que el rival realice un movimiento.",
   REVIVIR: "Añade un peón extra a una casilla vacía de tu mitad del campo.",
   SALVAR_REY: "Mueve a tu Rey a una casilla vacía de tu mitad del campo.",
   SACRIFICIO: "Selecciona un peón tuyo y un peón rival; ambos mueren.",
