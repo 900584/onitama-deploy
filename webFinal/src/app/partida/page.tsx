@@ -1630,17 +1630,29 @@ function PartidaInterna({
         {/* Equipo 1 = Azul, Equipo 2 = Rojo */}
         <aside className="w-64 shrink-0 flex flex-col gap-3 px-3 pt-3 pb-2 bg-[#162235] border-r border-white/10 overflow-hidden min-h-0">
           <div className="flex flex-col items-center gap-1">
-            <div className={`w-11 h-11 rounded-full border-2 overflow-hidden shrink-0 ${miEquipoActual === 2
-              ? "bg-blue-900/60 border-blue-400/40"   // oponente es equipo 1 (azul)
-              : "bg-red-900/60 border-red-400/40"     // oponente es equipo 2 (rojo)
+            <div className={`${!esModoServidor && nombreOponente.startsWith("Iron Bot") ? "w-16 h-16" : "w-11 h-11"} rounded-full overflow-hidden shrink-0 ${!esModoServidor && nombreOponente.startsWith("Iron Bot")
+              ? "bg-transparent border-0"
+              : miEquipoActual === 2
+                ? "bg-blue-900/60 border-2 border-blue-400/40"   // oponente es equipo 1 (azul)
+                : "bg-red-900/60 border-2 border-red-400/40"     // oponente es equipo 2 (rojo)
               }`}>
-              <AvatarCircle
-                nombre={nombreOponente}
-                avatarId={infoOponenteUI.avatar_id}
-                sizeClass="w-full h-full"
-                textClass="text-base"
-                bgClass="bg-transparent"
-              />
+              {!esModoServidor && nombreOponente.startsWith("Iron Bot") ? (
+                <Image
+                  src="/pEntrenamiento.png"
+                  alt="Bot de entrenamiento"
+                  width={64}
+                  height={64}
+                  className="w-full h-full object-cover scale-125"
+                />
+              ) : (
+                <AvatarCircle
+                  nombre={nombreOponente}
+                  avatarId={infoOponenteUI.avatar_id}
+                  sizeClass="w-full h-full"
+                  textClass="text-base"
+                  bgClass="bg-transparent"
+                />
+              )}
             </div>
             <span className="text-white/80 text-[11px] font-semibold">@{nombreOponente}</span>
             <span className="text-white/30 text-[9px]">{infoOponenteUI.puntos} pts</span>
