@@ -543,11 +543,8 @@ public class Partida{
                 }
             }
             if (movExiste) {
-                if(equipo == 1 && accionActivadaJ2 && cartaAccionJugadaJ2 != null && !cartaAccionJugadaJ2.permiteMovimiento(normDx, normDy)){
-                    movExiste = false;
-                    return -2;
-                }
-                if(equipo == 2 && accionActivadaJ1 && cartaAccionJugadaJ1 != null && !cartaAccionJugadaJ1.permiteMovimiento(normDx, normDy)){
+                //Nos da igual si la accion activada es nuestra, sigue afectandonos si el rival no ha movido
+                if((accionActivadaJ2 && cartaAccionJugadaJ2 != null && !cartaAccionJugadaJ2.permiteMovimiento(normDx, normDy)) || (accionActivadaJ1 && cartaAccionJugadaJ1 != null && !cartaAccionJugadaJ1.permiteMovimiento(normDx, normDy))){
                     movExiste = false;
                     return -2;
                 }
@@ -623,21 +620,22 @@ public class Partida{
             }
 
             rotarCartas(carta.getNombre(), equipo);
-            turno++; //Cambiamos de turno (tambien lo utilizamos para saber cuantas rondas se han jugado) 
-            if (accionActivadaJ1 && cartaAccionJugadaJ1 != null && equipo == 2) {
+            //Solo se desactivara a accion cuando el rival mueva (osea que podria afectarte si el rival juega justo despues su carta de accion)
+            if (accionActivadaJ1 && cartaAccionJugadaJ1 != null && turno%2 + 1 == 2) {
                 CartaAccion accionJ1 = cartaAccionJugadaJ1;
                 accionJ1.deshacerCarta(this);
                 accionJ1.marcarUsada();
                 cartaAccionJugadaJ1 = null;
                 accionActivadaJ1 = false;
             }
-            if (accionActivadaJ2 && cartaAccionJugadaJ2 != null && equipo == 1) {
+            if (accionActivadaJ2 && cartaAccionJugadaJ2 != null && turno%2 + 1 == 1) {
                 CartaAccion accionJ2 = cartaAccionJugadaJ2;
                 accionJ2.deshacerCarta(this);
                 accionJ2.marcarUsada();
                 cartaAccionJugadaJ2 = null;
                 accionActivadaJ2 = false;
             }
+            turno++; //Cambiamos de turno (tambien lo utilizamos para saber cuantas rondas se han jugado) 
             return 0; //Movimiento realizado con exito
         }else{
             return -1;
