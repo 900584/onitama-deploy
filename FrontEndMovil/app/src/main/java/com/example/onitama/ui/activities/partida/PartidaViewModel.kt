@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.onitama.PartidaActiva
 import com.example.onitama.api.ManejadorGlobal
 import com.example.onitama.api.Partida
+import com.example.onitama.api.jsonPartida
 import com.example.onitama.lib.Carta
 import com.example.onitama.lib.Cartas
 import com.example.onitama.lib.Dificultad
@@ -19,6 +20,9 @@ import com.example.onitama.lib.calcularMovimientosValidos
 import com.example.onitama.lib.crearEstadoInicial
 import com.example.onitama.lib.crearEstadoServidor
 import com.example.onitama.lib.ejecutarMovimiento
+import com.example.onitama.lib.invertirCartasEspejo
+import com.example.onitama.lib.activarRestriccionSolo
+import com.example.onitama.lib.TipoRestriccion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,6 +66,11 @@ class PartidaViewModel : ViewModel() {
                     cartas_jugador = datos.cartas_jugador.map { it.nombre },
                     cartas_oponente = datos.cartas_oponente.map { it.nombre },
                     carta_siguiente = datos.carta_siguiente.map { it.nombre },
+                    tablero_eq1 = datos.tablero_eq1,
+                    tablero_eq2 = datos.tablero_eq2,
+                    turno = datos.turno,
+                    cartas_accion_jugador = datos.cartas_accion_jugador,
+                    cartas_accion_oponente = datos.cartas_accion_oponente
                 )
 
                 // Luego conectamos el WebSocket para escuchar los turnos
@@ -94,10 +103,12 @@ class PartidaViewModel : ViewModel() {
 
                         Log.w("CHIVATO_WS", "El ViewModel está procesando: $mensaje")
 
+                        val actual = _estado.value
                         when (mensaje) {
                             is Partida.RespuestaTuTurno -> {
                                 _estado.value = _estado.value.copy(turnoActual = equipoPropio)
                             }
+
                             is Partida.RespuestaMover -> {
                                 val filaOrigen = END - mensaje.fila_origen
                                 val colOrigen = END - mensaje.col_origen
@@ -110,7 +121,15 @@ class PartidaViewModel : ViewModel() {
 
                                 Log.i("conexion servidor", "Mensaje de movimiento recibido")
 
-                                val resultado = ejecutarMovimiento(_estado.value, origen, destino, carta, equipoPropio)
+                                val resultado = ejecutarMovimiento(
+                                    estado = actual, 
+                                    origen, 
+                                    destino, 
+                                    carta, 
+                                    equipoPropio, 
+                                    trampaActivada = mensaje.trampa_activada?: false
+                                )
+
                                 if(resultado.victoriaPorTrono){
                                     razon = "TRONO"
                                 }
@@ -119,9 +138,89 @@ class PartidaViewModel : ViewModel() {
                                 }
                                 _estado.value = resultado.nuevoEstado
                             }
+
+                            is Partida.RespuestaTrampaActivada -> {
+                                val fila = END - mensaje.fila
+                                val columna = END - mensaje.columna
+
+                                val nuevoTablero = actual.tablero.map {
+                                    it.toMutableList()
+                                }.toMutableList()
+
+                                nuevoTablero[fila][columna] = nuevoTablero[fila][columna].copy(
+                                    ficha = null,
+                                    esTrampaEquipo = -1
+                                )
+
+                                _estado.value = actual.copy(
+                                    tablero = nuevoTablero
+                                )
+                            }
+
+                            is Partida.RespuestaCartaAccionJugada -> {
+                                val jugador = if (mensaje.equipo == 1) {
+                                    EquipoID.AZUL
+                                }
+                                else {
+                                    EquipoID.ROJO
+                                }
+
+                                when (mensaje.accion) {
+                                    "ESPEJO" -> {
+                                        _estado.value = actual.copy(
+                                            cartasJugador = invertirCartasEspejo(actual.cartasJugador),
+                                            cartasOponente = invertirCartasEspejo(actual.cartasOponente),
+                                            cartasSiguientes = invertirCartasEspejo(actual.cartasSiguientes),
+                                            espejoActivadoPor = jugador
+                                        )
+                                    }
+
+                                    "CEGAR" -> {
+                                        _estado.value = actual.copy(
+                                            equipoCiego = jugador
+                                        )
+                                    }
+
+                                    "SOLO_PARA_ADELANTE" -> {
+                                        _estado.value = actual.copy(
+                                            restriccionSolo = activarRestriccionSolo(
+                                                jugador,
+                                                TipoRestriccion.SOLO_PARA_ADELANTE
+                                            )
+                                        )
+                                    }
+
+                                    "SOLO_PARA_ATRAS" -> {
+                                        _estado.value = actual.copy(
+                                            restriccionSolo = activarRestriccionSolo(
+                                                jugador,
+                                                TipoRestriccion.SOLO_PARA_ATRAS
+                                            )
+                                        )
+                                    }
+
+                                    "ROBAR" -> {}
+                                }
+
+                                if (jugador != equipoPropio && datos.accion != "ROBAR") {
+                                    _estado.value = _estado.value.copy(
+                                        turnoActual = equipoPropio
+                                    )
+                                }
+                            }
+
+                            is Partida.RespuestaTrampaInvalida -> {
+                                Log.e("Partida", "Error: No se puede poner una trampa en esa casilla")
+                            }
+
+                            is Partida.RespuestaCartaAccionInvalida -> {
+                                Log.e("Partida", "Error: No puedes usar esta carta de acción ahora")
+                            }
+
                             is Partida.RespuestaDerrota -> {
                                 _estado.value = _estado.value.copy(ganador = if (equipoPropio == EquipoID.AZUL) EquipoID.ROJO else EquipoID.AZUL)
                             }
+
                             is Partida.RespuestaVictoria -> {
                                 if(mensaje.motivo == "ABANDONO"){
                                     razon = "ABANDONO"
@@ -129,11 +228,13 @@ class PartidaViewModel : ViewModel() {
                                 _estado.value = _estado.value.copy(ganador = if (equipoPropio == EquipoID.ROJO) EquipoID.ROJO else EquipoID.AZUL)
                                 Log.i("conexion servidor", "Mensaje de victoria recibido")
                             }
+
                             is Partida.RespuestaTerminarPartida ->{
                                 if (mensaje.razon == "ABANDONO"){ razon ="ABANDONO" }
                                 Log.i("conexion servidor", "Mensaje de terminar partida recibido")
                                 _estado.value = _estado.value.copy(ganador = if (mensaje.ganador == EquipoID.ROJO.id.toString()) EquipoID.ROJO else EquipoID.AZUL)
                             }
+
                             else -> {
                                 println("LOG: Mensaje recibido no reconocido: $mensaje")
                             }
@@ -148,53 +249,78 @@ class PartidaViewModel : ViewModel() {
 
     fun tocarCelda(pos: Posicion) {
         val actual = _estado.value
-        //si le toca al bot se ignoran los clicks
-        if(actual.turnoActual == equipoPropio){
-        // Si ya hay algo seleccionado y el destino es válido, movemos
-            if (actual.movimientosValidos.contains(pos) && actual.fichaSeleccionada != null && actual.cartaSeleccionada != null) {
-                val resultado = ejecutarMovimiento(
-                    actual,
-                    actual.fichaSeleccionada,
-                    pos,
-                    actual.cartaSeleccionada,
-                    equipoPropio
-                )
-                if(resultado.victoriaPorTrono){
-                    razon = "TRONO"
+
+        when (actual.fasePartida) {
+            FasePartida.COLOCAR_TRAMPA -> {
+                val sePuede = if (equipoPropio == EquipoID.AZUL) {
+                    pos.fila >= 4
                 }
-                if(resultado.esReyCapturado){
-                    razon = "REY CAPTURADO"
+                else {
+                    pos.fila <= 2
                 }
-                _estado.value = resultado.nuevoEstado
 
-
-
-                if (resultado.nuevoEstado.turnoActual != equipoPropio) {
-                    if(modoJuegoActual == ModoJuego.BOT){
-                        if(resultado.nuevoEstado.ganador == null){
-                            jugarTurnoBot()
-                        }
-                    }
-                    else{
-                        partida.enviarMovimiento(
-                            Partida.MensajeMover(
-                                equipo = equipoPropio.id,
-                                col_origen = END - actual.fichaSeleccionada.col ,
-                                fila_origen = END - actual.fichaSeleccionada.fila ,
-                                col_destino = END - pos.col,
-                                fila_destino = END - pos.fila,
-                                carta = actual.cartaSeleccionada.nombre
-                            ))
-                    }
+                if (sePuede) {
+                    partida.enviarPonerTrampa(
+                        equipo = equipoPropio.id,
+                        fila = END -pos.fila,
+                        columna = END - pos.col
+                    )
                 }
             }
-            else if(actual.cartaSeleccionada != null){
-                val celda = actual.tablero[pos.fila][pos.col]
-                if (celda.ficha?.equipo == actual.turnoActual) {
-                    _estado.value = actual.copy(
-                        fichaSeleccionada = pos,
-                        movimientosValidos = calcularMovimientosValidos(actual.tablero, pos.fila, pos.col, actual.cartaSeleccionada, actual.turnoActual)
-                    )
+
+            FasePartida.JUGANDO -> {
+                if (actual.modoAccion != null) {
+
+                }
+                else {
+                    //si le toca al bot se ignoran los clicks
+                    if(actual.turnoActual == equipoPropio){
+                    // Si ya hay algo seleccionado y el destino es válido, movemos
+                        if (actual.movimientosValidos.contains(pos) && actual.fichaSeleccionada != null && actual.cartaSeleccionada != null) {
+                            val resultado = ejecutarMovimiento(
+                                actual,
+                                actual.fichaSeleccionada,
+                                pos,
+                                actual.cartaSeleccionada,
+                                equipoPropio
+                            )
+                            if(resultado.victoriaPorTrono){
+                                razon = "TRONO"
+                            }
+                            if(resultado.esReyCapturado){
+                                razon = "REY CAPTURADO"
+                            }
+                            _estado.value = resultado.nuevoEstado
+
+                            if (resultado.nuevoEstado.turnoActual != equipoPropio) {
+                                if (modoJuegoActual == ModoJuego.BOT) {
+                                    if (resultado.nuevoEstado.ganador == null) {
+                                        jugarTurnoBot()
+                                    }
+                                }
+                                else {
+                                    partida.enviarMovimiento(
+                                        Partida.MensajeMover(
+                                            equipo = equipoPropio.id,
+                                            col_origen = END - actual.fichaSeleccionada.col ,
+                                            fila_origen = END - actual.fichaSeleccionada.fila ,
+                                            col_destino = END - pos.col,
+                                            fila_destino = END - pos.fila,
+                                            carta = actual.cartaSeleccionada.nombre
+                                        ))
+                                }
+                            }
+                        }
+                        else if (actual.cartaSeleccionada != null) {
+                            val celda = actual.tablero[pos.fila][pos.col]
+                            if (celda.ficha?.equipo == actual.turnoActual) {
+                                _estado.value = actual.copy(
+                                    fichaSeleccionada = pos,
+                                    movimientosValidos = calcularMovimientosValidos(actual.tablero, pos.fila, pos.col, actual.cartaSeleccionada, actual.turnoActual)
+                                )
+                            }
+                        }
+                    }           
                 }
             }
         }
@@ -211,7 +337,8 @@ class PartidaViewModel : ViewModel() {
                 actual.fichaSeleccionada.fila,
                 actual.fichaSeleccionada.col,
                 carta,
-                actual.turnoActual
+                actual.turnoActual,
+                actual.restriccionSolo
             )
 
             println("LOG: Carta seleccionada -> ${carta.nombre}. Movimientos hallados: ${posibles.size}")
@@ -233,6 +360,75 @@ class PartidaViewModel : ViewModel() {
         _estado.value = actual.copy(cartaSeleccionada = null, fichaSeleccionada = null, movimientosValidos = emptyList())
     }
 
+    fun activarCartaAccion (
+        nombreCarta: String
+    ) {
+        val actual = _estado.value
+
+        if (actual.turnoActual == equipoPropio) {
+            val carta = when (nombreCarta) {
+                "Pensatorium" -> "ESPEJO"
+                "Atrapasueños" -> "ROBAR"
+                "Requiem" -> "SACRIFICIO"
+                "Santo Grial" -> "REVIVIR"
+                "La Dama del Mar" -> "SOLO_PARA_ADELANTE"
+                "Finisterra" -> "SOLO_PARA_ATRAS"
+                "Brujeria" -> "CEGAR"
+                "Illusia" -> "SALVAR_REY"
+                else -> null
+            }
+
+            if (carta == "ESPEJO" || 
+                carta == "CEGAR" ||
+                carta == "SOLO_PARA_ADELANTE" ||
+                carta == "SOLO_PARA_ATRAS") {
+                ejecucionCartaAccion(nombreCarta, carta)
+            }   
+            else {
+                _estado.value = actual.copy(
+                    modoAccion = carta
+                )
+            }
+        }
+    }
+
+    fun ejecucionCartaAccion(
+        nombreCarta: String,
+        cartaAccion: String,
+        posicionPropia: Posicion? = null,
+        posicionRival: Posicion? = null,
+        cartaARobar: String = ""
+    ) {
+        val mensaje = Partida.MensajeJugarCartaAccion(
+            nombreCarta,
+            equipoPropio.id,
+            x = posicionPropia?.col ?: -1,
+            y = posicionPropia?.fila ?: -1,
+            x_op = posicionRival?.col ?: -1,
+            y_op = posicionRival?.fila ?: -1,
+            cartaRobar = cartaARobar
+        )
+
+        val sePuedeJugar = partida.enviarJugarCartaAccion(mensaje)
+        if (sePuedeJugar) {
+            _estado.value = _estado.value.copy(
+                modoAccion = null
+            )
+        }
+    }
+
+    fun seleccionarCartaRobar(
+        nombreCarta: String
+    ) {
+        val actual = _estado.value
+        val cartaAccion = actual.cartaAccionPropia ?: return 
+
+        ejecucionCartaAccion(
+            nombreCarta = cartaAccion,
+            accion = "ROBAR",
+            cartaARobar = nombreCarta
+        )
+    }
 
     private fun jugarTurnoBot() {
         val estadoActual = _estado.value
