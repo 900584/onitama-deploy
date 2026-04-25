@@ -150,6 +150,7 @@ class Partida(
         val cartas_oponente: List<CartaJson>,
         val carta_siguiente: List<CartaJson>,
         val oponente_avatar_id: String? = null,
+        val oponente_skin_id: String? = null,
         val tablero_eq1: String? = null,
         val tablero_eq2: String? = null,
         val turno: Int? = null,
@@ -174,6 +175,7 @@ class Partida(
         val cartas_oponente: List<CartaJson>,
         val carta_siguiente: List<CartaJson>,
         val oponente_avatar_id: String? = null,
+        val oponente_skin_id: String? = null,
         val tablero_eq1: String? = null,
         val tablero_eq2: String? = null,
         val turno: Int? = null,
@@ -196,6 +198,13 @@ class Partida(
         val fila_destino: Int,
         val carta: String,
         val trampa_activada: Boolean? = false
+    ): MensajeServidor()
+
+    @Serializable
+    @SerialName("MOVIMIENTO_INVALIDO")
+    data class RespuestaMovimientoInvalido(
+        val motivo: String,
+        val codigo: Int
     ): MensajeServidor()
 
     @Serializable

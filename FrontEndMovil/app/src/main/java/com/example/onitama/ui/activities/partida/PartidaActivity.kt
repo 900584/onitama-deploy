@@ -100,10 +100,13 @@ class PartidaActivity: AppCompatActivity() {
             // Observamos el estado del ViewModel. Cuando cambie, la UI se repintará sola.
             val estadoJuego = viewModel.estado.collectAsState().value
 
+            val pausa = viewModel.notificacionPausa.collectAsState().value
+
             Surface(modifier = Modifier.fillMaxSize()) {
                 MatchScreen(
                     estado = estadoJuego, // Pasamos el estado a la UI
-                    modo = modoJuego
+                    modo = modoJuego,
+                    avisoPausa = pausa
                 )
             }
         }
@@ -113,7 +116,8 @@ class PartidaActivity: AppCompatActivity() {
     @Composable
     fun MatchScreen(
         estado: EstadoJuego,
-        modo: ModoJuego
+        modo: ModoJuego,
+        avisoPausa: Partida.RespuestaSolicitudPausa?
     ) {
         val datosUsuario by AutoLogin.sesion.collectAsState()
         val authClient: Auth = Auth()
@@ -189,7 +193,7 @@ class PartidaActivity: AppCompatActivity() {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "CCOLOCA TU TRAMPA",
+                    text = "COLOCA TU TRAMPA",
                     color = Color.Yellow,
                     fontFamily = quattrocentoBold,
                     fontSize = 16.sp,
@@ -392,37 +396,49 @@ class PartidaActivity: AppCompatActivity() {
 
                     }
 
-                    Button(
-                        onClick = {
-                            when(modo){
-                                ModoJuego.BOT -> finish()
-                                ModoJuego.PUBLICA ->{
-                                    viewModel.botonAbandonar()
-                                    val datos = runBlocking {
-                                        delay(1000)
-                                        authClient.obtenerPerfil(datosUsuario!!.nombre)
-                                    }
-                                    AutoLogin.actualizar(context, datos)
-                                    partida.desconectarPartida()
-                                    finish()
-                                }
-                                else -> finish()
-                            }
-
-                        },
-                        modifier = Modifier.Companion
-                            .size(width = 220.dp, height = 55.dp)
-                            .padding(top = 15.dp, start = 30.dp)
-                            .align(Alignment.Companion.Top),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Companion.LightGray)
+                    Column(
+                        horizontalAlignment = Alignment.End
                     ) {
-                        Text(
-                            if(modo != ModoJuego.PRIVADA) "ABANDONAR" else "PAUSAR",
-                            fontFamily = quattrocentoBold,
-                            fontSize = 20.sp,
-                            color = colorResource(R.color.azulFondo)
-                        )
+                        if (modo == ModoJuego.PRIVADA) {
+                            Button(
+                                onClick = {
+                                    viewModel.activarPausa()
+                                },
+                                modifier = Modifier.height(40.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Companion.Gray)
+                                ) {
+                                    Text(
+                                        "PAUSAR",
+                                        fontFamily = quattrocentoBold,
+                                        fontSize = 10.sp,
+                                        color = Color.White
+                                        )
+                                }
+                        } 
+
+                        Button(
+                            onClick = {
+                                viewModel.botonAbandonar()
+                                val datos = runBlocking {
+                                    delay(1000)
+                                    authClient.obtenerPerfil(datosUsuario!!.nombre)
+                                }
+                                AutoLogin.actualizar(context, datos)
+                                partida.desconectarPartida()
+                                finish()
+                            },
+                            modifier = Modifier.Companion
+                                .size(width = 220.dp, height = 55.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Companion.LightGray)
+                        ) {
+                            Text(
+                                "ABANDONAR",
+                                fontFamily = quattrocentoBold,
+                                fontSize = 12.sp,
+                                color = colorResource(R.color.azulFondo)
+                            )
                     }
                 }
                 Row(
@@ -457,7 +473,9 @@ class PartidaActivity: AppCompatActivity() {
                         CartaBoton(
                             carta = carta,
                             seleccionada = estado.cartaSeleccionada == carta,
-                            onClick = {cambiarEstadoCarta(carta, estado)},
+                            onClick = {
+                                cambiarEstadoCarta(carta, estado)
+                            },
                             false
                         )
                     }
@@ -569,7 +587,70 @@ class PartidaActivity: AppCompatActivity() {
                     }
                 }
             }
+
+            avisoPausa?.let { notificacion ->
+                AlertDialog(
+                    onDismissRequest = {},
+                    title = {
+                        Row(
+                            verticalAlignment =Alignment.CenterVertically
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.core),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(30.dp)
+                            )
+
+                            Text(
+                                text = "SOLICITUD DE PAUSA",
+                                fontFamily = quattrocentoBold,
+                                fontSize = 20.sp,
+                                color = Color.Yellow
+                            )
+                        }
+                    },
+
+                    text = {
+                        Text(
+                            text = "¿Aceptas la pausa?",
+                            color = Color.White,
+                            fontSize = 16.sp
+                        )
+                    },
+
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                viewModel.enviarAceptarPausa(notificacion.idNotificacion, datosUsuario?.nombre ?:"")
+                            },
+                        ) {
+                            Text(
+                                "ACEPTAR",
+                                color = Color.White,
+                                fontFamily = quattrocentoBold
+                            )
+                        }
+                    },
+
+                    dismissButton = {
+                        Button(
+                            onClick = {
+                                viewModel.enviarRechazarPausa(notificacion.idNotificacion, datosUsuario?.nombre ?:"")
+                            },
+                        ) {
+                            Text(
+                                "RECHAZAR",
+                                color = Color.White,
+                                fontFamily = quattrocentoBold
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(15.dp),
+                )
+            }
         }
+    }
     }
 
     fun cambiarEstadoCarta(carta: Carta, estado: EstadoJuego){
@@ -772,5 +853,4 @@ class PartidaActivity: AppCompatActivity() {
         }
     }
 }
-
 

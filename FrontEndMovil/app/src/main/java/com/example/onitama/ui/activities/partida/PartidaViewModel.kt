@@ -24,6 +24,8 @@ import com.example.onitama.lib.ejecutarMovimiento
 import com.example.onitama.lib.invertirCartasEspejo
 import com.example.onitama.lib.activarRestriccionSolo
 import com.example.onitama.lib.TipoRestriccion
+import com.example.onitama.AutoLogin
+import com.example.onitama.lib.aplicarCartaAccion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +46,9 @@ class PartidaViewModel : ViewModel() {
     private val _estado = MutableStateFlow(crearEstadoInicial())
     var razon: String? = null
     val estado: StateFlow<EstadoJuego> = _estado.asStateFlow()
+
+    private val _notificacionPausa = MutableStateFlow<Partida.RespuestaSolicitudPausa?>(null)
+    val notificacionPausa = _notificacionPausa.asStateFlow()
 
     var partida = Partida()
 
@@ -108,7 +113,7 @@ class PartidaViewModel : ViewModel() {
                         val actual = _estado.value
                         when (mensaje) {
                             is Partida.RespuestaTuTurno -> {
-                                _estado.value = _estado.value.copy(turnoActual = equipoPropio)
+                                _estado.value = actual.copy(turnoActual = equipoPropio)
                             }
 
                             is Partida.RespuestaMover -> {
@@ -167,48 +172,24 @@ class PartidaViewModel : ViewModel() {
                                     EquipoID.ROJO
                                 }
 
-                                when (mensaje.accion) {
-                                    "ESPEJO" -> {
-                                        _estado.value = actual.copy(
-                                            cartasJugador = invertirCartasEspejo(actual.cartasJugador),
-                                            cartasOponente = invertirCartasEspejo(actual.cartasOponente),
-                                            cartasSiguientes = invertirCartasEspejo(actual.cartasSiguientes),
-                                            espejoActivadoPor = jugador
-                                        )
-                                    }
+                                val tipoAccion = obtenerCartaAccion(mensaje.carta_accion)
 
-                                    "CEGAR" -> {
-                                        _estado.value = actual.copy(
-                                            equipoCiego = jugador
-                                        )
-                                    }
+                                _estado.value = aplicarCartaAccion(
+                                    estado = actual,
+                                    equipo = jugador,
+                                    cartaNombre = mensaje.carta_accion,
+                                    x = if (mensaje.x != -1) END - mensaje.x else -1,
+                                    y = if (mensaje.y != -1) END - mensaje.y else -1,
+                                    x_op = if (mensaje.x_op != -1) END - mensaje.x_op else -1,
+                                    y_op = if (mensaje.y_op != -1) END - mensaje.y_op else -1,
+                                    cartaRobar = mensaje.carta_robar,
+                                    tipo = tipoAccion
+                                )
+                            }
 
-                                    "SOLO_PARA_ADELANTE" -> {
-                                        _estado.value = actual.copy(
-                                            restriccionSolo = activarRestriccionSolo(
-                                                jugador,
-                                                TipoRestriccion.SOLO_PARA_ADELANTE
-                                            )
-                                        )
-                                    }
-
-                                    "SOLO_PARA_ATRAS" -> {
-                                        _estado.value = actual.copy(
-                                            restriccionSolo = activarRestriccionSolo(
-                                                jugador,
-                                                TipoRestriccion.SOLO_PARA_ATRAS
-                                            )
-                                        )
-                                    }
-
-                                    "ROBAR" -> {}
-                                }
-
-                                if (jugador != equipoPropio && accion != "ROBAR") {
-                                    _estado.value = _estado.value.copy(
-                                        turnoActual = equipoPropio
-                                    )
-                                }
+                            is Partida.RespuestaMovimientoInvalido -> {
+                                Log.e("Partida", "Error: Movimiento inválido")
+                                desSeleccionarCarta()
                             }
 
                             is Partida.RespuestaTrampaInvalida -> {
@@ -260,6 +241,12 @@ class PartidaViewModel : ViewModel() {
                                 )
                             }
 
+                            is Partida.RespuestaSolicitudPausa -> {
+                                _notificacionPausa.value = mensaje
+                            }
+
+                            is Partida.RespuestaPartidaPausada -> { }
+
                             else -> {
                                 println("LOG: Mensaje recibido no reconocido: $mensaje")
                             }
@@ -295,7 +282,24 @@ class PartidaViewModel : ViewModel() {
 
             FasePartida.JUGANDO -> {
                 if (actual.modoAccion != null) {
+                    val cartaAccion = actual.modoAccion ?: return
+                    val nombreCarta = actual.cartaAccionPropia ?: return
 
+                    when (cartaAccion) {
+                        "REVIVIR" -> {
+                            ejecucionCartaAccion(nombreCarta, cartaAccion, posicionPropia = pos)
+                        }
+
+                        "SACRIFICIO" -> {
+                            ejecucionCartaAccion(nombreCarta, cartaAccion, posicionRival = pos)
+                        }
+
+                        "SALVAR_REY" -> {
+                            ejecucionCartaAccion(nombreCarta, cartaAccion, posicionPropia = pos)
+                        }
+
+                        "ROBAR" -> {}
+                    }
                 }
                 else {
                     //si le toca al bot se ignoran los clicks
@@ -404,17 +408,7 @@ class PartidaViewModel : ViewModel() {
         val actual = _estado.value
 
         if (actual.turnoActual == equipoPropio) {
-            val carta = when (nombreCarta) {
-                "Pensatorium" -> "ESPEJO"
-                "Atrapasueños" -> "ROBAR"
-                "Requiem" -> "SACRIFICIO"
-                "Santo Grial" -> "REVIVIR"
-                "La Dama del Mar" -> "SOLO_PARA_ADELANTE"
-                "Finisterra" -> "SOLO_PARA_ATRAS"
-                "Brujeria" -> "CEGAR"
-                "Illusia" -> "SALVAR_REY"
-                else -> null
-            }
+            val carta = obtenerCartaAccion(nombreCarta) ?: return
 
             if (carta == "ESPEJO" || 
                 carta == "CEGAR" ||
@@ -427,6 +421,22 @@ class PartidaViewModel : ViewModel() {
                     modoAccion = carta
                 )
             }
+        }
+    }
+
+    private fun obtenerCartaAccion(
+        nombre: String
+    ): String? {
+        return when (nombre) {
+            "Pensatorium" -> "ESPEJO"
+            "Atrapasueños" -> "ROBAR"
+            "Requiem" -> "SACRIFICIO"
+            "Santo Grial" -> "REVIVIR"
+            "La Dama del Mar" -> "SOLO_PARA_ADELANTE"
+            "Finisterra" -> "SOLO_PARA_ATRAS"
+            "Brujeria" -> "CEGAR"
+            "Illusia" -> "SALVAR_REY"
+            else -> null
         }
     }
 
@@ -466,6 +476,48 @@ class PartidaViewModel : ViewModel() {
             cartaAccion = "ROBAR",
             cartaARobar = nombreCarta
         )
+    }
+
+    fun activarPausa() {
+        val datos = PartidaActiva.datosPartida ?: return
+
+        val jugador = AutoLogin.sesion.value?.nombre ?: "Jugador"
+        val rival = datos.oponente
+        val idPartida = datos.partida_id
+
+        val exito = partida.enviarSolicitudPausa(
+            jugador,
+            rival,
+            idPartida
+        )
+    }
+
+    fun enviarAceptarPausa(
+        idNotificacion: Int,
+        miNombre: String
+    ) {
+        val exito = partida.enviarAceptarPausa(
+            idNotificacion,
+            miNombre
+        )
+
+        if (exito) {
+            _notificacionPausa.value = null
+        }
+    }
+
+    fun enviarRechazarPausa(
+        idNotificacion: Int,
+        miNombre: String
+    ) {
+        val exito = partida.enviarRechazarPausa(
+            idNotificacion,
+            miNombre
+        )
+
+        if (exito) {
+            _notificacionPausa.value = null
+        }
     }
 
     private fun jugarTurnoBot() {
