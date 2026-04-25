@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.onitama.R
 import com.example.onitama.AutoLogin
-import com.example.onitama.api.obtenerCartas
+import com.example.onitama.api.CartasAPI
 import com.example.onitama.lib.Carta
 import com.example.onitama.lib.Cartas
 import com.example.onitama.lib.Movimiento
@@ -122,7 +122,7 @@ fun CartasScreen(
                 )
         )
         val cartas = runBlocking {
-            obtenerCartas()
+            CartasAPI().obtenerCartas()
         }
         Column(
             Modifier

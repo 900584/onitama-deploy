@@ -2,20 +2,13 @@ package com.example.onitama.api
 
 import android.util.Log
 import com.example.onitama.Config
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
-import org.json.JSONObject
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 class Amigos (
     private val wsUrl: String = Config.WS_URL
@@ -127,52 +120,19 @@ class Amigos (
         val destinatario: String
     ): MensajeServidor()
 
-    private val client = OkHttpClient()
     private val jsonSerializer = Json {
         ignoreUnknownKeys = true
         classDiscriminator = "tipo"
     }
 
-    private suspend fun enviarYEsperarRespuesta(mensajeJson: String): String {
-        return suspendCancellableCoroutine { continuation ->
-            val request = Request.Builder().url(wsUrl).build()
-
-            val listener = object : WebSocketListener() {
-                override fun onOpen(webSocket: WebSocket, response: Response) {
-                    Log.d("Amigos_WS", "Conectado. Enviando: $mensajeJson")
-                    webSocket.send(mensajeJson)
-                }
-
-                override fun onMessage(webSocket: WebSocket, text: String) {
-                    Log.d("Amigos_WS", "Mensaje recibido del servidor: $text")
-                    webSocket.close(1000, "Cierre normal")
-                    if (continuation.isActive) {
-                        continuation.resume(text)
-                    }
-                }
-
-                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                    Log.e("Amigos_WS", "Fallo en el socket", t)
-                    if (continuation.isActive) {
-                        continuation.resumeWithException(Exception("Error de conexión con el servidor."))
-                    }
-                }
-
-                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                    if (continuation.isActive) {
-                        continuation.resumeWithException(Exception("El servidor cerró la conexión sin responder."))
-                    }
-                }
-            }
-
-            val ws = client.newWebSocket(request, listener)
-
-            continuation.invokeOnCancellation {
-                ws.cancel()
-            }
-        }
-    }
-
+    /**
+     * Esta función se encarga de enviar y recibir los mensajes
+     * correspondientes al servidor para obtener los amigos del
+     * usuario 'usuario'.
+     *
+     * @param usuario Nombre del usuario cuyos amigos se van a obtener.
+     * @return Lista con los amigos del usuario 'usuario'.
+     */
     suspend fun obtenerAmigos(usuario: String): List<Info> {
         if (!usarServidor) {
             val amigo1 = Info(nombre = "granluchador", puntos = 100)
@@ -182,20 +142,31 @@ class Amigos (
         }
 
         return try {
+            // Convierte el mensaje a enviar al servidor en JSON.
             val mensaje = MensajeObtenerAmigos(usuario)
             val jsonMsg = jsonSerializer.encodeToString<MensajeCliente>(mensaje)
-            
+            // Lo envía a través del websocket.
+            ManejadorGlobal.enviarMensaje(jsonMsg)
+
+            // Espera 5 segundos para recibir la respuesta del servidor.
             val respuestaStr = withTimeoutOrNull(5000L) {
-                enviarYEsperarRespuesta(jsonMsg)
+                ManejadorGlobal.mensajesEntrantes
+                    .filter { json ->
+                        val tipo = json.optString("tipo")
+                        tipo in listOf("INFORMACION_AMIGOS", "NO_AMIGOS", "ERROR_AMIGOS")
+                    }
+                    .first()
+                    .toString()
             } ?: return emptyList()
 
+            // Si recibe respuesta la decodifica y según el mensaje recibido
+            // devuelve una lista con los amigos o una lista vacía.
             val respuesta = jsonSerializer.decodeFromString<MensajeServidor>(respuestaStr)
             if (respuesta is MensajeInformacionAmigos) {
                 respuesta.info
             } else if (respuesta is MensajeNoAmigos) {
                 emptyList()
             } else {
-                Log.e("Amigos_API", "Error al obtener amigos")
                 emptyList()
             }
         } catch (e: Exception) {
@@ -204,17 +175,38 @@ class Amigos (
         }
     }
 
+    /**
+     * Esta función se encarga de enviar y recibir los mensajes
+     * correspondientes al servidor para obtener los jugadores cuyo
+     * nombre de usuario comienza por 'raiz'.
+     *
+     * @param raiz La raíz por la que comienzan los nombres de los
+     * jugadores que se buscan.
+     * @return Lista con los jugadores que tienen la raíz 'raiz'.
+     */
     suspend fun buscarJugadores(raiz: String): List<Info> {
         if (!usarServidor) return emptyList()
 
         return try {
+            // Convierte el mensaje a enviar al servidor en JSON.
             val mensaje = MensajeBuscarJugadores(raiz)
             val jsonMsg = jsonSerializer.encodeToString<MensajeCliente>(mensaje)
+            // Lo envía a través del websocket.
+            ManejadorGlobal.enviarMensaje(jsonMsg)
 
+            // Espera 5 segundos para recibir la respuesta del servidor.
             val respuestaStr = withTimeoutOrNull(5000L) {
-                enviarYEsperarRespuesta(jsonMsg)
+                ManejadorGlobal.mensajesEntrantes
+                    .filter { json ->
+                        val tipo = json.optString("tipo")
+                        tipo in listOf("INFORMACION_JUGADORES", "NO_ENCONTRADOS")
+                    }
+                    .first()
+                    .toString()
             } ?: return emptyList()
 
+            // Si recibe respuesta la decodifica y según el mensaje recibido
+            // devuelve una lista con los jugadores que comparten la raíz o una lista vacía.
             val respuesta = jsonSerializer.decodeFromString<MensajeServidor>(respuestaStr)
             if (respuesta is MensajeInformacionJugadores) {
                 respuesta.info
@@ -227,25 +219,50 @@ class Amigos (
         }
     }
 
+    /**
+     * Esta función se encarga de enviar y recibir los mensajes
+     * correspondientes al servidor para enviar una solicitud
+     * de amistad al usuario 'destinatario'.
+     *
+     * @param remitente Nombre del usuario que envía la solicitud.
+     * @param destinatario Nombre del usuario que recibe la solicitud.
+     * @return Devuelve 'true' si la solicitud ha sido enviada con
+     * éxito y 'false' si ha fallado.
+     */
     suspend fun enviarSolicitudAmistad(remitente: String, destinatario: String): Boolean {
         if (!usarServidor) {
-            Log.d("Amigos_API", "Mock: Enviando solicitud de $remitente a $destinatario")
+            Log.d("Amigos_API", "Mock: Enviando solicitud")
             return true
         }
 
         return try {
+            // Convierte el mensaje a enviar al servidor en JSON.
             val mensaje = MensajeSolicitudAmistad(remitente, destinatario)
             val jsonMsg = jsonSerializer.encodeToString<MensajeCliente>(mensaje)
+            // Lo envía a través del websocket.
+            ManejadorGlobal.enviarMensaje(jsonMsg)
 
+            // Espera 5 segundos para recibir la respuesta del servidor.
             val respuestaStr = withTimeoutOrNull(5000L) {
-                enviarYEsperarRespuesta(jsonMsg)
-            } ?: return true
+                ManejadorGlobal.mensajesEntrantes
+                    .filter { json ->
+                        val tipo = json.optString("tipo")
+                        tipo in listOf("AMISTAD_ACEPTADA", "ERROR_SOLICITUD_AMISTAD", "SOLICITUD_ENVIADA")
+                    }
+                    .first()
+                    .toString()
+            }
 
+            if (respuestaStr == null) return true
+
+            // Si recibe respuesta la decodifica y según el mensaje recibido
+            // devuelve una lista con los jugadores que comparten la raíz o una lista vacía.
             val respuesta = jsonSerializer.decodeFromString<MensajeServidor>(respuestaStr)
             if (respuesta is MensajeErrorSolicitudAmistad) {
                 false
             } else {
-                false
+                // Si recibe cualquier otra cosa asumimos éxito.
+                true 
             }
 
         } catch (e: Exception) {
@@ -254,6 +271,16 @@ class Amigos (
         }
     }
 
+    /**
+     * Esta función se encarga de enviar y recibir los mensajes
+     * correspondientes al servidor para borrar el amigo 'amigo',
+     * es decir, que deje de ser amigo de 'usuario'.
+     *
+     * @param usuario Nombre del usuario que borra al amigo.
+     * @param amigo Nombre del amigo a borrar.
+     * @return Devuelve 'true' si el amigo ha sido borrado con
+     * éxito y 'false' si no se ha podido borrar.
+     */
     suspend fun borrarAmigo(usuario: String, amigo: String): Boolean {
         if (!usarServidor) {
             Log.d("Amigos_API", "Mock: Borrando amigo $amigo de $usuario")
@@ -261,23 +288,84 @@ class Amigos (
         }
 
         return try {
+            // Convierte el mensaje a enviar al servidor en JSON.
             val mensaje = MensajeBorrarAmigo(usuario, amigo)
             val jsonMsg = jsonSerializer.encodeToString<MensajeCliente>(mensaje)
+            // Lo envía a través del websocket.
+            ManejadorGlobal.enviarMensaje(jsonMsg)
 
+            // Espera 5 segundos para recibir la respuesta del servidor.
             val respuestaStr = withTimeoutOrNull(5000L) {
-                enviarYEsperarRespuesta(jsonMsg)
+                ManejadorGlobal.mensajesEntrantes
+                    .filter { json ->
+                        val tipo = json.optString("tipo")
+                        tipo in listOf("AMIGO_BORRADO", "ERROR_AL_BORRAR_AMIGO")
+                    }
+                    .first()
+                    .toString()
             } ?: return false
 
+            // Si recibe respuesta la decodifica y según el mensaje recibido
+            // devuelve 'true' si se ha borrado o 'false' si no se ha borrado.
             val respuesta = jsonSerializer.decodeFromString<MensajeServidor>(respuestaStr)
             if (respuesta is MensajeAmigoBorrado) {
-                Log.e("Amigos_API", "Amigo borrado con éxito")
+                Log.d("Amigos_API", "Amigo borrado con éxito")
                 true
             } else {
-                Log.e("Amigos_API", "Error al borrar amigo")
+                Log.d("Amigos_API", "Error al borrar amigo")
                 false
             }
         } catch (e: Exception) {
             Log.e("Amigos_API", "Error al borrar amigo", e)
+            false
+        }
+    }
+
+    /**
+     * Esta función se encarga de enviar los mensajes correspondeintes
+     * al servidor para aceptar una solicitud de amistad.
+     *
+     * @param remitente Nombre del usuario que envió la solicitud.
+     * @param destinatario Nombre del usuario que acepta la solicitud.
+     * @return Devuelve 'true' si la amistad ha sido aceptada con éxito.
+     */
+    suspend fun aceptarAmistad(remitente: String, destinatario: String): Boolean {
+        if (!usarServidor) return true
+
+        return try {
+            // Convierte el mensaje a enviar al servidor en JSON.
+            val mensaje = MensajeAceptarAmistad(remitente, destinatario)
+            val jsonMsg = jsonSerializer.encodeToString<MensajeCliente>(mensaje)
+            // Lo envía a través del websocket.
+            ManejadorGlobal.enviarMensaje(jsonMsg)
+            true
+
+        } catch (e: Exception) {
+            Log.e("Amigos_API", "Error al aceptar amistad", e)
+            false
+        }
+    }
+
+    /**
+     * Esta función se encarga de enviar y recibir los mensajes correspondientes
+     * al servidor para rechazar una solicitud de amistad.
+     *
+     * @param idNotificacion ID de la notificación a rechazar.
+     * @return Devuelve 'true' si la solicitud ha sido rechazada con éxito.
+     */
+    suspend fun rechazarAmistad(idNotificacion: Int): Boolean {
+        if (!usarServidor) return true
+
+        return try {
+            // Convierte el mensaje a enviar al servidor en JSON.
+            val mensaje = MensajeRechazarAmistad(idNotificacion)
+            val jsonMsg = jsonSerializer.encodeToString<MensajeCliente>(mensaje)
+            // Lo envía a través del websocket.
+            ManejadorGlobal.enviarMensaje(jsonMsg)
+            true
+
+        } catch (e: Exception) {
+            Log.e("Amigos_API", "Error al rechazar amistad", e)
             false
         }
     }

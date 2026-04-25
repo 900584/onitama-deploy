@@ -13,6 +13,7 @@ data class DatosPerfil(
     val partidas_ganadas: Int,
     val partidas_jugadas: Int,
     val cores: Int,
+    val skin_activa: String,
     val avatar_id: String
 )
 
@@ -25,8 +26,8 @@ object AutoLogin {
     private const val JUGADAS = "jugadas"
     private const val GANADAS = "ganadas"
     private const val KATANAS = "katanas"
-
-    private const val AVATAR = "Avatra_id"
+    private const val AVATAR = "Avatar_id"
+    private const val SKIN = "Skin_id"
     private const val CORES = "cores"
 
     // El estado interno (privado)
@@ -50,12 +51,13 @@ object AutoLogin {
                 partidas_ganadas = pref.getInt(GANADAS, 0),
                 partidas_jugadas = pref.getInt(JUGADAS, 0),
                 cores = pref.getInt(CORES, 0),
+                skin_activa = pref.getString(SKIN, "")?: "",
                 avatar_id = pref.getString(AVATAR, "")?: ""
             )
         }
     }
 
-    fun inicioSesion(context: Context, nombre: String, katanas: Int, cores: Int, avatar: String){
+    fun inicioSesion(context: Context, nombre: String, katanas: Int, cores: Int, avatar: String, skin: String){
         val pref = obtenerPreferences(context).edit()
         pref.putBoolean(HAINICIADO, true)
         pref.putString(NOMBRE, nombre)
@@ -81,6 +83,7 @@ object AutoLogin {
                 partidas_ganadas = 0,
                 partidas_jugadas = 0,
                 cores = cores,
+                skin_activa = skin,
                 avatar_id = avatar
             )
         }

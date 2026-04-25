@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.onitama.AutoLogin
 import com.example.onitama.api.Amigos
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
@@ -35,6 +37,28 @@ class ViewModelAmigos : ViewModel() {
     init {
         // Carga inicial de amigos del usuario actual
         cargarAmigos()
+
+        // Escuchar nuevos amigos aceptados en tiempo real
+        viewModelScope.launch {
+            amigosNuevos.collect { nuevo ->
+                // Evitar duplicados
+                if (_listaAmigos.value.none { it.nombre == nuevo.nombre }) {
+                    _listaAmigos.value = _listaAmigos.value + nuevo
+                }
+            }
+        }
+    }
+
+    companion object {
+        private val _amigosNuevos = MutableSharedFlow<Amigos.Info>(extraBufferCapacity = 1)
+        val amigosNuevos = _amigosNuevos.asSharedFlow()
+
+        /**
+         * Permite añadir un amigo directamente a la lista desde fuera del ViewModel.
+         */
+        suspend fun agregarAmigoDirecto(amigo: Amigos.Info) {
+            _amigosNuevos.emit(amigo)
+        }
     }
 
     fun busqueda(raiz: String) {

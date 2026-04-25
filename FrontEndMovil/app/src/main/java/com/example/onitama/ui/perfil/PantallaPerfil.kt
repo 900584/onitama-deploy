@@ -1,4 +1,4 @@
-package com.example.onitama.ui.amigos
+package com.example.onitama.ui.perfil
 
 import android.content.Intent
 import androidx.compose.foundation.Image
@@ -15,23 +15,25 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -42,28 +44,33 @@ import androidx.compose.ui.unit.sp
 import com.example.onitama.AutoLogin
 import com.example.onitama.R
 import com.example.onitama.ui.activities.cartas.Cartas_activity
+import com.example.onitama.ui.perfil.ViewModelPerfil
+import com.example.onitama.ui.activities.notificaciones.NotificacionesActivity
 
 /**
- * Pantalla de amigos.
+ * Pantalla que muestra datos del usuario.
  *
- * Esta función es un Composable que representa la pantalla de
- * amigos. En esta pantalla se muestran los amigos que tiene el
- * usuario. Además, hay un buscador que permite al usuario hacer
- * búsquedas escribiendo el nombre de usuario del jugador que
- * busca.
+ * Esta función es un Composable que representa la pantalla que
+ * muestra el perfil del usuario.
  *
  * @param viewModel View Model que gestiona el estado y la lógica.
  */
 @Composable
-fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
+fun PantallaPerfil(
+    viewModel: ViewModelPerfil
+) {
 
-    val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
-    val context = LocalContext.current
     val datosUsuario by AutoLogin.sesion.collectAsState()
-    
-    val query by viewModel.raizBuscada.collectAsState()
-    val amigos by viewModel.listaAmigos.collectAsState()
-    val cargando by viewModel.cargando.collectAsState()
+    val context = LocalContext.current
+    val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
+
+    // Resolución de la imagen de perfil
+    val imageResId = context.resources.getIdentifier(
+        datosUsuario?.avatar_id,
+        "drawable",
+        context.packageName
+    )
+    val idSeguro = if (imageResId != 0) imageResId else R.drawable.rey_azul
 
     Box(
         modifier = Modifier
@@ -77,7 +84,7 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(120.dp)
-                .align(Alignment.TopCenter) // Se ancla arriba del todo
+                .align(Alignment.TopCenter)
                 .background(colorResource(id = R.color.azulFondo))
                 .padding(horizontal = 16.dp)
         ) {
@@ -101,6 +108,8 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                     .padding(start = 30.dp, top = 16.dp)
                     .height(60.dp)
                     .align(Alignment.TopStart)
+
+
             )
 
             // C) Contadores (Katanas y Core)
@@ -143,63 +152,112 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
         }
 
         // ==========================================
-        // 2. BUSCADOR Y LISTA DE AMIGOS
+        // 2. DATOS DEL USUARIO
         // ==========================================
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 130.dp, bottom = 70.dp, start = 16.dp, end = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(top = 120.dp, bottom = 63.dp), // Espacio entre cabecera y pie
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            // Buscador
-            OutlinedTextField(
-                value = query,
-                onValueChange = { viewModel.busqueda(it) },
+            // Imagen de perfil
+            Image(
+                painter = painterResource(id = idSeguro),
+                contentDescription = "Imagen de Perfil",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                placeholder = { Text("Buscar jugadores...") },
-                leadingIcon = {
-                    Image(
-                        painter = painterResource(id = R.drawable.lupa),
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                },
-                shape = CircleShape,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = colorResource(id = R.color.azulFondo),
-                    unfocusedBorderColor = Color.Gray,
-                    cursorColor = colorResource(id = R.color.azulFondo)
-                ),
-                singleLine = true
+                    .size(150.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray)
             )
 
-            if (cargando) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = colorResource(id = R.color.azulFondo))
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Información del jugador
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 40.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                InfoRow(
+                    label = "Nombre de usuario:",
+                    value = datosUsuario?.nombre ?: "Nombre de usuario",
+                    fontFamily = quattrocentoBold
+                )
+                InfoRow(
+                    label = "Correo electrónico:",
+                    value = datosUsuario?.correo ?: "Correo electrónico",
+                    fontFamily = quattrocentoBold
+                )
+                InfoRow(
+                    label = "Partidas Jugadas:",
+                    value = datosUsuario?.partidas_jugadas?.toString() ?: "0",
+                    fontFamily = quattrocentoBold
+                )
+                InfoRow(
+                    label = "Partidas Ganadas:",
+                    value = datosUsuario?.partidas_ganadas?.toString() ?: "0",
+                    fontFamily = quattrocentoBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 40.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Botón 'Editar Perfil'
+                Button(
+                    onClick = { /* Acción editar perfil */ },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(id = R.color.azulBarraTareas),
+                        contentColor = Color.White
+                    ),
+                    shape = MaterialTheme.shapes.medium
                 ) {
-                    items(amigos) { amigo ->
-                        val esAmigo = amigos.any { it.nombre == amigo.nombre }
-                        FriendItem(
-                            amigo = amigo,
-                            fontFamily = quattrocentoBold,
-                            esAmigo = esAmigo,
-                            onSeguir = { viewModel.seguir(amigo.nombre) },
-                            onDejarDeSeguir = { viewModel.dejarDeSeguir(amigo.nombre) }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(top = 8.dp),
-                            thickness = 0.5.dp,
-                            color = Color.LightGray
-                        )
-                    }
+                    Image(
+                        painter = painterResource(id = R.drawable.editar),
+                        contentDescription = "Editar Perfil",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "EDITAR",
+                        fontFamily = quattrocentoBold,
+                        fontSize = 12.sp
+                    )
+                }
+
+                // Botón 'Notificaciones'
+                Button(
+                    onClick = {
+                        val intent = Intent(context, NotificacionesActivity::class.java)
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(id = R.color.azulBarraTareas),
+                        contentColor = Color.White
+                    ),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.notificacion),
+                        contentDescription = "Notificaciones",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "NOTIFICACIONES",
+                        fontFamily = quattrocentoBold,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
@@ -283,86 +341,30 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
     }
 }
 
+/**
+ * Fila que muestra una etiqueta y un valor de información del usuario.
+ */
 @Composable
-fun FriendItem(
-    amigo: com.example.onitama.api.Amigos.Info,
-    fontFamily: FontFamily,
-    esAmigo: Boolean,
-    onSeguir: () -> Unit,
-    onDejarDeSeguir: () -> Unit
+fun InfoRow(
+    label: String,
+    value: String,
+    fontFamily: FontFamily
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // Avatar con inicial
-        Box(
-            modifier = Modifier
-                .size(50.dp)
-                .clip(CircleShape)
-                .background(colorResource(id = R.color.azulFondo)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = amigo.nombre.take(1).uppercase(),
-                color = Color.White,
-                fontSize = 20.sp,
-                fontFamily = fontFamily
-            )
-        }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        // Nombre y Puntos
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                text = amigo.nombre,
-                fontSize = 18.sp,
-                fontFamily = fontFamily,
-                color = Color.Black
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(id = R.drawable.katanas),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = "${amigo.puntos} pts",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(start = 4.dp)
-                )
-            }
-        }
-
-        // Botón de seguir o dejar de seguir
-        if (esAmigo) {
-            IconButton(
-                onClick = onDejarDeSeguir,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.no_seguir),
-                    contentDescription = "Dejar de Seguir",
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        } else {
-            IconButton(
-                onClick = onSeguir,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.seguir),
-                    contentDescription = "Seguir",
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
+        Text(
+            text = label,
+            fontFamily = fontFamily,
+            fontSize = 18.sp,
+            color = Color.Gray
+        )
+        Text(
+            text = value,
+            fontFamily = fontFamily,
+            fontSize = 18.sp,
+            color = Color.Black
+        )
     }
 }

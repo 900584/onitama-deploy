@@ -2,51 +2,87 @@ package com.example.onitama.api
 
 import android.util.Log
 import com.example.onitama.Config
-import com.example.onitama.DatosPerfil
-import com.example.onitama.lib.Carta
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
-import org.json.JSONObject
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
+class CartasAPI(
+    private val wsUrl: String = Config.WS_URL
+) {
+    val usarServidor: Boolean get() = !(wsUrl.isEmpty())
 
-data class CartaYPuntos(
-    val nombre: String,
-    val puntos_necesarios: Int
-)
+    @Serializable
+    data class CartaYPuntos(
+        val nombre: String,
+        val puntos_necesarios: Int
+    )
 
-val AuthClient = Auth()
+    @Serializable
+    sealed class MensajeCliente
 
-suspend fun obtenerCartas(): List<CartaYPuntos>? {
-    if (!AuthClient.usarServidor) {
-        return null
+    @Serializable
+    @SerialName("OBTENER_CARTAS")
+    object MensajeObtenerCartas : MensajeCliente()
+
+    @Serializable
+    sealed class MensajeServidor
+
+    @Serializable
+    @SerialName("LISTA_CARTAS")
+    data class MensajeListaCartas(
+        val cartas: List<CartaYPuntos>
+    ): MensajeServidor()
+
+    private val jsonSerializer = Json {
+        ignoreUnknownKeys = true
+        classDiscriminator = "tipo"
     }
 
-    val respuesta = withTimeoutOrNull(8_000L) {
-        val requestJson = JSONObject().apply {
-            put("tipo", "OBTENER_CARTAS")
+    /**
+     * Esta función se encarga de enviar y recibir los mensajes
+     * correspondientes al servidor para obtener la lista de cartas.
+     *
+     * @return Lista de cartas disponibles con sus puntos necesarios.
+     */
+    suspend fun obtenerCartas(): List<CartaYPuntos> {
+        if (!usarServidor) {
+            // Datos mock en caso de no usar servidor
+            return listOf(
+                CartaYPuntos(nombre = "Tigre", puntos_necesarios = 0),
+                CartaYPuntos(nombre = "Cangrejo", puntos_necesarios = 0),
+                CartaYPuntos(nombre = "Rana", puntos_necesarios = 0),
+                CartaYPuntos(nombre = "Ganso", puntos_necesarios = 0),
+                CartaYPuntos(nombre = "Conejo", puntos_necesarios = 0)
+            )
         }
-        AuthClient.enviarYEsperarRespuesta(requestJson.toString())
-    } ?: throw Exception("El servidor no respondió a tiempo.")
-    val tipo = respuesta.optString("tipo")
-    when(tipo){
-        "LISTA_CARTAS" ->{
-            var resultado = mutableListOf<CartaYPuntos>()
-            val cartasArray = respuesta.optJSONArray("cartas")
-            if (cartasArray != null) {
-                for (i in 0 until cartasArray.length()) {
-                    val cartaJson = cartasArray.optJSONObject(i)
-                    if (cartaJson != null) {
-                        resultado.add(
-                            CartaYPuntos(
-                                nombre = cartaJson.optString("nombre"),
-                                puntos_necesarios = cartaJson.optInt("puntos_necesarios")
-                            )
-                        )
+
+        return try {
+            val mensaje = MensajeObtenerCartas
+            val jsonMsg = jsonSerializer.encodeToString<MensajeCliente>(mensaje)
+            ManejadorGlobal.enviarMensaje(jsonMsg)
+
+            val respuestaStr = withTimeoutOrNull(5000L) {
+                ManejadorGlobal.mensajesEntrantes
+                    .filter { json ->
+                        json.optString("tipo") == "LISTA_CARTAS"
                     }
-                }
+                    .first()
+                    .toString()
+            } ?: return emptyList()
+
+            val respuesta = jsonSerializer.decodeFromString<MensajeServidor>(respuestaStr)
+            if (respuesta is MensajeListaCartas) {
+                respuesta.cartas
+            } else {
+                emptyList()
             }
-            return resultado
+        } catch (e: Exception) {
+            Log.e("Cartas_API", "Error al obtener cartas", e)
+            emptyList()
         }
-        else -> Log.e("ERROR", "Respuesta inesperada del servidor.")
     }
-    return null
 }

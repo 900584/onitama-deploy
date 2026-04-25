@@ -98,7 +98,8 @@ class ViewModelRegistro() : ViewModel() {
                         datos!!.nombre,
                         datos.puntos,
                         datos.cores,
-                        datos.avatar_id
+                        datos.avatar_id,
+                        datos.skin_activa
                     )
                     AutoLogin.actualizar(context, datos as DatosPerfil?)
 
