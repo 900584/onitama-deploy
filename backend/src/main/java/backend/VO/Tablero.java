@@ -265,7 +265,7 @@ public class Tablero {
                         if((J1 == null || (J1 != null && J1.permiteMovimiento(m.getX(), m.getY()))) && (J2 == null || (J2 != null && J2.permiteMovimiento(m.getX(), m.getY())))){
                             int x = (equipo == 1) ? j-m.getX() : j+m.getX();
                             int y = (equipo == 1) ? i+m.getY() : i-m.getY();
-                            if(x < DIM && y < DIM){
+                            if(x >= 0 && y >= 0 && x < DIM && y < DIM){
                                 Posicion destino = tablero[y][x];
                                 Ficha fDest = destino.getFicha();
                                 if(destino.estaActiva() && (fDest == null || (fDest != null && fDest.getEquipo() != equipo))){

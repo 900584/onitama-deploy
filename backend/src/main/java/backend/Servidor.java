@@ -1351,6 +1351,14 @@ public class Servidor extends WebSocketServer {
                 JSONObject msg1 = new JSONObject();
                 JSONObject msg2 = new JSONObject();
                 esperaPartida.remove(idPartida);
+                try {
+                    mutexParejas.acquire();
+                    parejas.remove(pj);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    mutexParejas.release();
+                }
                 
                 msg1.put("tipo", "DERROTA");
                 msg1.put("motivo", "SIN_MOV");
