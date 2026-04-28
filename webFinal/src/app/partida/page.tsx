@@ -1450,7 +1450,15 @@ function PartidaInterna({
     ? resultadoFinal.ganador === jugadorActual.nombre
     : estado.ganador === miEquipoActual;
 
-  const razonFin = resultadoFinal?.razon ?? razonLocalFin ?? "FIN_PARTIDA";
+  // Si el servidor mandó un motivo específico lo usamos; si mandó el genérico
+  // "FIN_PARTIDA" (o nada), preferimos la razón detectada localmente.
+  const razonServidor = resultadoFinal?.razon;
+  const razonFin =
+    razonServidor && razonServidor !== "FIN_PARTIDA"
+      ? razonServidor       // servidor envió motivo concreto → usarlo
+      : razonLocalFin       // servidor fue genérico → razón local
+      ?? razonServidor      // sin razón local → lo que dijo el servidor
+      ?? "FIN_PARTIDA";     // último recurso
   const razonFinLabel =
     razonFin === "ABANDONO"
       ? "RIVAL ABANDONO"
@@ -2115,8 +2123,28 @@ function PartidaInterna({
 
       {/* ═══ TOAST IN-GAME (reemplaza alert del navegador) ══════════════════════════ */}
       {mensajeInGame && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] bg-red-700/95 backdrop-blur-sm text-white px-5 py-3 rounded-xl shadow-2xl border border-red-400/60 text-sm font-semibold text-center max-w-xs pointer-events-none">
-          ⚠ {mensajeInGame}
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] pointer-events-none flex flex-col items-center gap-1"
+          style={{ minWidth: 240, maxWidth: 320 }}>
+          {/* Línea de acento superior */}
+          <div style={{ width: "100%", height: 2, background: "linear-gradient(to right, transparent, #b85c38, transparent)" }} />
+          <div
+            style={{
+              background: "rgba(15, 26, 43, 0.97)",
+              border: "1px solid rgba(184, 92, 56, 0.45)",
+              backdropFilter: "blur(8px)",
+              padding: "12px 24px",
+              width: "100%",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ color: "#b85c38", fontSize: 9, letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: 4, fontWeight: 600 }}>
+              Movimiento inválido
+            </p>
+            <p style={{ color: "#c4b5a0", fontSize: 13, fontWeight: 400, lineHeight: 1.5 }}>
+              {mensajeInGame}
+            </p>
+          </div>
+          <div style={{ width: "100%", height: 1, background: "linear-gradient(to right, transparent, rgba(184,92,56,0.2), transparent)" }} />
         </div>
       )}
 
