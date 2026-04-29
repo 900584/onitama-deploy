@@ -1,5 +1,6 @@
 package com.example.onitama.ui.amigos
 
+import android.app.Activity
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.onitama.AutoLogin
 import com.example.onitama.R
+import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.activities.cartas.Cartas_activity
 
 /**
@@ -210,7 +212,7 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.BottomCenter)
+                .align(Alignment.BottomCenter) // Se ancla abajo del todo
         ) {
             // Fondo y botones laterales de la barra
             Row(
@@ -232,7 +234,10 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                 IconButton(
                     onClick = {
                         val intent = Intent(context, Cartas_activity::class.java)
-                        context.startActivity(intent)},
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    },
+
                     modifier = Modifier.size(60.dp)
                 ) {
                     Image(painterResource(R.drawable.cards),
@@ -242,19 +247,16 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                 Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
 
                 IconButton(
-                    onClick = {},
-                    modifier = Modifier.size(70.dp)
+                    onClick = {
+                        val intent = Intent(context, MenuPrincipalActivity::class.java)
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    },
+                    modifier = Modifier.size(60.dp)
                 ){
-                    Image(painterResource(R.drawable.amigos),
-                        contentDescription = "Amigos")
+                    Image(painterResource(R.drawable.espadas),
+                        contentDescription = "Jugar")
                 }
-                Text(
-                    text = "AMIGOS",
-                    fontFamily = quattrocentoBold,
-                    fontSize = 12.sp,
-                    color = Color.White,
-                    modifier = Modifier.offset(y = (-8).dp)
-                )
                 IconButton(
                     onClick = {},
                     modifier = Modifier.size(60.dp)
@@ -265,7 +267,7 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                 }
             }
 
-            // Botón central "A JUGAR" sobresaliendo
+            // Botón central "Amigos" sobresaliendo
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -273,11 +275,18 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 IconButton(
-                    onClick = { /* Iniciar partida rápida */ },
-                    modifier = Modifier.size(60.dp)
+                    onClick = {},
+                    modifier = Modifier.size(70.dp)
                 ) {
-                    Image(painterResource(R.drawable.espadas), contentDescription = "Jugar")
+                    Image(painterResource(R.drawable.amigos), contentDescription = "Amigos")
                 }
+                Text(
+                    text = "AMIGOS",
+                    fontFamily = quattrocentoBold,
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    modifier = Modifier.offset(y = (-8).dp)
+                )
             }
         }
     }

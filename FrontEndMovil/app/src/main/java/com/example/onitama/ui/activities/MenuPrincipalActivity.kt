@@ -56,6 +56,7 @@ import com.example.onitama.AutoLogin
 import com.example.onitama.ui.activities.cartas.Cartas_activity
 import com.example.onitama.ui.activities.partida.PartidaActivity
 import com.example.onitama.ui.activities.profile.ProfileActivity
+import com.example.onitama.ui.amigos.Amigos_Activity
 
 class MenuPrincipalActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -452,7 +453,11 @@ fun MainMenuScreen(
                 Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
 
                 IconButton(
-                    onClick = {},
+                    onClick = {
+                        val intent = Intent(context, Amigos_Activity::class.java)
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    },
                     modifier = Modifier.size(60.dp)
                 ){
                     Image(painterResource(R.drawable.amigos),

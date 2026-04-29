@@ -1,5 +1,6 @@
 package com.example.onitama.ui.activities.cartas
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -54,6 +55,7 @@ import com.example.onitama.lib.Carta
 import com.example.onitama.lib.Cartas
 import com.example.onitama.lib.Movimiento
 import com.example.onitama.ui.activities.MenuPrincipalActivity
+import com.example.onitama.ui.amigos.Amigos_Activity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 
@@ -303,7 +305,11 @@ fun CartasScreen(
                 Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
 
                 IconButton(
-                    onClick = {},
+                    onClick = {
+                        val intent = Intent(context, Amigos_Activity::class.java)
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    },
                     modifier = Modifier.size(60.dp)
                 ){
                     Image(painterResource(R.drawable.amigos),

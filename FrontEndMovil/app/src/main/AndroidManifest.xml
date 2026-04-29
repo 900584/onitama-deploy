@@ -54,6 +54,9 @@
             android:name=".ui.activities.cartas.Cartas_activity">
         </activity>
         <activity
+            android:name=".ui.amigos.Amigos_Activity">
+        </activity>
+        <activity
             android:name=".ui.activities.profile.ProfileActivity">
         </activity>
         <activity
