@@ -55,7 +55,7 @@ export default function Header() {
       {/* Nav */}
       <nav style={{ display: "flex", alignItems: "center", gap: 36 }}>
         <Link
-          href="/"
+          href="/juego"
           className="oni-nav-link"
           style={{
             fontFamily: DISPLAY,
@@ -68,7 +68,8 @@ export default function Header() {
         >
           El juego
         </Link>
-        <span
+        <Link
+          href="/nosotros"
           className="oni-nav-link"
           style={{
             fontFamily: DISPLAY,
@@ -76,11 +77,11 @@ export default function Header() {
             fontWeight: 600,
             letterSpacing: "0.22em",
             textTransform: "uppercase",
-            cursor: "default",
+            textDecoration: "none",
           }}
         >
           Nosotros
-        </span>
+        </Link>
       </nav>
 
       {/* CTA */}
