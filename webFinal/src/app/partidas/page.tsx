@@ -17,7 +17,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { obtenerJugadorActivo, guardarSesion, cerrarSesion, type DatosSesion } from "@/lib/sesion";
-import { obtenerPerfil } from "@/api/auth";
+import { obtenerPerfil, cambiarAvatar, cambiarContrasena } from "@/api/auth";
 import { activarSkin, comprarSkin, obtenerTiendaSkins, type SkinEstado } from "@/api/skins";
 import { obtenerCartas, obtenerCartasAccion, type CartaEstado } from "@/api/cartas";
 import { CartaAccionFicha, getDescripcionCartaAccion } from "@/lib/cartasAccionVisual";
@@ -897,6 +897,13 @@ export default function PartidasPage() {
               jugador={jugador}
               partidasPublicas={partidasPublicas}
               cargandoPartidasPublicas={cargandoPartidasPublicas}
+              onPerfilActualizado={(nuevosDatos) => {
+                setJugador((prev) => {
+                  const s = { ...prev, ...nuevosDatos };
+                  guardarSesion(s);
+                  return s;
+                });
+              }}
             />
           )}
 
@@ -1402,16 +1409,81 @@ function FilaHistorialPartidaCard({
   );
 }
 
+const AVATARES_DISPONIBLES = Array.from({ length: 12 }, (_, i) => `avatar_${(i + 1).toString().padStart(2, "0")}`);
+
 function PanelMiCuenta({
   jugador,
   partidasPublicas,
   cargandoPartidasPublicas,
+  onPerfilActualizado,
 }: {
   jugador: DatosSesion;
   partidasPublicas: ResumenPartidaPublica[];
   cargandoPartidasPublicas: boolean;
+  onPerfilActualizado: (nuevosDatos: Partial<DatosSesion>) => void;
 }) {
   const ultimas = [...partidasPublicas].slice(-10).reverse();
+
+  const [modalAvatar, setModalAvatar] = useState(false);
+  const [modalPass, setModalPass] = useState(false);
+  
+  const [avatarSeleccionado, setAvatarSeleccionado] = useState(jugador.avatar_id || "avatar_01");
+  const [guardandoAvatar, setGuardandoAvatar] = useState(false);
+
+  const [passForm, setPassForm] = useState({ actual: "", nueva: "", confirmar: "" });
+  const [guardandoPass, setGuardandoPass] = useState(false);
+  const [passError, setPassError] = useState("");
+  const [passExito, setPassExito] = useState(false);
+
+  const handleGuardarAvatar = async () => {
+    setGuardandoAvatar(true);
+    try {
+      const res = await cambiarAvatar(jugador.nombre, avatarSeleccionado);
+      if (res.ok) {
+        onPerfilActualizado({ avatar_id: avatarSeleccionado });
+        setModalAvatar(false);
+      } else {
+        alert("Error al guardar avatar: " + (res.codigo || "Desconocido"));
+      }
+    } catch (error: any) {
+      alert("Error de conexión: " + (error.message || "No se pudo contactar con el servidor."));
+    } finally {
+      setGuardandoAvatar(false);
+    }
+  };
+
+  const handleGuardarPass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassError("");
+    setPassExito(false);
+    if (!passForm.actual) {
+      setPassError("Introduce tu contraseña actual.");
+      return;
+    }
+    if (passForm.nueva !== passForm.confirmar) {
+      setPassError("Las contraseñas no coinciden.");
+      return;
+    }
+    if (passForm.nueva.length < 4) {
+      setPassError("La contraseña debe tener al menos 4 caracteres.");
+      return;
+    }
+    setGuardandoPass(true);
+    try {
+      const res = await cambiarContrasena(jugador.nombre, passForm.actual, passForm.nueva);
+      if (res.ok) {
+        setPassExito(true);
+        setPassForm({ actual: "", nueva: "", confirmar: "" });
+        setTimeout(() => setModalPass(false), 2000);
+      } else {
+        setPassError("Error al cambiar contraseña: " + (res.codigo || "Desconocido"));
+      }
+    } catch (error: any) {
+      setPassError("Error de conexión: " + (error.message || "No se pudo contactar con el servidor."));
+    } finally {
+      setGuardandoPass(false);
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8">
@@ -1420,16 +1492,32 @@ function PanelMiCuenta({
         Mi cuenta
       </h2>
       <p className="text-stone-500 text-sm mb-8">
-        Datos de tu perfil. El cambio de nombre y contraseña estará disponible cuando el servidor lo soporte.
+        Datos de tu perfil y preferencias de la cuenta.
       </p>
 
-      <div className="rounded-2xl border border-stone-200 bg-white shadow-sm p-6 mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-          <AvatarCircle nombre={jugador.nombre} avatarId={jugador.avatar_id} sizeClass="w-16 h-16 shrink-0" textClass="text-2xl" />
-          <div>
-            <p className="text-lg font-semibold text-stone-900">@{jugador.nombre}</p>
-            <p className="text-sm text-stone-500">{jugador.correo}</p>
+      <div className="rounded-2xl border border-stone-200 bg-white shadow-sm p-6 mb-8 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <AvatarCircle nombre={jugador.nombre} avatarId={jugador.avatar_id} sizeClass="w-20 h-20 shrink-0" textClass="text-3xl" />
+              <button 
+                onClick={() => { setAvatarSeleccionado(jugador.avatar_id || "avatar_01"); setModalAvatar(true); }}
+                className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-full text-xs font-semibold uppercase tracking-wider transition-opacity"
+              >
+                Cambiar
+              </button>
+            </div>
+            <div>
+              <p className="text-xl font-semibold text-stone-900">@{jugador.nombre}</p>
+              <p className="text-sm text-stone-500">{jugador.correo}</p>
+            </div>
           </div>
+          <button 
+            onClick={() => { setPassError(""); setPassExito(false); setPassForm({actual:"", nueva:"", confirmar:""}); setModalPass(true); }}
+            className="px-4 py-2 border border-stone-300 rounded-lg text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-colors shrink-0"
+          >
+            Cambiar contraseña
+          </button>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -1483,6 +1571,95 @@ function PanelMiCuenta({
           </ul>
         )}
       </div>
+
+      {/* Modal Cambiar Avatar */}
+      {modalAvatar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative animate-in fade-in zoom-in-95 duration-200">
+            <button onClick={() => setModalAvatar(false)} className="absolute top-4 right-4 text-stone-400 hover:text-stone-600">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <h3 className="text-lg font-bold uppercase tracking-widest text-stone-800 mb-6">Selecciona un Avatar</h3>
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              {AVATARES_DISPONIBLES.map(id => (
+                <button 
+                  key={id}
+                  onClick={() => setAvatarSeleccionado(id)}
+                  className={`relative aspect-square rounded-full overflow-hidden border-4 transition-all ${avatarSeleccionado === id ? "border-[#b85c38] shadow-lg scale-105" : "border-transparent hover:border-stone-200"}`}
+                >
+                  <AvatarCircle nombre={jugador.nombre} avatarId={id} sizeClass="w-full h-full" textClass="text-xl" />
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setModalAvatar(false)} className="px-4 py-2 rounded-lg font-semibold text-stone-500 hover:bg-stone-100 transition-colors">Cancelar</button>
+              <button onClick={handleGuardarAvatar} disabled={guardandoAvatar || avatarSeleccionado === jugador.avatar_id} className="px-5 py-2 rounded-lg font-semibold bg-[#b85c38] text-white hover:bg-[#a04e2e] transition-colors disabled:opacity-50 flex items-center gap-2">
+                {guardandoAvatar ? "Guardando..." : "Guardar foto"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cambiar Contraseña */}
+      {modalPass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl relative animate-in fade-in zoom-in-95 duration-200">
+            <button onClick={() => setModalPass(false)} className="absolute top-4 right-4 text-stone-400 hover:text-stone-600">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <h3 className="text-lg font-bold uppercase tracking-widest text-stone-800 mb-4">Cambiar contraseña</h3>
+            {passExito ? (
+              <div className="text-center py-6">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <p className="text-emerald-700 font-semibold">¡Contraseña actualizada!</p>
+              </div>
+            ) : (
+              <form onSubmit={handleGuardarPass}>
+                {passError && <p className="mb-4 text-red-600 bg-red-50 p-2 rounded text-sm">{passError}</p>}
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-stone-500 uppercase tracking-widest mb-1">Contraseña actual</label>
+                  <input
+                    type="password"
+                    value={passForm.actual}
+                    onChange={e => setPassForm(prev => ({...prev, actual: e.target.value}))}
+                    className="w-full bg-stone-50 border border-stone-200 text-stone-800 px-4 py-2 rounded-lg outline-none focus:border-[#b85c38] focus:ring-1 focus:ring-[#b85c38] transition-all"
+                    required
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-stone-500 uppercase tracking-widest mb-1">Nueva contraseña</label>
+                  <input
+                    type="password"
+                    value={passForm.nueva}
+                    onChange={e => setPassForm(prev => ({...prev, nueva: e.target.value}))}
+                    className="w-full bg-stone-50 border border-stone-200 text-stone-800 px-4 py-2 rounded-lg outline-none focus:border-[#b85c38] focus:ring-1 focus:ring-[#b85c38] transition-all"
+                    required
+                  />
+                </div>
+                <div className="mb-6">
+                  <label className="block text-xs font-bold text-stone-500 uppercase tracking-widest mb-1">Confirmar contraseña</label>
+                  <input
+                    type="password"
+                    value={passForm.confirmar}
+                    onChange={e => setPassForm(prev => ({...prev, confirmar: e.target.value}))}
+                    className="w-full bg-stone-50 border border-stone-200 text-stone-800 px-4 py-2 rounded-lg outline-none focus:border-[#b85c38] focus:ring-1 focus:ring-[#b85c38] transition-all"
+                    required
+                  />
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button type="button" onClick={() => setModalPass(false)} className="px-4 py-2 rounded-lg font-semibold text-stone-500 hover:bg-stone-100 transition-colors">Cancelar</button>
+                  <button type="submit" disabled={guardandoPass} className="px-5 py-2 rounded-lg font-semibold bg-[#1a2d4a] text-white hover:bg-[#203a60] transition-colors disabled:opacity-50">
+                    {guardandoPass ? "Guardando..." : "Actualizar"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -264,3 +264,69 @@ export async function obtenerPerfil(nombre: string): Promise<DatosSesion> {
     }
   });
 }
+
+// ─── Edición de perfil ────────────────────────────────────────────────────────
+
+/**
+ * Cambia el avatar del jugador actual.
+ */
+export async function cambiarAvatar(nombre: string, avatarId: string): Promise<{ ok: boolean; codigo?: string }> {
+  if (!usarServidor) return { ok: true };
+
+  await WS.conectar();
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      unsub();
+      reject(new Error("Timeout al cambiar avatar."));
+    }, 8_000);
+
+    const unsub = WS.suscribirTodos((msg) => {
+      if (msg.tipo !== "AVATAR_CAMBIADO" && msg.tipo !== "CAMBIO_AVATAR_ERROR") return;
+      
+      clearTimeout(timeout);
+      unsub();
+
+      if (msg.tipo === "AVATAR_CAMBIADO") {
+        resolve({ ok: true });
+      } else {
+        resolve({ ok: false, codigo: msg.codigo as string });
+      }
+    });
+
+    // El servidor espera "usuario", no "nombre"
+    WS.enviar({ tipo: "CAMBIAR_AVATAR", usuario: nombre, avatar_id: avatarId });
+  });
+}
+
+/**
+ * Cambia la contraseña del jugador actual.
+ */
+export async function cambiarContrasena(nombre: string, contrasenaActual: string, contrasenaNueva: string): Promise<{ ok: boolean; codigo?: string }> {
+  if (!usarServidor) return { ok: true };
+
+  await WS.conectar();
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      unsub();
+      reject(new Error("Timeout al cambiar contraseña."));
+    }, 8_000);
+
+    const unsub = WS.suscribirTodos((msg) => {
+      if (msg.tipo !== "CONTRASENA_CAMBIADA" && msg.tipo !== "CAMBIO_CONTRASENA_ERROR") return;
+      
+      clearTimeout(timeout);
+      unsub();
+
+      if (msg.tipo === "CONTRASENA_CAMBIADA") {
+        resolve({ ok: true });
+      } else {
+        resolve({ ok: false, codigo: msg.codigo as string });
+      }
+    });
+
+    // El servidor espera "usuario", "contrasena_actual" y "contrasena_nueva"
+    WS.enviar({ tipo: "CAMBIAR_CONTRASENA", usuario: nombre, contrasena_actual: contrasenaActual, contrasena_nueva: contrasenaNueva });
+  });
+}
