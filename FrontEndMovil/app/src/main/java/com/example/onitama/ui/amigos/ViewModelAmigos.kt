@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.onitama.AutoLogin
 import com.example.onitama.api.Amigos
+import com.example.onitama.api.ManejadorGlobal
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,12 +12,14 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 /**
  * ViewModel que gestiona la lógica de 'amigos'.
@@ -31,103 +34,67 @@ class ViewModelAmigos : ViewModel() {
     private val _cargando = MutableStateFlow(false)
     val cargando: StateFlow<Boolean> = _cargando.asStateFlow()
 
+    private val _listaJugadores = MutableStateFlow<List<Amigos.Info>>(emptyList())
+    val listaJugadores: StateFlow<List<Amigos.Info>> = _listaJugadores.asStateFlow()
+
     private val _listaAmigos = MutableStateFlow<List<Amigos.Info>>(emptyList())
     val listaAmigos: StateFlow<List<Amigos.Info>> = _listaAmigos.asStateFlow()
 
     init {
-        // Carga inicial de amigos del usuario actual
-        cargarAmigos()
+        obtenerAmigos()
+        escucharMensajes()
+    }
 
-        // Escuchar nuevos amigos aceptados en tiempo real
+    private fun escucharMensajes() {
         viewModelScope.launch {
-            amigosNuevos.collect { nuevo ->
-                // Evitar duplicados
-                if (_listaAmigos.value.none { it.nombre == nuevo.nombre }) {
-                    _listaAmigos.value = _listaAmigos.value + nuevo
+            ManejadorGlobal.mensajesEntrantes.collectLatest { json ->
+                val tipo = json.optString("tipo")
+                if (tipo == "AMISTAD_ACEPTADA" || tipo == "AMIGO_BORRADO") {
+                    obtenerAmigos()
                 }
             }
         }
     }
 
-    companion object {
-        private val _amigosNuevos = MutableSharedFlow<Amigos.Info>(extraBufferCapacity = 1)
-        val amigosNuevos = _amigosNuevos.asSharedFlow()
-
-        /**
-         * Permite añadir un amigo directamente a la lista desde fuera del ViewModel.
-         */
-        suspend fun agregarAmigoDirecto(amigo: Amigos.Info) {
-            _amigosNuevos.emit(amigo)
+    fun obtenerAmigos() {
+        viewModelScope.launch {
+            _cargando.value = true
+            val usuario = AutoLogin.sesion.value?.nombre ?: ""
+            if (usuario.isNotEmpty()) {
+                _listaAmigos.value = api.obtenerAmigos(usuario)
+            }
+            _cargando.value = false
         }
     }
 
-    fun busqueda(raiz: String) {
-        _raizBuscada.value = raiz
-        if (raiz.isEmpty()) {
-            cargarAmigos()
+    fun busqueda(query: String) {
+        _raizBuscada.value = query
+        if (query.isNotEmpty()) {
+            viewModelScope.launch {
+                _cargando.value = true
+                _listaJugadores.value = api.buscarJugadores(query)
+                _cargando.value = false
+            }
         } else {
-            // La búsqueda se dispara desde el Flow de abajo o manualmente
-            buscar(raiz)
+            _listaJugadores.value = emptyList()
         }
     }
 
-    private fun cargarAmigos() {
+    fun seguir(nombre: String) {
         viewModelScope.launch {
-            _cargando.value = true
-            val user = AutoLogin.sesion.value?.nombre ?: "Jugador"
-            val amigos = api.obtenerAmigos(user)
-            _listaAmigos.value = amigos
-            _cargando.value = false
-        }
-    }
-
-    private fun buscar(raiz: String) {
-        viewModelScope.launch {
-            _cargando.value = true
-            val resultados = api.buscarJugadores(raiz)
-            _listaAmigos.value = resultados
-            _cargando.value = false
-        }
-    }
-
-    fun seguir(destinatario: String) {
-        viewModelScope.launch {
-            val remitente = AutoLogin.sesion.value?.nombre ?: return@launch
-            val exito = api.enviarSolicitudAmistad(remitente, destinatario)
-            if (exito) {
-                // Podríamos mostrar un mensaje o simplemente recargar
-                // En este caso, si estamos buscando, seguimos mostrando la búsqueda
-                // pero si estamos en la lista de amigos, recargamos
-                if (_raizBuscada.value.isEmpty()) {
-                    cargarAmigos()
-                } else {
-                    // Si queremos que se actualice el estado de "amigo" en la búsqueda,
-                    // deberíamos volver a cargar pero sin que se note mucho o simplemente
-                    // confiar en que la siguiente carga traerá los datos actualizados.
-                    // Por ahora, recargamos misAmigos para que la UI sepa que ya es amigo.
-                    actualizarMisAmigos()
-                }
+            val remitente = AutoLogin.sesion.value?.nombre ?: ""
+            if (remitente.isNotEmpty() && api.enviarSolicitudAmistad(remitente, nombre)) {
+                obtenerAmigos()
             }
         }
     }
 
-    fun dejarDeSeguir(amigoNombre: String) {
+    fun dejarDeSeguir(nombre: String) {
         viewModelScope.launch {
-            val usuario = AutoLogin.sesion.value?.nombre ?: return@launch
-            val exito = api.borrarAmigo(usuario, amigoNombre)
-            if (exito) {
-                if (_raizBuscada.value.isEmpty()) {
-                    cargarAmigos()
-                } else {
-                    actualizarMisAmigos()
-                }
+            val usuario = AutoLogin.sesion.value?.nombre ?: ""
+            if (usuario.isNotEmpty() && api.borrarAmigo(usuario, nombre)) {
+                obtenerAmigos()
             }
         }
-    }
-
-    private suspend fun actualizarMisAmigos() {
-        val user = AutoLogin.sesion.value?.nombre ?: return
-        val amigos = api.obtenerAmigos(user)
-        _listaAmigos.value = amigos
     }
 }

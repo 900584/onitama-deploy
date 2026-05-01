@@ -2,8 +2,10 @@ package com.example.onitama.ui.amigos
 
 import android.app.Activity
 import android.content.Intent
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +22,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -33,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -44,6 +46,7 @@ import com.example.onitama.AutoLogin
 import com.example.onitama.R
 import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.activities.cartas.Cartas_activity
+import com.example.onitama.ui.perfil.Perfil_Activity
 
 /**
  * Pantalla de amigos.
@@ -64,6 +67,7 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
     val datosUsuario by AutoLogin.sesion.collectAsState()
     
     val query by viewModel.raizBuscada.collectAsState()
+    val jugadores by viewModel.listaJugadores.collectAsState()
     val amigos by viewModel.listaAmigos.collectAsState()
     val cargando by viewModel.cargando.collectAsState()
 
@@ -79,67 +83,102 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(120.dp)
-                .align(Alignment.TopCenter) // Se ancla arriba del todo
+                .align(Alignment.TopCenter)
                 .background(colorResource(id = R.color.azulFondo))
                 .padding(horizontal = 16.dp)
         ) {
-            // A) Botón de Perfil
-            IconButton(
-                onClick = { /* Acción perfil */ },
-                modifier = Modifier
-                    .size(80.dp)
-                    .align(Alignment.CenterEnd)
-                    .clip(CircleShape)
-                    .background(Color.White)
-            ) {
+            if(datosUsuario != null) {
+                Log.d("DEBUG", "Imagen: ${datosUsuario?.avatar_id}")
+                val imageResId = context.resources.getIdentifier(
+                    datosUsuario?.avatar_id,
+                    "drawable",
+                    context.packageName
+                )
 
-            }
-
-            // B) Título del juego
-            Image(
-                painter = painterResource(id = R.drawable.onitama_text),
-                contentDescription = "Titulo",
-                modifier = Modifier
-                    .padding(start = 30.dp, top = 16.dp)
-                    .height(60.dp)
-                    .align(Alignment.TopStart)
-            )
-
-            // C) Contadores (Katanas y Core)
-            Row(
-                modifier = Modifier
-                    .padding(top = 30.dp, bottom = 10.dp)
-                    .align(Alignment.BottomCenter),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                if (imageResId != 0) {
                     Image(
-                        painterResource(id = R.drawable.katanas),
-                        contentDescription = "Katanas",
-                        modifier = Modifier.size(30.dp)
+                        painter = painterResource(imageResId),
+                        contentDescription = "Imagen de perfil",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(80.dp)
+                            .align(Alignment.CenterEnd)
+                            .clip(CircleShape)
+                            .clickable(onClick = {
+                                val intent = Intent(context, Perfil_Activity::class.java)
+                                context.startActivity(intent)
+                            })
                     )
-                    Text(
-                        datosUsuario?.puntos.toString(),
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontFamily = quattrocentoBold,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .align(Alignment.CenterEnd)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .clickable(onClick = {
+                                val intent = Intent(context, Perfil_Activity::class.java)
+                                context.startActivity(intent)
+                            }),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = datosUsuario?.nombre?.take(1)?.uppercase() ?: "",
+                            color = colorResource(id = R.color.azulFondo),
+                            fontSize = 32.sp,
+                            fontFamily = quattrocentoBold
+                        )
+                    }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painterResource(id = R.drawable.core),
-                        contentDescription = "Core",
-                        modifier = Modifier.height(30.dp)
-                    )
-                    Text(
-                        datosUsuario?.cores.toString(),
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontFamily = quattrocentoBold,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+                // B) Título del juego
+                Image(
+                    painter = painterResource(id = R.drawable.onitama_text),
+                    contentDescription = "Titulo",
+                    modifier = Modifier
+                        .padding(start = 30.dp, top = 16.dp)
+                        .height(60.dp)
+                        .align(Alignment.TopStart)
+
+
+                )
+
+                // C) Contadores (Katanas y Core)
+                Row(
+                    modifier = Modifier
+                        .padding(top = 30.dp, bottom = 10.dp)
+                        .align(Alignment.BottomCenter),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painterResource(id = R.drawable.katanas),
+                            contentDescription = "Katanas",
+                            modifier = Modifier.size(30.dp)
+                        )
+                        Text(
+                            datosUsuario?.puntos.toString(),
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontFamily = quattrocentoBold,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painterResource(id = R.drawable.core),
+                            contentDescription = "Core",
+                            modifier = Modifier.height(30.dp)
+                        )
+                        Text(
+                            datosUsuario?.cores.toString(),
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontFamily = quattrocentoBold,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
                 }
             }
         }
@@ -187,19 +226,15 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(amigos) { amigo ->
-                        val esAmigo = amigos.any { it.nombre == amigo.nombre }
+                    val listaAMostrar = if (query.isEmpty()) amigos else jugadores
+                    items(listaAMostrar) { item ->
+                        val esAmigo = amigos.any { it.nombre == item.nombre }
                         FriendItem(
-                            amigo = amigo,
+                            amigo = item,
                             fontFamily = quattrocentoBold,
                             esAmigo = esAmigo,
-                            onSeguir = { viewModel.seguir(amigo.nombre) },
-                            onDejarDeSeguir = { viewModel.dejarDeSeguir(amigo.nombre) }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(top = 8.dp),
-                            thickness = 0.5.dp,
-                            color = Color.LightGray
+                            onSeguir = { viewModel.seguir(item.nombre) },
+                            onDejarDeSeguir = { viewModel.dejarDeSeguir(item.nombre) }
                         )
                     }
                 }

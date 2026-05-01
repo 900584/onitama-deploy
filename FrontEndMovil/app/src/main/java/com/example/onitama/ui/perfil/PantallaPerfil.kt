@@ -1,8 +1,11 @@
 package com.example.onitama.ui.perfil
 
+import android.app.Activity
 import android.content.Intent
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,19 +19,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,10 +40,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.onitama.AutoLogin
+import com.example.onitama.AutoLogin.cerrarSesion
 import com.example.onitama.R
+import com.example.onitama.api.ManejadorGlobal
+import com.example.onitama.ui.activities.Ini_Activity
+import com.example.onitama.ui.activities.MenuPrincipalActivity
+import com.example.onitama.ui.notificaciones.Notificaciones_Activity
 import com.example.onitama.ui.activities.cartas.Cartas_activity
-import com.example.onitama.ui.perfil.ViewModelPerfil
-import com.example.onitama.ui.activities.notificaciones.NotificacionesActivity
+import com.example.onitama.ui.amigos.Amigos_Activity
 
 /**
  * Pantalla que muestra datos del usuario.
@@ -56,21 +58,11 @@ import com.example.onitama.ui.activities.notificaciones.NotificacionesActivity
  * @param viewModel View Model que gestiona el estado y la lógica.
  */
 @Composable
-fun PantallaPerfil(
-    viewModel: ViewModelPerfil
-) {
+fun PantallaPerfil() {
 
     val datosUsuario by AutoLogin.sesion.collectAsState()
     val context = LocalContext.current
     val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
-
-    // Resolución de la imagen de perfil
-    val imageResId = context.resources.getIdentifier(
-        datosUsuario?.avatar_id,
-        "drawable",
-        context.packageName
-    )
-    val idSeguro = if (imageResId != 0) imageResId else R.drawable.rey_azul
 
     Box(
         modifier = Modifier
@@ -88,65 +80,98 @@ fun PantallaPerfil(
                 .background(colorResource(id = R.color.azulFondo))
                 .padding(horizontal = 16.dp)
         ) {
-            // A) Botón de Perfil
-            IconButton(
-                onClick = { /* Acción perfil */ },
-                modifier = Modifier
-                    .size(80.dp)
-                    .align(Alignment.CenterEnd)
-                    .clip(CircleShape)
-                    .background(Color.White)
-            ) {
+            if (datosUsuario != null) {
+                Log.d("DEBUG", "Imagen: ${datosUsuario?.avatar_id}")
+                val imageResId = context.resources.getIdentifier(
+                    datosUsuario?.avatar_id,
+                    "drawable",
+                    context.packageName
+                )
 
-            }
-
-            // B) Título del juego
-            Image(
-                painter = painterResource(id = R.drawable.onitama_text),
-                contentDescription = "Titulo",
-                modifier = Modifier
-                    .padding(start = 30.dp, top = 16.dp)
-                    .height(60.dp)
-                    .align(Alignment.TopStart)
-
-
-            )
-
-            // C) Contadores (Katanas y Core)
-            Row(
-                modifier = Modifier
-                    .padding(top = 30.dp, bottom = 10.dp)
-                    .align(Alignment.BottomCenter),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                if (imageResId != 0) {
                     Image(
-                        painterResource(id = R.drawable.katanas),
-                        contentDescription = "Katanas",
-                        modifier = Modifier.size(30.dp)
+                        painter = painterResource(imageResId),
+                        contentDescription = "Imagen de perfil",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(80.dp)
+                            .align(Alignment.CenterEnd)
+                            .clip(CircleShape)
+                            .clickable(onClick = {
+                                val intent = Intent(context, Perfil_Activity::class.java)
+                                context.startActivity(intent)
+                            })
                     )
-                    Text(
-                        datosUsuario?.puntos.toString(),
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontFamily = quattrocentoBold,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .align(Alignment.CenterEnd)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .clickable(onClick = {
+                                val intent = Intent(context, Perfil_Activity::class.java)
+                                context.startActivity(intent)
+                            }),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = datosUsuario?.nombre?.take(1)?.uppercase() ?: "",
+                            color = colorResource(id = R.color.azulFondo),
+                            fontSize = 32.sp,
+                            fontFamily = quattrocentoBold
+                        )
+                    }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painterResource(id = R.drawable.core),
-                        contentDescription = "Core",
-                        modifier = Modifier.height(30.dp)
-                    )
-                    Text(
-                        datosUsuario?.cores.toString(),
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontFamily = quattrocentoBold,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+                // B) Título del juego
+                Image(
+                    painter = painterResource(id = R.drawable.onitama_text),
+                    contentDescription = "Titulo",
+                    modifier = Modifier
+                        .padding(start = 30.dp, top = 16.dp)
+                        .height(60.dp)
+                        .align(Alignment.TopStart)
+
+
+                )
+
+                // C) Contadores (Katanas y Core)
+                Row(
+                    modifier = Modifier
+                        .padding(top = 30.dp, bottom = 10.dp)
+                        .align(Alignment.BottomCenter),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painterResource(id = R.drawable.katanas),
+                            contentDescription = "Katanas",
+                            modifier = Modifier.size(30.dp)
+                        )
+                        Text(
+                            datosUsuario?.puntos.toString(),
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontFamily = quattrocentoBold,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painterResource(id = R.drawable.core),
+                            contentDescription = "Core",
+                            modifier = Modifier.height(30.dp)
+                        )
+                        Text(
+                            datosUsuario?.cores.toString(),
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontFamily = quattrocentoBold,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
                 }
             }
         }
@@ -157,20 +182,43 @@ fun PantallaPerfil(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 120.dp, bottom = 63.dp), // Espacio entre cabecera y pie
+                .padding(top = 120.dp, bottom = 63.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             // Imagen de perfil
-            Image(
-                painter = painterResource(id = idSeguro),
-                contentDescription = "Imagen de Perfil",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(150.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray)
+            val imageResId = context.resources.getIdentifier(
+                datosUsuario?.avatar_id,
+                "drawable",
+                context.packageName
             )
+
+            if (imageResId != 0) {
+                Image(
+                    painter = painterResource(id = imageResId),
+                    contentDescription = "Imagen de Perfil",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(150.dp)
+                        .clip(CircleShape)
+                        .background(Color.LightGray)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(150.dp)
+                        .clip(CircleShape)
+                        .background(Color.LightGray),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = datosUsuario?.nombre?.take(1)?.uppercase() ?: "",
+                        color = colorResource(id = R.color.azulFondo),
+                        fontSize = 64.sp,
+                        fontFamily = quattrocentoBold
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -205,16 +253,16 @@ fun PantallaPerfil(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 40.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Botón 'Editar Perfil'
                 Button(
                     onClick = { /* Acción editar perfil */ },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colorResource(id = R.color.azulBarraTareas),
                         contentColor = Color.White
@@ -237,10 +285,11 @@ fun PantallaPerfil(
                 // Botón 'Notificaciones'
                 Button(
                     onClick = {
-                        val intent = Intent(context, NotificacionesActivity::class.java)
+                        val intent = Intent(context, Notificaciones_Activity::class.java)
                         context.startActivity(intent)
+                        (context as? Activity)?.finish()
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colorResource(id = R.color.azulBarraTareas),
                         contentColor = Color.White
@@ -259,6 +308,30 @@ fun PantallaPerfil(
                         fontSize = 12.sp
                     )
                 }
+
+                // Botón 'Cerrar Sesión'
+                Button(
+                    onClick = {
+                        cerrarSesion(context)
+                        val intent = Intent(context, Ini_Activity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        }
+                        ManejadorGlobal.desconectar()
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Red,
+                        contentColor = Color.White
+                    ),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Text(
+                        text = "CERRAR SESIÓN",
+                        fontFamily = quattrocentoBold,
+                        fontSize = 12.sp
+                    )
+                }
             }
         }
 
@@ -268,7 +341,7 @@ fun PantallaPerfil(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.BottomCenter)
+                .align(Alignment.BottomCenter) // Se ancla abajo del todo
         ) {
             // Fondo y botones laterales de la barra
             Row(
@@ -283,43 +356,50 @@ fun PantallaPerfil(
                 IconButton(
                     onClick = {},
                     modifier = Modifier.size(60.dp)
-                ){
-                    Image(painterResource(R.drawable.tablero),
-                        contentDescription = "Skins")
+                ) {
+                    Image(
+                        painterResource(R.drawable.tablero),
+                        contentDescription = "Skins"
+                    )
                 }
                 IconButton(
                     onClick = {
                         val intent = Intent(context, Cartas_activity::class.java)
-                        context.startActivity(intent)},
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    },
+
                     modifier = Modifier.size(60.dp)
                 ) {
-                    Image(painterResource(R.drawable.cards),
-                        contentDescription = "Cards")
+                    Image(
+                        painterResource(R.drawable.cards),
+                        contentDescription = "Cards"
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
 
                 IconButton(
-                    onClick = {},
-                    modifier = Modifier.size(70.dp)
-                ){
-                    Image(painterResource(R.drawable.amigos),
-                        contentDescription = "Amigos")
+                    onClick = {
+                        val intent = Intent(context, Amigos_Activity::class.java)
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    },
+                    modifier = Modifier.size(60.dp)
+                ) {
+                    Image(
+                        painterResource(R.drawable.amigos),
+                        contentDescription = "Amigos"
+                    )
                 }
-                Text(
-                    text = "AMIGOS",
-                    fontFamily = quattrocentoBold,
-                    fontSize = 12.sp,
-                    color = Color.White,
-                    modifier = Modifier.offset(y = (-8).dp)
-                )
                 IconButton(
                     onClick = {},
                     modifier = Modifier.size(60.dp)
                 ) {
                     Image(
                         painterResource(R.drawable.carrito),
-                        contentDescription = "Tienda")
+                        contentDescription = "Tienda"
+                    )
                 }
             }
 
@@ -331,11 +411,22 @@ fun PantallaPerfil(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 IconButton(
-                    onClick = { /* Iniciar partida rápida */ },
-                    modifier = Modifier.size(60.dp)
+                    onClick = {
+                        val intent = Intent(context, MenuPrincipalActivity::class.java)
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    },
+                    modifier = Modifier.size(70.dp)
                 ) {
                     Image(painterResource(R.drawable.espadas), contentDescription = "Jugar")
                 }
+                Text(
+                    text = "¡A JUGAR!",
+                    fontFamily = quattrocentoBold,
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    modifier = Modifier.offset(y = (-8).dp)
+                )
             }
         }
     }

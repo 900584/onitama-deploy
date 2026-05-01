@@ -30,15 +30,12 @@
         <activity
             android:name=".ui.activities.Ini_Activity">
         </activity>
-
         <activity
             android:name=".ui.login.Ini_Ses_Activity">
         </activity>
-
         <activity
             android:name=".ui.activities.MenuPrincipalActivity">
         </activity>
-
         <activity
             android:name=".ui.registro.Reg_Activity">
         </activity>
@@ -57,10 +54,13 @@
             android:name=".ui.amigos.Amigos_Activity">
         </activity>
         <activity
+            android:name=".ui.perfil.Perfil_Activity">
+        </activity>
+        <activity
             android:name=".ui.activities.profile.ProfileActivity">
         </activity>
         <activity
-            android:name="ui.activities.notificaciones.NotificacionesActivity">
+            android:name=".ui.notificaciones.Notificaciones_Activity">
         </activity>
 
     </application>
