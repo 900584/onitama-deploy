@@ -1435,6 +1435,7 @@ function PanelMiCuenta({
   const [guardandoPass, setGuardandoPass] = useState(false);
   const [passError, setPassError] = useState("");
   const [passExito, setPassExito] = useState(false);
+  const [mostrarPassModal, setMostrarPassModal] = useState(false);
 
   const handleGuardarAvatar = async () => {
     setGuardandoAvatar(true);
@@ -1623,7 +1624,7 @@ function PanelMiCuenta({
                 <div className="mb-4">
                   <label className="block text-xs font-bold text-stone-500 uppercase tracking-widest mb-1">Contraseña actual</label>
                   <input
-                    type="password"
+                    type={mostrarPassModal ? "text" : "password"}
                     value={passForm.actual}
                     onChange={e => setPassForm(prev => ({...prev, actual: e.target.value}))}
                     className="w-full bg-stone-50 border border-stone-200 text-stone-800 px-4 py-2 rounded-lg outline-none focus:border-[#b85c38] focus:ring-1 focus:ring-[#b85c38] transition-all"
@@ -1633,7 +1634,7 @@ function PanelMiCuenta({
                 <div className="mb-4">
                   <label className="block text-xs font-bold text-stone-500 uppercase tracking-widest mb-1">Nueva contraseña</label>
                   <input
-                    type="password"
+                    type={mostrarPassModal ? "text" : "password"}
                     value={passForm.nueva}
                     onChange={e => setPassForm(prev => ({...prev, nueva: e.target.value}))}
                     className="w-full bg-stone-50 border border-stone-200 text-stone-800 px-4 py-2 rounded-lg outline-none focus:border-[#b85c38] focus:ring-1 focus:ring-[#b85c38] transition-all"
@@ -1644,18 +1645,42 @@ function PanelMiCuenta({
                 <div className="mb-6">
                   <label className="block text-xs font-bold text-stone-500 uppercase tracking-widest mb-1">Confirmar contraseña</label>
                   <input
-                    type="password"
+                    type={mostrarPassModal ? "text" : "password"}
                     value={passForm.confirmar}
                     onChange={e => setPassForm(prev => ({...prev, confirmar: e.target.value}))}
                     className="w-full bg-stone-50 border border-stone-200 text-stone-800 px-4 py-2 rounded-lg outline-none focus:border-[#b85c38] focus:ring-1 focus:ring-[#b85c38] transition-all"
                     required
                   />
                 </div>
-                <div className="flex justify-end gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMostrarPassModal(v => !v)}
+                    className="inline-flex items-center gap-2 px-1 py-1 rounded-md text-stone-500 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                    title={mostrarPassModal ? "Ocultar contraseñas" : "Mostrar contraseñas"}
+                    aria-label={mostrarPassModal ? "Ocultar contraseñas" : "Mostrar contraseñas"}
+                  >
+                    {mostrarPassModal ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                    <span className="text-xs font-semibold">
+                      {mostrarPassModal ? "Ocultar" : "Mostrar"}
+                    </span>
+                  </button>
+                  <div className="flex justify-end gap-3">
                   <button type="button" onClick={() => setModalPass(false)} className="px-4 py-2 rounded-lg font-semibold text-stone-500 hover:bg-stone-100 transition-colors">Cancelar</button>
                   <button type="submit" disabled={guardandoPass} className="px-5 py-2 rounded-lg font-semibold bg-[#1a2d4a] text-white hover:bg-[#203a60] transition-colors disabled:opacity-50">
                     {guardandoPass ? "Guardando..." : "Actualizar"}
                   </button>
+                  </div>
                 </div>
               </form>
             )}
