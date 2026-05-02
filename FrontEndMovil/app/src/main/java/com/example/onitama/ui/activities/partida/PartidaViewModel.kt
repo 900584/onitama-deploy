@@ -70,16 +70,17 @@ class PartidaViewModel : ViewModel() {
                 equipoPropio = if (datos.equipo == 1) EquipoID.AZUL else EquipoID.ROJO
 
                 // Primero construimos el tablero con las cartas del servidor
+                val esNueva = (modo == ModoJuego.PUBLICA || modo == ModoJuego.PRIVADA )
                 _estado.value = crearEstadoServidor(
                     cartas_jugador = datos.cartas_jugador.map { it.nombre },
                     cartas_oponente = datos.cartas_oponente.map { it.nombre },
                     carta_siguiente = datos.carta_siguiente.map { it.nombre },
-                    equipo = equipoPropio,
                     tablero_eq1 = datos.tablero_eq1,
                     tablero_eq2 = datos.tablero_eq2,
                     turno = datos.turno,
                     cartas_accion_propia = datos.cartas_accion_jugador,
-                    cartas_accion_rival = datos.cartas_accion_oponente
+                    cartas_accion_rival = datos.cartas_accion_oponente,
+                    esReanudada = !esNueva
                 )
 
                 // Luego conectamos el WebSocket para escuchar los turnos
@@ -145,7 +146,7 @@ class PartidaViewModel : ViewModel() {
                                 if(resultado.esReyCapturado) {
                                     razon = "REY CAPTURADO"
                                 }
-                                _estado.value = resultado.nuevoEstado
+                                _estado.value = resultado.nuevoEstado//.copy(turnoActual = equipoPropio)
                             }
 
                             is Partida.RespuestaMovimientoInvalido -> {
@@ -284,9 +285,10 @@ class PartidaViewModel : ViewModel() {
 
     fun tocarCelda(pos: Posicion) {
         val actual = _estado.value
-
+        Log.d("LOG", "Toque en $pos durante fase ${actual.fasePartida}")
         when (actual.fasePartida) {
             FasePartida.COLOCAR_TRAMPA -> {
+
                 val sePuede = if (equipoPropio == EquipoID.AZUL) {
                     pos.fila >= 4
                 }
@@ -305,6 +307,7 @@ class PartidaViewModel : ViewModel() {
 
             FasePartida.JUGANDO -> {
                 if (actual.modoAccion != null) {
+                    Log.d("LOG", "modoaccion no es null")
                     val cartaAccion = actual.modoAccion ?: return
                     val nombreCarta = cartaAccionEnUso ?: return
 
@@ -325,10 +328,13 @@ class PartidaViewModel : ViewModel() {
                     }
                 }
                 else {
-                    //si le toca al bot se ignoran los clicks
+                    Log.d("LOG", "modoaccion es null y el turno es ${actual.turnoActual}")
+                    //si le toca al oponente se ignoran los clicks
                     if(actual.turnoActual == equipoPropio){
+                        Log.d("LOG", "Nos toca")
                     // Si ya hay algo seleccionado y el destino es válido, movemos
                         if (actual.movimientosValidos.contains(pos) && actual.fichaSeleccionada != null && actual.cartaSeleccionada != null) {
+                            Log.d("LOG", "Toque en $pos durante fase ${actual.fasePartida} con carta seleccionada ${actual.cartaSeleccionada.nombre} y la ficha seleccionada ${actual.fichaSeleccionada}")
                             val resultado = ejecutarMovimiento(
                                 actual,
                                 actual.fichaSeleccionada,
@@ -364,8 +370,11 @@ class PartidaViewModel : ViewModel() {
                             }
                         }
                         else if (actual.cartaSeleccionada != null) {
+                            Log.d("LOG", "Toque en $pos durante fase ${actual.fasePartida} con carta seleccionada ${actual.cartaSeleccionada.nombre}")
                             val celda = actual.tablero[pos.fila][pos.col]
+                            Log.d("LOG", "en esa celda hay una ficha? ${celda.ficha != null}")
                             if (celda.ficha?.equipo == actual.turnoActual) {
+                                Log.d("LOG", "en esa celda hay una ficha tuya, todo bien")
                                 _estado.value = actual.copy(
                                     fichaSeleccionada = pos,
                                     movimientosValidos = calcularMovimientosValidos(
@@ -379,7 +388,9 @@ class PartidaViewModel : ViewModel() {
                                 )
                             }
                         }
-                    }           
+                    }else{
+                        Log.d("LOG", "No nos toca")
+                    }
                 }
             }
             else -> {}

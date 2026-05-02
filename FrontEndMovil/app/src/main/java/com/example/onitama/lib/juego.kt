@@ -1,5 +1,6 @@
 package com.example.onitama.lib
 
+import android.util.Log
 import com.example.onitama.api.Partida
 
 // ─── Constantes del tablero ───────────────────────────────────────────────────
@@ -207,7 +208,7 @@ fun crearTableroInicial(): List<List<Celda>> {
 fun crearEstadoInicial(): EstadoJuego {
     val cartas = Cartas.selectRandomCards(7)
     return EstadoJuego(
-        fasePartida = FasePartida.COLOCAR_TRAMPA,
+        fasePartida = FasePartida.JUGANDO,
         tablero = crearTableroInicial(),
         turnoActual = EquipoID.AZUL,
         cartasJugador = listOf(cartas[0], cartas[1]),
@@ -613,9 +614,9 @@ fun crearEstadoServidor (
     cartas_jugador: List<Any>,
     cartas_oponente: List<Any>,
     carta_siguiente: List<Any>,
-    equipo: EquipoID?,
     tablero_eq1: String?,
     tablero_eq2: String?,
+    esReanudada: Boolean,
     
     /** Turno numérico del servidor: par=equipo1, impar=equipo2 */
     turno: Int?,
@@ -625,8 +626,7 @@ fun crearEstadoServidor (
     cartas_accion_propia: List<Partida.CartaAccionJson>?,
     cartas_accion_rival: List<Partida.CartaAccionJson>?
 ): EstadoJuego {
-    val esReanudada = !tablero_eq1.isNullOrEmpty() && !tablero_eq2.isNullOrEmpty()
-
+    Log.d("LOG de partida", "Partida reanudada?: $esReanudada")
     val tablero = if (esReanudada) {
         tableroDesdeServidor(tablero_eq1!!, tablero_eq2!!)
     }
@@ -634,11 +634,10 @@ fun crearEstadoServidor (
         crearTableroInicial()
     }
 
-    val turnoActual = if ((turno ?:0) % 2 == 0) {
-        EquipoID.ROJO
-    }
-    else {
-        EquipoID.AZUL
+    val turnoActual = if ((turno ?: 0) % 2 == 0) {
+        EquipoID.AZUL // El turno 0 (par) siempre es del Equipo 1 (Azul)
+    } else {
+        EquipoID.ROJO // El turno 1 (impar) siempre es del Equipo 2 (Rojo)
     }
 
     val faseP = if (esReanudada) {
@@ -740,9 +739,9 @@ fun ejecutarMovimiento (
     }
 
     /** Victoria por trono: el rey llega al trono enemigo */
-    val victoriaPorTrono = fichaMovida.esRey &&
-            ((fichaMovida.equipo == equipoLocal && destino.fila == 0 && destino.col == CENTRO) ||
-                    (fichaMovida.equipo != equipoLocal && destino.fila == DIM - 1 && destino.col == CENTRO));
+    val victoriaPorTrono = fichaMovida.esRey && destino.col == CENTRO &&
+            ((fichaMovida.equipo == EquipoID.AZUL && destino.fila == 0) ||
+                    (fichaMovida.equipo == EquipoID.ROJO && destino.fila == DIM - 1))
 
     val equipoActual = estado.turnoActual
 
