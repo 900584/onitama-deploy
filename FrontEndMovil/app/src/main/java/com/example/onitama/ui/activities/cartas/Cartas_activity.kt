@@ -35,6 +35,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +50,7 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.onitama.R
@@ -93,6 +98,17 @@ fun CartasScreen(
     val context = LocalContext.current
     val datosUsuario by AutoLogin.sesion.collectAsState()
 
+    var listasCartasMovimiento by remember { mutableStateOf<List<CartasAPI.CartaYPuntos>>(emptyList()) }
+    var listasCartasAccion by remember { mutableStateOf<List<CartasAPI.CartaYPuntos>>(emptyList()) }
+    var cargarLista by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val api = CartasAPI()
+        listasCartasMovimiento = api.obtenerCartas()
+        listasCartasAccion = api.obtenerCartasAccion()
+        cargarLista = false
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -123,9 +139,7 @@ fun CartasScreen(
                     )
                 )
         )
-        val cartas = runBlocking {
-            CartasAPI().obtenerCartas()
-        }
+        
         Column(
             Modifier
                 .fillMaxWidth()
@@ -140,7 +154,7 @@ fun CartasScreen(
                     .align(Alignment.CenterHorizontally)
             )
 
-            if (cartas != null) {
+            if (cargarLista != null) {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -148,12 +162,21 @@ fun CartasScreen(
                         .padding(15.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ){
-                    items(cartas.size) { card ->
-                        val puntosNeeded = cartas[card].puntos_necesarios
+                    item {
+                        Text(
+                            "CARTAS DE MOVIMIENTO",
+                            fontFamily = quattrocentoBold,
+                            fontSize = 16.sp,
+                            color = Color.Gray,
+                        )
+                    }
+                    items(listasCartasMovimiento.size) { card ->
+                        val puntosNeeded = listasCartasMovimiento[card].puntos_necesarios
                         Log.d("DEBUG", "Puntos necesarios: $puntosNeeded")
                         if(katanas >= puntosNeeded){
                             CartaCatalogo(
-                                carta = Cartas.getCarta(cartas[card].nombre),
+                                carta = Cartas.getCarta(listasCartasMovimiento[card].nombre),
+                                esAccion = false,
                                 onClick = {}
                             )
                         }
@@ -194,6 +217,91 @@ fun CartasScreen(
                                 }
                             }
                         }
+                    }
+
+                    item {
+                        Spacer(
+                            modifier = Modifier
+                                .height(20.dp)
+                        )
+                    }
+
+                    item {
+                        Text(
+                            "CARTAS ACCION",
+                            fontFamily = quattrocentoBold,
+                            fontSize = 16.sp,
+                            color = Color.Gray
+                        )
+                    }
+
+                    items(listasCartasAccion.size) { card ->
+                        val puntosNeeded = listasCartasAccion[card].puntos_necesarios
+                        Log.d("DEBUG", "Puntos necesarios: $puntosNeeded")
+                        
+                        val cartasAccion = Carta(
+                            nombre = listasCartasAccion[card].nombre,
+                            imagen = "",
+                            movimientos = emptyList()
+                        )
+                        if(katanas >= puntosNeeded){
+                            CartaCatalogo(
+                                carta = cartasAccion,
+                                esAccion = true,
+                                onClick = {}
+                            )
+                            Text(
+                                text = listasCartasAccion[card].descripcion,
+                                fontFamily = quattrocentoBold,
+                                fontSize = 14.sp,
+                                color = Color.DarkGray,
+                                textAlign = TextAlign.Start
+                            )
+                        }
+                        else {
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 15.dp)
+                                    .height(200.dp)
+                                    .width(340.dp)
+                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                                    // 3. 🎨 Feedback visual: Si está seleccionada, se pone azul
+                                    .background( Color.LightGray)
+                            ){
+                                Column(
+                                    Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.Center,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ){
+                                    Image(
+                                        painterResource(id = R.drawable.bloqueado),
+                                        contentDescription = "Imagen de candado",
+                                        alignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .padding(10.dp)
+                                            .height(90.dp)
+                                            .width(90.dp)
+                                    )
+                                    Row(
+
+                                    ){
+                                        Image(painterResource(id = R.drawable.katanas), contentDescription = "Katanas", modifier = Modifier.size(40.dp))
+                                        Text(
+                                            text = puntosNeeded.toString(),
+                                            fontFamily = quattrocentoBold,
+                                            fontSize = 30.sp,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Spacer(
+                            modifier = Modifier
+                                .height(20.dp)
+                        )
                     }
                 }
             }
@@ -305,11 +413,21 @@ fun CartasScreen(
                 Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
 
                 IconButton(
+<<<<<<< Updated upstream
                     onClick = {
                         val intent = Intent(context, Amigos_Activity::class.java)
                         context.startActivity(intent)
                         (context as? Activity)?.finish()
                     },
+=======
+                    onClick = { 
+                        val intent = Intent(
+                            context, 
+                            Amigos_Activity::class.java
+                        )
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()},
+>>>>>>> Stashed changes
                     modifier = Modifier.size(60.dp)
                 ){
                     Image(painterResource(R.drawable.amigos),
@@ -351,7 +469,11 @@ fun CartasScreen(
 }
 
 @Composable
-fun CartaCatalogo(carta: Carta, onClick: () -> Unit) {
+fun CartaCatalogo(
+    carta: Carta, 
+    esAccion: Boolean, 
+    onClick: () -> Unit
+) {
 
     val ancho = 340.dp
     val alto = 200.dp
@@ -402,7 +524,17 @@ fun CartaCatalogo(carta: Carta, onClick: () -> Unit) {
                 )
             }
 
-            MinigridCatalogo(carta.movimientos)
+            if (esAccion) {
+                Text(
+                    text = "Carta Accion",
+                    fontSize = 16.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center
+                )
+            }
+            else {
+                MinigridCatalogo(carta.movimientos)
+            }
         }
     }
 }

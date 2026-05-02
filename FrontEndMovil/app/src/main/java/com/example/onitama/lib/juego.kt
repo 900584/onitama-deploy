@@ -85,8 +85,8 @@ data class EstadoJuego (
     val ultimoMovimiento: Pair<Posicion, Posicion>? = null,
 
     
-    val cartaAccionPropia : String? = null,
-    val cartaAccionRival: String? = null,
+    val cartasAccionPropia : List<String> = emptyList(),
+    val cartasAccionRival: List<String> = emptyList(),
 
     val modoAccion: String? = null,
     
@@ -268,10 +268,10 @@ fun tieneMovimientosPosibles(
     equipo: EquipoID
 ): Boolean {
     val tieneCartaAccion = if (equipo == EquipoID.AZUL) {
-        estado.cartaAccionPropia != null
+        estado.cartasAccionPropia.isNotEmpty()
     }
     else {
-        estado.cartaAccionRival != null
+        estado.cartasAccionRival.isNotEmpty()
     }
 
     if (tieneCartaAccion && estado.modoAccion == null) {
@@ -334,6 +334,20 @@ fun aplicarCartaAccion(
         EquipoID.AZUL
     }
 
+    val nuevasCartasAccionPropia = if (equipo == EquipoID.AZUL) {
+        estado.cartasAccionPropia - cartaNombre
+    }
+    else {
+        estado.cartasAccionPropia
+    }
+
+    val nuevasCartasAccionRival = if (equipo == EquipoID.ROJO) {
+        estado.cartasAccionRival - cartaNombre
+    }
+    else {
+        estado.cartasAccionRival
+    }
+
     val nuevoEstado = estado.copy(
         tablero = tablero,
         turnoActual = if (cambioTurno) siguiente else equipo,
@@ -341,8 +355,8 @@ fun aplicarCartaAccion(
         cartaSeleccionada = null,
         movimientosValidos = emptyList(),
         modoAccion = null,
-        cartaAccionPropia = if (equipo == EquipoID.AZUL) null else estado.cartaAccionPropia,
-        cartaAccionRival = if (equipo == EquipoID.ROJO) null else estado.cartaAccionRival 
+        cartasAccionPropia = nuevasCartasAccionPropia,
+        cartasAccionRival = nuevasCartasAccionRival 
     )
 
     return when (tipo) {
@@ -641,8 +655,8 @@ fun crearEstadoServidor (
         cartasJugador = cartas_jugador.map { convertirCarta(it) },
         cartasOponente = cartas_oponente.map { convertirCarta(it) },
         cartasSiguientes = carta_siguiente.map { convertirCarta(it) },
-        cartaAccionPropia = cartas_accion_propia?.firstOrNull()?.nombre,
-        cartaAccionRival = cartas_accion_rival?.firstOrNull()?.nombre,
+        cartasAccionPropia = cartas_accion_propia?.map { it.nombre } ?: emptyList(),
+        cartasAccionRival = cartas_accion_rival?.map { it.nombre } ?: emptyList()
     )
 
 }
@@ -807,6 +821,14 @@ fun ejecutarMovimiento (
         ganador = null
     }
 
+    val siguiente = if (equipoActual == EquipoID.ROJO) EquipoID.AZUL else EquipoID.ROJO
+    val puedeMoverDespues = tieneMovimientosPosibles(nuevoEstado, siguiente)
+
+    val gana = when {
+        esReyCapturado || victoriaPorTrono || !puedeMoverDespues -> equipoActual
+        else -> null
+    }
+
     var nuevoEstado = estado.copy(
         fasePartida = if (ganador != null) FasePartida.TERMINADA else estado.fasePartida,
         tablero = tablero,
@@ -823,17 +845,6 @@ fun ejecutarMovimiento (
         restriccionSolo = resolverRestrccionSoloTrasMovimiento(estado.restriccionSolo, equipoActual)
     )
 
-    val siguiente = if (equipoActual == EquipoID.ROJO) EquipoID.AZUL else EquipoID.ROJO
-    val puedeMoverDespues = tieneMovimientosPosibles(nuevoEstado, siguiente)
-
-    val gana = when {
-        esReyCapturado || victoriaPorTrono || !puedeMoverDespues -> equipoActual
-        else -> null
-    }
-    nuevoEstado = nuevoEstado.copy(
-        fasePartida = if (ganador != null) FasePartida.TERMINADA else estado.fasePartida,
-        ganador = gana
-    )
     val estadoFinal = deshacerEspejoTrasMovimientoRival(nuevoEstado, equipoActual)
 
     return ResultadoMovimiento(estadoFinal, capturado, esReyCapturado, victoriaPorTrono)

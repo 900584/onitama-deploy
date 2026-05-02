@@ -18,7 +18,8 @@ class CartasAPI(
     @Serializable
     data class CartaYPuntos(
         val nombre: String,
-        val puntos_necesarios: Int
+        val puntos_necesarios: Int,
+        val descripcion: String = ""
     )
 
     @Serializable
@@ -29,11 +30,21 @@ class CartasAPI(
     object MensajeObtenerCartas : MensajeCliente()
 
     @Serializable
+    @SerialName("OBTENER_CARTAS_ACCION")
+    object MensajeObtenerCartasAccion : MensajeCliente()
+
+    @Serializable
     sealed class MensajeServidor
 
     @Serializable
     @SerialName("LISTA_CARTAS")
     data class MensajeListaCartas(
+        val cartas: List<CartaYPuntos>
+    ): MensajeServidor()
+
+    @Serializable
+    @SerialName("LISTA_CARTAS_ACCION")
+    data class MensajeListaCartasAccion(
         val cartas: List<CartaYPuntos>
     ): MensajeServidor()
 
@@ -81,7 +92,38 @@ class CartasAPI(
                 emptyList()
             }
         } catch (e: Exception) {
-            Log.e("Cartas_API", "Error al obtener cartas", e)
+            Log.e("Cartas_API", "Error al obtener cartas de movimiento", e)
+            emptyList()
+        }
+    }
+
+
+    suspend fun obtenerCartasAccion(): List<CartaYPuntos> {
+        if (!usarServidor) {
+        }
+
+        return try {
+            val mensaje = MensajeObtenerCartasAccion
+            val jsonMsg = jsonSerializer.encodeToString<MensajeCliente>(mensaje)
+            ManejadorGlobal.enviarMensaje(jsonMsg)
+
+            val respuestaStr = withTimeoutOrNull(5000L) {
+                ManejadorGlobal.mensajesEntrantes
+                    .filter { json ->
+                        json.optString("tipo") == "LISTA_CARTAS_ACCION"
+                    }
+                    .first()
+                    .toString()
+            } ?: return emptyList()
+
+            val respuesta = jsonSerializer.decodeFromString<MensajeServidor>(respuestaStr)
+            if (respuesta is MensajeListaCartasAccion) {
+                respuesta.cartas
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e("Cartas_API", "Error al obtener cartas de accion", e)
             emptyList()
         }
     }

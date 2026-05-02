@@ -127,134 +127,6 @@ class PartidaActivity: AppCompatActivity() {
 
         val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
 
-        if (estado.ganador != null) {
-            val motivo = viewModel.razon
-            val equipo = viewModel.equipoPropio
-            val winner = estado.ganador
-            val victoria = winner == equipo
-
-            AlertDialog(
-                // Evita que el jugador cierre el popup pulsando fuera de él
-                onDismissRequest = { },
-                title = {
-                    Text(
-                        text = if(victoria) "VICTORIA" else "DERROTA",
-                        fontFamily = quattrocentoBold,
-                        fontSize = 24.sp
-                    )
-                },
-
-                /*image = {
-                    Image(
-                        painter = painterResource(id = R.drawable.emote_derrota),
-                        contentDescription = "Imagen de resultado",
-                        modifier = Modifier.size(100.dp)
-                    )
-                },*/
-
-                text = {
-                    Text(
-                        text = when(motivo) {
-                            "TRONO"-> if(victoria)"Colocaste tu rey en el trono del rival" else "Tu rival llevó su rey hasta tu trono"
-                            "REY CAPTURADO"-> if(victoria)"Capturaste el rey de tu rival" else "Tu rival ha capturado tu rey"
-                            "ABANDONO" -> if(victoria)"Tu rival abandonó la partida" else "Has abandonado la partida"
-                            "SIN MOVIMIENTOS" -> if(victoria)"El rival no tiene movimientos disponibles" else "Te has quedado sin mvimientos disponibles"
-                            else -> if(victoria)"El Rey del rival ha caído en tu trampa" else "Tu rey ha caido en una trampa. Esta vez tu rival te ha vencido, más suerte a la próxima"
-
-                        },
-                        fontSize = 18.sp,
-                        textAlign = TextAlign.Center
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if(modo == ModoJuego.PUBLICA) {
-                                val datos = runBlocking {
-                                    authClient.obtenerPerfil(datosUsuario!!.nombre)
-                                }
-                                AutoLogin.actualizar(context, datos)
-                            }
-                            finish()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = colorResource(R.color.azulFondo))
-                    ) {
-                        Text("Volver al Menú", color = Color.White)
-                    }
-                }
-            )
-        }
-
-        if (estado.fasePartida == FasePartida.COLOCAR_TRAMPA) {
-            Box (
-                modifier = Modifier.Companion
-                    .fillMaxWidth()
-                    .padding(top = 130.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "COLOCA TU TRAMPA",
-                    color = Color.Yellow,
-                    fontFamily = quattrocentoBold,
-                    fontSize = 16.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            vertical = 5.dp
-                        )
-                )
-            }
-        }
-
-        if (estado.cartaAccionPropia != null && estado.fasePartida == FasePartida.JUGANDO) {
-            val seleccion = estado.modoAccion != null
-
-            Box (
-                modifier = Modifier.Companion
-                    .fillMaxSize()
-                    .padding(bottom = 100.dp),
-            )
-            Button(
-                onClick = { 
-                    if (seleccion) {
-                        viewModel.desSeleccionarCarta()
-                    }
-                    else {
-                        viewModel.activarCartaAccion(estado.cartaAccionPropia) 
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = 15.dp
-                    )
-                    .height(50.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (estado.modoAccion != null){
-                        Color.Red
-                    } 
-                    else {
-                        colorResource(
-                            id = R.color.azulFondo
-                        )
-                    }
-                ),
-                enabled = estado.turnoActual == viewModel.equipoPropio
-            ) {
-                Text(
-                    text = if (estado.modoAccion != null) {
-                        "CANCELAR PODER"
-                    } else {
-                        "USAR: ${estado.cartaAccionPropia}"
-                    },
-                    fontFamily = quattrocentoBold,
-                    color = Color.White,
-                    fontSize = 16.sp
-                )
-            }
-        }
-
         Box(
             modifier = Modifier.Companion
                 .fillMaxSize()
@@ -482,6 +354,59 @@ class PartidaActivity: AppCompatActivity() {
 
                 }
 
+                
+                if (estado.cartasAccionPropia.isNotEmpty() && estado.fasePartida == FasePartida.JUGANDO) {
+                    val seleccion = estado.modoAccion != null
+
+                    Column(
+                        modifier = Modifier.Companion
+                            .fillMaxWidth()
+                            .padding(bottom = 120.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalAlignment =Alignment.CenterHorizontally
+                    ){
+                        if (seleccion) {
+                            Button(
+                                onClick = {
+                                    viewModel.desSeleccionarCarta()
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Red
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text(
+                                    text = "CANCELAR PODER",
+                                    fontFamily = quattrocentoBold,
+                                    color = Color.White,
+                                    fontSize = 16.sp
+                                )                    
+                            }
+                        }
+                        else {
+                            estado.cartasAccionPropia.forEach { nombreCarta -> 
+                                val esMiTurno = estado.turnoActual == viewModel.equipoPropio
+
+                                Box(
+                                    modifier = Modifier
+                                        .clickable(enabled = esTurnoMio) { viewModel.activarCartaAccion(nombre) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = nombre.uppercase(),
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontFamily = quattrocentoBold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
 
                 Row(
@@ -588,6 +513,83 @@ class PartidaActivity: AppCompatActivity() {
                 }
             }
 
+            if (estado.fasePartida == FasePartida.COLOCAR_TRAMPA) {
+                Box (
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalArrangement = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "COLOCA TU TRAMPA",
+                            color = Color.Red,
+                            fontFamily = quattrocentoBold,
+                            fontSize = 24.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            if (estado.fasePartida == FasePartida.ELEGIR_CARTA_ACCION) {
+                Box (
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = "ELIGE TU CARTA DE ACCION",
+                            color = Color.Red,
+                            fontFamily = quattrocentoBold,
+                            fontSize = 24.sp,
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            estado.cartasAccionPropia.take(2).forEach { nombre ->
+                                Column(
+                                    modifier = Modifier
+                                        .clickable { viewModel.elegirCartaAccionInicial(nombre) },
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = nombre,
+                                        color = Color.White,
+                                        fontSize = 16.sp
+                                    )
+
+                                    Spacer(Modifier.height(5.dp))
+
+                                    Text(
+                                        text = when(nombre) {
+                                            "Pensatorium" -> 
+                                            "Atrapasueños" ->
+                                            "Requiem" ->
+                                            "Santo Grial" ->
+                                            "La Dama del Mar" ->
+                                            "Finisterra" ->
+                                            "Brujeria" ->
+                                            "Illusia" ->
+                                            else -> "NADA"
+                                        }, 
+                                        color = Color.LightGray,
+                                        fontSize = 10.sp.
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             avisoPausa?.let { notificacion ->
                 AlertDialog(
                     onDismissRequest = {},
@@ -641,7 +643,7 @@ class PartidaActivity: AppCompatActivity() {
                         ) {
                             Text(
                                 "RECHAZAR",
-                                color = Color.White,
+                                color = Color.Red,
                                 fontFamily = quattrocentoBold
                             )
                         }
@@ -649,8 +651,66 @@ class PartidaActivity: AppCompatActivity() {
                     shape = RoundedCornerShape(15.dp),
                 )
             }
+            }
+
+            if (estado.ganador != null) {
+                val motivo = viewModel.razon
+                val equipo = viewModel.equipoPropio
+                val winner = estado.ganador
+                val victoria = winner == equipo
+
+                AlertDialog(
+                    // Evita que el jugador cierre el popup pulsando fuera de él
+                    onDismissRequest = { },
+                    title = {
+                        Text(
+                            text = if(victoria) "VICTORIA" else "DERROTA",
+                            fontFamily = quattrocentoBold,
+                            fontSize = 24.sp
+                        )
+                    },
+
+                    /*image = {
+                        Image(
+                            painter = painterResource(id = R.drawable.emote_derrota),
+                            contentDescription = "Imagen de resultado",
+                            modifier = Modifier.size(100.dp)
+                        )
+                    },*/
+
+                    text = {
+                        Text(
+                            text = when(motivo) {
+                                "TRONO"-> if(victoria)"Colocaste tu rey en el trono del rival" else "Tu rival llevó su rey hasta tu trono"
+                                "REY CAPTURADO"-> if(victoria)"Capturaste el rey de tu rival" else "Tu rival ha capturado tu rey"
+                                "ABANDONO" -> if(victoria)"Tu rival abandonó la partida" else "Has abandonado la partida"
+                                "SIN MOVIMIENTOS" -> if(victoria)"El rival no tiene movimientos disponibles" else "Te has quedado sin mvimientos disponibles"
+                                else -> if(victoria)"El Rey del rival ha caído en tu trampa" else "Tu rey ha caido en una trampa. Esta vez tu rival te ha vencido, más suerte a la próxima"
+
+                            },
+                            fontSize = 18.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if(modo == ModoJuego.PUBLICA) {
+                                    val datos = runBlocking {
+                                        authClient.obtenerPerfil(datosUsuario!!.nombre)
+                                    }
+                                    AutoLogin.actualizar(context, datos)
+                                }
+                                finish()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colorResource(R.color.azulFondo))
+                        ) {
+                            Text("Volver al Menú", color = Color.White)
+                        }
+                    }
+                )
+            }
         }
-    }
     }
 
     fun cambiarEstadoCarta(carta: Carta, estado: EstadoJuego){

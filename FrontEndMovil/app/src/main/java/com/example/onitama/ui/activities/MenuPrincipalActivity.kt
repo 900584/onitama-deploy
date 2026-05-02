@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -35,7 +37,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,10 +57,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.onitama.R
 import com.example.onitama.AutoLogin
+import com.example.onitama.PartidaActiva
 import com.example.onitama.ui.activities.cartas.Cartas_activity
 import com.example.onitama.ui.activities.partida.PartidaActivity
 import com.example.onitama.ui.activities.profile.ProfileActivity
 import com.example.onitama.ui.amigos.Amigos_Activity
+<<<<<<< Updated upstream
+=======
+import com.example.onitama.api.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import org.json.JSONObject
+>>>>>>> Stashed changes
 
 class MenuPrincipalActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,8 +80,7 @@ class MenuPrincipalActivity : AppCompatActivity() {
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                MainMenuScreen(
-                )
+                MainMenuScreen()
             }
         }
     }
@@ -78,11 +90,124 @@ class MenuPrincipalActivity : AppCompatActivity() {
 fun MainMenuScreen(
 ) {
     val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
-    var menuPrivadoDesplegado by remember { mutableStateOf(false) }
-    var menuEntrenamientoDesplegado by remember  {mutableStateOf(false) }
-    val alphaOtrosBotones by animateFloatAsState(targetValue = if (menuPrivadoDesplegado || menuEntrenamientoDesplegado) 0.3f else 1f)
+    val scope = rememberCoroutineScope()
+    val alphaOtrosBotones by animateFloatAsState(
+        targetValue = if (menuPrivadoDesplegado || 
+                          menuEntrenamientoDesplegado ||
+                          listaAmigosDesplegada ||
+                          listaPartidasPausadaDesplegada ||
+                          esperar ) {
+                            0.3f
+                          } 
+                          else {
+                            1f
+                          }
+                        )
     val context = LocalContext.current
     val datosUsuario by AutoLogin.sesion.collectAsState()
+
+    val manejadorPartidaAPI = remember { ManejadorPartidaAPI() }
+    val amigosAPI = remember { Amigos() }
+
+    val partidaAPI = remember { Partida() }
+
+    var menuPrivadoDesplegado by remember { mutableStateOf(false) }
+    var menuEntrenamientoDesplegado by remember  {mutableStateOf(false) }
+    var listaAmigosDesplegada by remember { mutableStateOf(false) }
+    var listaPartidasPausadaDesplegada by remember { mutableStateOf(false) }
+
+    var esperar by remember { mutableStateOf(false) }
+    var oponente by remember { mutableStateOf("") }
+    var tiempo by remember { mutableIntStateOf(120) }
+    var idNotificacion by remember { mutableIntStateOf(-1) }
+
+    var listaAmigos by remember { mutableStateOf<List<Amigos.Info>>(emptyList()) }
+    var listaPartidasPausadas by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
+    val cargaDatos by remember { mutableStateOf(false) }
+
+    var esNuevaPartida by remember { mutableStateOf(true) }
+    var amigoSeleccionadoParaReanudar by remember { mutableStateOf<Amigos.Info?>(null) }
+
+    LaunchedEffect(Unit) {
+        ManejadorGlobal.mensajesEntrantes.collect { json ->
+            val tipo = json.optString("tipo")
+            when (tipo) {
+                "NOTIFICACION_ENVIADA" -> {
+                    idNotificacion = json.optInt("idNotificacion")
+                }
+
+                "PARTIDA_PRIVADA_ENCONTRADA" -> {
+                    esperar = false
+
+                    val jsonSerializer = Json {
+                        ignoreUnknownKeys = true,
+                        classDiscriminator = "tipo"
+                    }
+                    val datos = jsonSerializer.decodeFromString<Partida.RespuestaPartidaPrivadaEncontrada>(json.toString())
+
+                    PartidaActiva.datosPartida = datos.toPartidaEncontrada()
+
+                    val intent = Intent(context, PartidaActivity::class.java).apply {
+                        putExtra("MODO_JUEGO", "PRIVADA")
+                    }
+                    context.startActivity(intent)
+                }
+
+                "PARTIDAS_PRIVADAS" -> {
+                    val array = json.optJSONArray("partidas")
+                    val filtrar = mutableListOf<JSONObject>()
+                    if (array != null) {
+                        for (i in 0 until array.length()) {
+                            val indice = array.getJSONObject(i)
+
+                            if (indice.optString("estado") == "PAUSADA") {
+                                filtrar.add(indice)
+                            }
+                        }
+                        listaPartidasPausadas = filtrar
+                        cargaDatos = false
+                    }
+                }
+
+                "ERROR_NO_UNIDO", "INVITACION_RECHAZADA", "NOTIFICACION_CANCELADA" -> {
+                    esperar = false
+                    idNotificacion = -1
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(esperar) {
+        if (esperar) {
+            tiempo = 120
+
+            while (tiempo > = && esperar) {
+                delay(1000L)
+                tiempo--
+            }
+
+            if (tiempo == 0 && esperar) {
+                esperar = false
+                idNotificacion = -1
+            }
+        }
+    }
+
+    LaunchedEffect(listaAmigosDesplegada) {
+        if(listaAmigosDesplegada) {
+            cargaDatos = true
+            listaAmigos = amigosAPI.obtenerAmigos(datosUsuario?.nombre ?: "")
+            
+            if (!esNuevaPartida) {
+                manejadorPartidaAPI.obtenerPartidasPausadas(datosUsuario?.nombre ?: "")
+            }
+            else {
+                cargaDatos = false
+            }
+        }
+    }
+
+    
 
     Box(
         modifier = Modifier
@@ -123,7 +248,7 @@ fun MainMenuScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.6f))
-                    .clickable {
+                    .clickable(enabled = !esperar) {
                         menuPrivadoDesplegado = false
                     } // Si tocas fuera, se cierra
             )
@@ -137,9 +262,40 @@ fun MainMenuScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.6f))
-                    .clickable {
+                    .clickable(enabled = !esperar)  {
                         menuEntrenamientoDesplegado = false
                     } // Si tocas fuera, se cierra
+            )
+        }
+
+        if (listaAmigosDesplegada) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable(enabled = !esperar)  {
+                        listaAmigosDesplegada = false
+                    } // Si tocas fuera, se cierra
+            )
+        }
+
+        if (listaPartidasPausadaDesplegada) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable(enabled = !esperar)  {
+                        listaPartidasPausadaDesplegada = false
+                    } // Si tocas fuera, se cierra
+            )
+        }
+
+        if (esperar) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable(enabled = !esperar)  {}
             )
         }
 
@@ -170,7 +326,7 @@ fun MainMenuScreen(
                         val intent = Intent(context, Buscar_PartidaActivity::class.java)
                         context.startActivity(intent)
                     },
-                    enabled = !menuPrivadoDesplegado && !menuEntrenamientoDesplegado,
+                    enabled = !menuPrivadoDesplegado && !menuEntrenamientoDesplegado, && !listaAmigosDesplegada && !listaPartidasPausadaDesplegada && !esperar,
                     modifier = Modifier.size(width = 220.dp, height = 100.dp),
                     shape = RoundedCornerShape(16.dp), // Reemplaza @drawable/boton_esquinas_redondas
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White)
@@ -195,7 +351,7 @@ fun MainMenuScreen(
                     )
                     Button(
                         onClick = { menuEntrenamientoDesplegado = !menuEntrenamientoDesplegado },
-                        enabled = !menuPrivadoDesplegado,
+                        enabled = !menuPrivadoDesplegado && !listaAmigosDesplegada && !listaPartidasPausadaDesplegada && !esperar,
                         modifier = Modifier.size(width = 220.dp, height = 100.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = if (menuEntrenamientoDesplegado) Color.LightGray else Color.White)
@@ -283,7 +439,7 @@ fun MainMenuScreen(
                     )
                     Button(
                         onClick = { menuPrivadoDesplegado = !menuPrivadoDesplegado },
-                        enabled = !menuEntrenamientoDesplegado,
+                        enabled = !menuEntrenamientoDesplegado && !listaAmigosDesplegada && !listaPartidasPausadaDesplegada && !esperar,
                         modifier = Modifier.size(width = 220.dp, height = 100.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = if (menuPrivadoDesplegado) Color.LightGray else Color.White)
@@ -299,7 +455,11 @@ fun MainMenuScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ){
                         Button(
-                            onClick = { /* Acción Continuar Partida Privada */ },
+                            onClick = { /* Acción Continuar Partida Privada */ 
+                               esNuevaPartida = false
+                               listaAmigosDesplegada = true
+                               menuPrivadoDesplegado = false
+                            },
                             modifier = Modifier.size(width = 200.dp, height = 60.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White)
@@ -310,7 +470,11 @@ fun MainMenuScreen(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Button(
-                            onClick = { /* Acción Empezar Partida Privada */ },
+                            onClick = { /* Acción Empezar Partida Privada */ 
+                                esNuevaPartida = true
+                                listaAmigosDesplegada = true
+                                menuPrivadoDesplegado = false
+                            },
                             modifier = Modifier.size(width = 200.dp, height = 60.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White)
@@ -321,6 +485,286 @@ fun MainMenuScreen(
                 }
             }
 
+        }
+
+        AnimatedVisibility(
+            visible = listaAmigosDesplegada
+            modifier = Modifier
+                .align(Alignment.Center)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ){
+                        Text(
+                            text = if(esNuevaPartida) {
+                                "RETAR A UN AMIGO"
+                            }
+                            else {
+                                "SELECCIONAR RIVAL"
+                            },
+                            fontFamily = quattrocentoBold,
+                            fontSize = 16.sp,
+                            color = colorResource(id = R.color.azulFondo)
+                        )
+                        IconButton(
+                            onClick = {
+                                listaAmigosDesplegada = false
+                            }
+                        ) 
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (cargaDatos) {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "CARGANDO AMIGOS",
+                        textAlign = TextAlign.Center,
+                        color = Color.Gray
+                    )
+                }
+            }
+            else if (listaAmigos.isEmpty()) {
+                Text(
+                    "NO TIENES AMIGOS",
+                    textAlign = TextAlign.Center,
+                    color = Color.Gray
+                )
+            }
+            else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(listaAmigos.size) { index ->
+                        val amigo = listaAmigos[index]
+                        Button(
+                            onClick = {
+                                if (esNuevaPartida) {
+                                    oponente = amigo.nombre
+                                    esperar = true
+                                    listaAmigosDesplegada = false
+
+                                    manejadorPartidaAPI.enviarInvitacion(
+                                        remitente = datosUsuario?.nombre ?: "",
+                                        destinatario = amigo.nombre
+                                    )
+                                }
+                                else {
+                                    amigoSeleccionadoParaReanudar = amigo
+                                    listaAmigosDesplegada = false
+                                    listaPartidasPausadaDesplegada = true
+                                }
+                            },
+                            modifier = Modifier 
+                                .fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colorResource(id = R.color.azulFondo)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBetween
+                            ) {
+                                Text(
+                                    amigo.nombre,
+                                    fontFamily = quattrocentoBold,
+                                    color = Color.Black
+                                )
+                                Text(
+                                    text = if (esNuevaPartida) {
+                                        "INVITAR PARTIDA"
+                                    }
+                                    else {
+                                        "SELECCIONAR PARTIDA"
+                                    },
+                                    color = colorResource(
+                                        id = R.color.azulFondo
+                                    ),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = listaPartidasPausadaDesplegada,
+            modifier = Modifier
+                .align(Alignment.Center)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ){
+                        Text(
+                            "REANUDAR PARTIDA PRIVADA",
+                            fontFamily = quattrocentoBold,
+                            fontSize = 16.sp,
+                            color = colorResource(id = R.color.azulFondo)
+                        )
+                        IconButton(
+                            onClick = {
+                                listaPartidasPausadaDesplegada = false
+                                amigoSeleccionadoParaReanudar = null
+                            }
+                        ) 
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val partidasPrivadasAmigo = listaPartidasPausadas.FILTER {
+                it.optString("oponente" == amigoSeleccionadoParaReanudar?.nombre)
+            }
+
+            if (cargaDatos) {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "BUSCANDO PARTIDAS PAUSADAS",
+                        textAlign = Align.Center,
+                        color = Color.Gray
+                    )
+                }
+            } 
+            else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(partidasPrivadasAmigo) { index ->
+                        val partida = partidasPrivadasAmigo[index]
+                        val idPartida = partida.optInt("partida_id")
+
+                        Button(
+                            onClick = {
+                                oponente = amigoSeleccionadoParaReanudar?.nombre ?: ""
+                                esperar = true
+                                listaPartidasPausadaDesplegada = false
+
+                                manejadorPartidaAPI.solicitarReanudar(
+                                    remitente = datosUsuario?.nombre ?: "",
+                                    destinatario = oponente,
+                                    idPartida = idPartida
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.LightGray
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = esperar,
+            modifier = Modifier
+                .align(Alignment.Center)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "INVITACION ENVIADA. ESPERANDO ...",
+                        fontFamily = quattrocentoBold,
+                        fontSize = 16.sp,
+                        color = Color.Gray
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp)) 
+
+                    CircularProgressIndicator(
+                        color = colorResource(
+                            id = R.color.azulFondo
+                        ),
+                        modifier = Modifier
+                            .size(40.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp)) 
+
+                    Text(
+                        text = "ESPERANDO AMIGO..."
+                        fontFamily = quattrocentoBold,
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+
+                    val minutos = tiempo / 60
+                    val segundos = tiempo % 60
+                    Text(
+                        text = String.format("%02d:%02.d", minutos, segundos),
+                        fontFamily = quattrocentoBold,
+                        fontSize = 30.sp,
+                        color = Color.Black
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            manejadorPartidaAPI.cancelarNotificacionEnviada(idNotificacion)
+                            esperar = false
+                            idNotificacion = -1
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.LightGray
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            "CANCELAR",
+                            fontFamily = quattrocentoBold,
+                            color = Color.Black
+                        )
+                    } 
+                }
+            }
         }
 
         // ==========================================
@@ -432,6 +876,7 @@ fun MainMenuScreen(
             ) {
                 IconButton(
                     onClick = {},
+                    enabled = !esperar,
                     modifier = Modifier.size(60.dp)
                 ){
                     Image(painterResource(R.drawable.tablero),
@@ -439,11 +884,12 @@ fun MainMenuScreen(
                 }
                 IconButton(
                     onClick = {
-                        val intent = Intent(context, Cartas_activity::class.java)
+                        val intent = Intent(
+                            context, 
+                            Cartas_activity::class.java)
                         context.startActivity(intent)
-                        (context as? Activity)?.finish()
-                              },
-
+                    },
+                    enabled = !esperar,
                     modifier = Modifier.size(60.dp)
                 ) {
                     Image(painterResource(R.drawable.cards),
@@ -454,10 +900,20 @@ fun MainMenuScreen(
 
                 IconButton(
                     onClick = {
+<<<<<<< Updated upstream
                         val intent = Intent(context, Amigos_Activity::class.java)
                         context.startActivity(intent)
                         (context as? Activity)?.finish()
                     },
+=======
+                        val intent = Intent(
+                            context, 
+                            Amigos_Activity::class.java
+                        )
+                        context.startActivity(intent)
+                    },
+                     enabled = !esperar,
+>>>>>>> Stashed changes
                     modifier = Modifier.size(60.dp)
                 ){
                     Image(painterResource(R.drawable.amigos),
@@ -465,6 +921,7 @@ fun MainMenuScreen(
                 }
                 IconButton(
                     onClick = {},
+                     enabled = !esperar,
                     modifier = Modifier.size(60.dp)
                 ) {
                     Image(
