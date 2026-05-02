@@ -60,7 +60,7 @@ import com.example.onitama.AutoLogin
 import com.example.onitama.AutoLogin.cerrarSesion
 import com.example.onitama.api.ManejadorGlobal
 import com.example.onitama.ui.activities.Buscar_PartidaActivity
-import com.example.onitama.ui.activities.Ini_Activity
+import com.example.onitama.ui.inicial.Ini_Activity
 import com.example.onitama.ui.activities.cartas.Cartas_activity
 import com.example.onitama.ui.activities.partida.PartidaActivity
 

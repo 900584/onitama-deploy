@@ -3,7 +3,7 @@ package com.example.onitama
 import android.os.Bundle
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
-import com.example.onitama.ui.activities.Ini_Activity
+import com.example.onitama.ui.inicial.Ini_Activity
 import com.example.onitama.ui.activities.MenuPrincipalActivity
 
 class MainActivity : AppCompatActivity() {
