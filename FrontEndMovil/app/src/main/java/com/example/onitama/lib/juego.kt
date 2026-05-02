@@ -821,14 +821,6 @@ fun ejecutarMovimiento (
         ganador = null
     }
 
-    val siguiente = if (equipoActual == EquipoID.ROJO) EquipoID.AZUL else EquipoID.ROJO
-    val puedeMoverDespues = tieneMovimientosPosibles(nuevoEstado, siguiente)
-
-    val gana = when {
-        esReyCapturado || victoriaPorTrono || !puedeMoverDespues -> equipoActual
-        else -> null
-    }
-
     var nuevoEstado = estado.copy(
         fasePartida = if (ganador != null) FasePartida.TERMINADA else estado.fasePartida,
         tablero = tablero,
@@ -844,6 +836,14 @@ fun ejecutarMovimiento (
         equipoCiego = estado.equipoCiego,
         restriccionSolo = resolverRestrccionSoloTrasMovimiento(estado.restriccionSolo, equipoActual)
     )
+
+    val siguiente = if (equipoActual == EquipoID.ROJO) EquipoID.AZUL else EquipoID.ROJO
+    val puedeMoverDespues = tieneMovimientosPosibles(nuevoEstado, siguiente)
+
+    val gana = when {
+        esReyCapturado || victoriaPorTrono || !puedeMoverDespues -> equipoActual
+        else -> null
+    }
 
     val estadoFinal = deshacerEspejoTrasMovimientoRival(nuevoEstado, equipoActual)
 

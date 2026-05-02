@@ -413,21 +413,11 @@ fun CartasScreen(
                 Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
 
                 IconButton(
-<<<<<<< Updated upstream
                     onClick = {
                         val intent = Intent(context, Amigos_Activity::class.java)
                         context.startActivity(intent)
                         (context as? Activity)?.finish()
                     },
-=======
-                    onClick = { 
-                        val intent = Intent(
-                            context, 
-                            Amigos_Activity::class.java
-                        )
-                        context.startActivity(intent)
-                        (context as? Activity)?.finish()},
->>>>>>> Stashed changes
                     modifier = Modifier.size(60.dp)
                 ){
                     Image(painterResource(R.drawable.amigos),

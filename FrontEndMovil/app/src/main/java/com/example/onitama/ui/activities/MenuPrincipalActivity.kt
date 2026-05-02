@@ -28,12 +28,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonDefaults.buttonColors
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +57,7 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.onitama.R
@@ -62,14 +67,12 @@ import com.example.onitama.ui.activities.cartas.Cartas_activity
 import com.example.onitama.ui.activities.partida.PartidaActivity
 import com.example.onitama.ui.activities.profile.ProfileActivity
 import com.example.onitama.ui.amigos.Amigos_Activity
-<<<<<<< Updated upstream
-=======
 import com.example.onitama.api.*
+import com.example.onitama.api.ManejadorPartidaAPI
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
->>>>>>> Stashed changes
 
 class MenuPrincipalActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,18 +94,7 @@ fun MainMenuScreen(
 ) {
     val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
     val scope = rememberCoroutineScope()
-    val alphaOtrosBotones by animateFloatAsState(
-        targetValue = if (menuPrivadoDesplegado || 
-                          menuEntrenamientoDesplegado ||
-                          listaAmigosDesplegada ||
-                          listaPartidasPausadaDesplegada ||
-                          esperar ) {
-                            0.3f
-                          } 
-                          else {
-                            1f
-                          }
-                        )
+
     val context = LocalContext.current
     val datosUsuario by AutoLogin.sesion.collectAsState()
 
@@ -123,10 +115,23 @@ fun MainMenuScreen(
 
     var listaAmigos by remember { mutableStateOf<List<Amigos.Info>>(emptyList()) }
     var listaPartidasPausadas by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
-    val cargaDatos by remember { mutableStateOf(false) }
+    var cargaDatos by remember { mutableStateOf(false) }
 
     var esNuevaPartida by remember { mutableStateOf(true) }
     var amigoSeleccionadoParaReanudar by remember { mutableStateOf<Amigos.Info?>(null) }
+
+    val alphaOtrosBotones by animateFloatAsState(
+        targetValue = if (menuPrivadoDesplegado ||
+                          menuEntrenamientoDesplegado ||
+                          listaAmigosDesplegada ||
+                          listaPartidasPausadaDesplegada ||
+                          esperar ) {
+                            0.3f
+                        }
+                        else {
+                            1f
+                        }
+    )
 
     LaunchedEffect(Unit) {
         ManejadorGlobal.mensajesEntrantes.collect { json ->
@@ -140,7 +145,7 @@ fun MainMenuScreen(
                     esperar = false
 
                     val jsonSerializer = Json {
-                        ignoreUnknownKeys = true,
+                        ignoreUnknownKeys = true
                         classDiscriminator = "tipo"
                     }
                     val datos = jsonSerializer.decodeFromString<Partida.RespuestaPartidaPrivadaEncontrada>(json.toString())
@@ -181,7 +186,7 @@ fun MainMenuScreen(
         if (esperar) {
             tiempo = 120
 
-            while (tiempo > = && esperar) {
+            while (tiempo >= 0 && esperar) {
                 delay(1000L)
                 tiempo--
             }
@@ -326,10 +331,10 @@ fun MainMenuScreen(
                         val intent = Intent(context, Buscar_PartidaActivity::class.java)
                         context.startActivity(intent)
                     },
-                    enabled = !menuPrivadoDesplegado && !menuEntrenamientoDesplegado, && !listaAmigosDesplegada && !listaPartidasPausadaDesplegada && !esperar,
+                    enabled = !menuPrivadoDesplegado && !menuEntrenamientoDesplegado && !listaAmigosDesplegada && !listaPartidasPausadaDesplegada && !esperar,
                     modifier = Modifier.size(width = 220.dp, height = 100.dp),
                     shape = RoundedCornerShape(16.dp), // Reemplaza @drawable/boton_esquinas_redondas
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+                    colors = buttonColors(containerColor = Color.White)
                 ) {
                     Text("PARTIDA ONLINE", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
                 }
@@ -354,7 +359,7 @@ fun MainMenuScreen(
                         enabled = !menuPrivadoDesplegado && !listaAmigosDesplegada && !listaPartidasPausadaDesplegada && !esperar,
                         modifier = Modifier.size(width = 220.dp, height = 100.dp),
                         shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (menuEntrenamientoDesplegado) Color.LightGray else Color.White)
+                        colors = buttonColors(containerColor = if (menuEntrenamientoDesplegado) Color.LightGray else Color.White)
                     ) {
                         Text("PARTIDA ENTRENAMIENTO", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
                     }
@@ -379,7 +384,7 @@ fun MainMenuScreen(
                             },
                             modifier = Modifier.size(width = 200.dp, height = 60.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+                            colors = buttonColors(containerColor = Color.White)
                         ){
                             Text("NIVEL FÁCIL", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
                         }
@@ -397,7 +402,7 @@ fun MainMenuScreen(
                             },
                             modifier = Modifier.size(width = 200.dp, height = 60.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+                            colors = buttonColors(containerColor = Color.White)
                         ){
                             Text("NIVEL MEDIO", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
                         }
@@ -415,7 +420,7 @@ fun MainMenuScreen(
                             },
                             modifier = Modifier.size(width = 200.dp, height = 60.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+                            colors = buttonColors(containerColor = Color.White)
                         ){
                             Text("NIVEL DIFÍCIL", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
                         }
@@ -442,7 +447,7 @@ fun MainMenuScreen(
                         enabled = !menuEntrenamientoDesplegado && !listaAmigosDesplegada && !listaPartidasPausadaDesplegada && !esperar,
                         modifier = Modifier.size(width = 220.dp, height = 100.dp),
                         shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (menuPrivadoDesplegado) Color.LightGray else Color.White)
+                        colors = buttonColors(containerColor = if (menuPrivadoDesplegado) Color.LightGray else Color.White)
                     ) {
                         Text("PARTIDA PRIVADA", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
                     }
@@ -462,7 +467,7 @@ fun MainMenuScreen(
                             },
                             modifier = Modifier.size(width = 200.dp, height = 60.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+                            colors = buttonColors(containerColor = Color.White)
                         ){
                             Text("CONTINUAR PARTIDA", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
                         }
@@ -477,7 +482,7 @@ fun MainMenuScreen(
                             },
                             modifier = Modifier.size(width = 200.dp, height = 60.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+                            colors = buttonColors(containerColor = Color.White)
                         ){
                             Text("NUEVA PARTIDA", fontFamily = quattrocentoBold, color = colorResource(R.color.azulFondo))
                         }
@@ -488,14 +493,13 @@ fun MainMenuScreen(
         }
 
         AnimatedVisibility(
-            visible = listaAmigosDesplegada
+            visible = listaAmigosDesplegada,
             modifier = Modifier
                 .align(Alignment.Center)
         ) {
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(),
+                    .fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
             ) {
@@ -523,7 +527,8 @@ fun MainMenuScreen(
                             onClick = {
                                 listaAmigosDesplegada = false
                             }
-                        ) 
+                        ) {
+                        }
                     }
                 }
             }
@@ -575,15 +580,14 @@ fun MainMenuScreen(
                             },
                             modifier = Modifier 
                                 .fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
+                            colors = buttonColors(
                                 containerColor = colorResource(id = R.color.azulFondo)
                             ),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Row(
                                 modifier = Modifier
-                                    .fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBetween
+                                    .fillMaxWidth()
                             ) {
                                 Text(
                                     amigo.nombre,
@@ -639,15 +643,16 @@ fun MainMenuScreen(
                                 listaPartidasPausadaDesplegada = false
                                 amigoSeleccionadoParaReanudar = null
                             }
-                        ) 
+                        ){
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            val partidasPrivadasAmigo = listaPartidasPausadas.FILTER {
-                it.optString("oponente" == amigoSeleccionadoParaReanudar?.nombre)
+            val partidasPrivadasAmigo = listaPartidasPausadas.filter {
+                it.optString("oponente") == amigoSeleccionadoParaReanudar?.nombre
             }
 
             if (cargaDatos) {
@@ -657,7 +662,7 @@ fun MainMenuScreen(
                 ) {
                     Text(
                         "BUSCANDO PARTIDAS PAUSADAS",
-                        textAlign = Align.Center,
+                        textAlign = TextAlign.Center,
                         color = Color.Gray
                     )
                 }
@@ -666,8 +671,7 @@ fun MainMenuScreen(
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(partidasPrivadasAmigo) { index ->
-                        val partida = partidasPrivadasAmigo[index]
+                    items(partidasPrivadasAmigo) { partida ->
                         val idPartida = partida.optInt("partida_id")
 
                         Button(
@@ -684,11 +688,11 @@ fun MainMenuScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
+                            colors = buttonColors(
                                 containerColor = Color.LightGray
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        )
+                            )
+                        ) {
+                        }
                     }
                 }
             }
@@ -706,8 +710,8 @@ fun MainMenuScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .padding(16.dp)
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         "INVITACION ENVIADA. ESPERANDO ...",
@@ -729,7 +733,7 @@ fun MainMenuScreen(
                     Spacer(modifier = Modifier.height(16.dp)) 
 
                     Text(
-                        text = "ESPERANDO AMIGO..."
+                        text = "ESPERANDO AMIGO...",
                         fontFamily = quattrocentoBold,
                         fontSize = 12.sp,
                         color = Color.Gray
@@ -752,7 +756,7 @@ fun MainMenuScreen(
                             esperar = false
                             idNotificacion = -1
                         },
-                        colors = ButtonDefaults.buttonColors(
+                        colors = buttonColors(
                             containerColor = Color.LightGray
                         ),
                         shape = RoundedCornerShape(12.dp)
@@ -900,20 +904,11 @@ fun MainMenuScreen(
 
                 IconButton(
                     onClick = {
-<<<<<<< Updated upstream
                         val intent = Intent(context, Amigos_Activity::class.java)
                         context.startActivity(intent)
                         (context as? Activity)?.finish()
                     },
-=======
-                        val intent = Intent(
-                            context, 
-                            Amigos_Activity::class.java
-                        )
-                        context.startActivity(intent)
-                    },
-                     enabled = !esperar,
->>>>>>> Stashed changes
+                    enabled = !esperar,
                     modifier = Modifier.size(60.dp)
                 ){
                     Image(painterResource(R.drawable.amigos),

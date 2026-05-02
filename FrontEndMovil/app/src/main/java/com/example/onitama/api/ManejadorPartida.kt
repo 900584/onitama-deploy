@@ -1,6 +1,8 @@
-package com.example.ontitama.api
+package com.example.onitama.api
 
 import org.json.JSONObject
+import kotlin.apply
+import com.example.onitama.api.ManejadorGlobal
 
 class ManejadorPartidaAPI {
     fun enviarInvitacion(
@@ -22,7 +24,7 @@ class ManejadorPartidaAPI {
             return
         }
 
-        val json = JSONObject.apply {
+        val json = JSONObject().apply {
             put("tipo", "CANCELAR_NOTIFICACION")
             put("idNotificacion", idNotificacion)
         }
@@ -41,7 +43,7 @@ class ManejadorPartidaAPI {
             mensaje = "RECHAZAR_INVITACION"
         }
 
-        val json = JSONObject.apply {
+        val json = JSONObject().apply {
             put("tipo", mensaje)
             put("idNotificacion", idNotificacion)
         }
@@ -51,7 +53,7 @@ class ManejadorPartidaAPI {
     fun obtenerPartidasPausadas(
         nombreUsuario: String
     ) {
-        val json = JSONObject.apply {
+        val json = JSONObject().apply {
             put("tipo", "SOLICITAR_PARTIDAS_PRIV")
             put("usuario", nombreUsuario)
         }
@@ -63,7 +65,7 @@ class ManejadorPartidaAPI {
         destinatario: String,
         idPartida: Int
     ) {
-        val json = JSONObject.apply {
+        val json = JSONObject().apply {
             put("tipo", "SOLICITAR_REANUDAR")
             put("remitente", remitente)
             put("destinatario", destinatario)
@@ -85,7 +87,7 @@ class ManejadorPartidaAPI {
             mensaje = "RECHAZAR_REANUDAR"
         }
 
-        val json = JSONObject.apply {
+        val json = JSONObject().apply {
             put("tipo", mensaje)
             put("idNotificacion", idNotificacion)
             put("nombre", miNombre)

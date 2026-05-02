@@ -48,6 +48,7 @@ import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.activities.cartas.Cartas_activity
 import com.example.onitama.ui.amigos.Amigos_Activity
 import com.example.onitama.ui.perfil.Perfil_Activity
+import org.json.JSONObject
 
 /**
  * Pantalla que muestra las notificaciones.
@@ -210,7 +211,7 @@ fun PantallaNotificaciones(
                             notif = notif,
                             fontFamily = quattrocentoBold,
                             onAceptar = { viewModel.aceptar(notif, datosUsuario?.nombre ?: "") },
-                            onRechazar = { viewModel.rechazar(notif) }
+                            onRechazar = { viewModel.rechazar(notif, datosUsuario?.nombre ?: "") }
                         )
                     }
                 }
@@ -316,11 +317,28 @@ fun PantallaNotificaciones(
 
 @Composable
 fun NotificacionItem(
-    notif: Amigos.MensajeSolicitudAmistadS,
+    notif: JSONObject,
     fontFamily: FontFamily,
     onAceptar: () -> Unit,
     onRechazar: () -> Unit
 ) {
+    val tipo = notif.optString("tipo")
+    val remitente = notif.optString("remitente")
+
+    val notificacion = when(tipo) {
+        "SOLICITUD_AMISTAD" ->
+            "${remitente} te ha enviado una solicitud de amistad"
+
+        "INVITACION_PARTIDA" ->
+            "${remitente} te desafía a una partida privada"
+
+        "SOLICITAR_REANUDAR" ->
+            "${remitente} quiere continuar una partida pendiente"
+
+        else ->
+            "" 
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -329,7 +347,7 @@ fun NotificacionItem(
             .padding(16.dp)
     ) {
         Text(
-            text = "${notif.remitente} te ha enviado una solicitud de amistad",
+            text = notificacion,
             fontFamily = fontFamily,
             fontSize = 16.sp,
             color = Color.Black

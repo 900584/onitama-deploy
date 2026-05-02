@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -392,11 +393,11 @@ class PartidaActivity: AppCompatActivity() {
 
                                 Box(
                                     modifier = Modifier
-                                        .clickable(enabled = esTurnoMio) { viewModel.activarCartaAccion(nombre) },
+                                        .clickable(enabled = esMiTurno) { viewModel.activarCartaAccion(nombreCarta) },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = nombre.uppercase(),
+                                        text = nombreCarta.uppercase(),
                                         color = Color.White,
                                         fontSize = 12.sp,
                                         fontFamily = quattrocentoBold,
@@ -519,9 +520,7 @@ class PartidaActivity: AppCompatActivity() {
                         .fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalArrangement = Alignment.CenterHorizontally
-                    ) {
+                    Column() {
                         Text(
                             text = "COLOCA TU TRAMPA",
                             color = Color.Red,
@@ -569,18 +568,18 @@ class PartidaActivity: AppCompatActivity() {
 
                                     Text(
                                         text = when(nombre) {
-                                            "Pensatorium" -> 
-                                            "Atrapasueños" ->
-                                            "Requiem" ->
-                                            "Santo Grial" ->
-                                            "La Dama del Mar" ->
-                                            "Finisterra" ->
-                                            "Brujeria" ->
-                                            "Illusia" ->
+                                            "Pensatorium" -> "Invierte en espejo los movimientos de todas las cartas del tablero. Dura hasta que el rival realice un movimiento."
+                                            "Atrapasueños" -> "Elige una carta de movimiento del oponente y añádela a tu mano."
+                                            "Requiem" -> "Selecciona un peón tuyo y un peón rival; ambos mueren."
+                                            "Santo Grial" -> "Añade un peón extra a una casilla vacía de tu mitad del campo."
+                                            "La Dama del Mar" -> "Solo se pueden hacer movimientos para  adelante. Dura hasta que el rival realice un movimiento."
+                                            "Finisterra" -> "Solo se pueden hacer movimientos para atrás. Dura hasta que el rival realice un movimiento."
+                                            "Brujeria" -> "Durante toda la partida tu rival no verá qué cartas de movimiento tienes."
+                                            "Illusia" -> "Mueve a tu Rey a una casilla vacía de tu mitad del campo."
                                             else -> "NADA"
                                         }, 
                                         color = Color.LightGray,
-                                        fontSize = 10.sp.
+                                        fontSize = 10.sp,
                                         textAlign = TextAlign.Center
                                     )
                                 }
