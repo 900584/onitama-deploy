@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.onitama.AutoLogin
 import com.example.onitama.api.Amigos
 import com.example.onitama.api.ManejadorGlobal
+import com.example.onitama.api.ManejadorPartidaAPI
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +28,7 @@ import org.json.JSONObject
 class ViewModelAmigos : ViewModel() {
 
     private val api = Amigos()
+    private val manejadorPartidaAPI = ManejadorPartidaAPI()
 
     private val _raizBuscada = MutableStateFlow("")
     val raizBuscada: StateFlow<String> = _raizBuscada.asStateFlow()
@@ -54,6 +56,20 @@ class ViewModelAmigos : ViewModel() {
                 }
             }
         }
+    }
+
+    fun enviarPartidaPrivada(
+        nombreAmigo: String
+    ) {
+        val miNombre = AutoLogin.sesion.value?.nombre ?: return
+        manejadorPartidaAPI.enviarInvitacion(miNombre, nombreAmigo)
+    }
+
+    fun solicitarReanudacion(
+        nombreAmigo: String
+    ) {
+        val miNombre = AutoLogin.sesion.value?.nombre ?: return
+        manejadorPartidaAPI.obtenerPartidasPausadas(miNombre)
     }
 
     fun obtenerAmigos() {

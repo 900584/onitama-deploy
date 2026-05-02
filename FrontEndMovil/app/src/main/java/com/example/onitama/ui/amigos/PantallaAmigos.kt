@@ -234,7 +234,9 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                             fontFamily = quattrocentoBold,
                             esAmigo = esAmigo,
                             onSeguir = { viewModel.seguir(item.nombre) },
-                            onDejarDeSeguir = { viewModel.dejarDeSeguir(item.nombre) }
+                            onDejarDeSeguir = { viewModel.dejarDeSeguir(item.nombre) },
+                            onPartidaPrivada = { viewModel.enviarPartidaPrivada(item.nombre) },
+                            onReanudar = { viewModel.solicitarReanudacion(item.nombre) }
                         )
                     }
                 }
@@ -333,7 +335,9 @@ fun FriendItem(
     fontFamily: FontFamily,
     esAmigo: Boolean,
     onSeguir: () -> Unit,
-    onDejarDeSeguir: () -> Unit
+    onDejarDeSeguir: () -> Unit,
+    onPartidaPrivada: () -> Unit,
+    onReanudar: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -386,6 +390,28 @@ fun FriendItem(
 
         // Botón de seguir o dejar de seguir
         if (esAmigo) {
+            IconButton(
+                onClick = onPartidaPrivada,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.espadas),
+                    contentDescription = "Desafiar",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            IconButton(
+                onClick = onReanudar,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.tablero),
+                    contentDescription = "Reanudar",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
             IconButton(
                 onClick = onDejarDeSeguir,
                 modifier = Modifier.size(40.dp)

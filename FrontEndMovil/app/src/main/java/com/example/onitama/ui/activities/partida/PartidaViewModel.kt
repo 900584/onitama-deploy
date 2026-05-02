@@ -47,6 +47,8 @@ class PartidaViewModel : ViewModel() {
     var razon: String? = null
     val estado: StateFlow<EstadoJuego> = _estado.asStateFlow()
 
+    private var cartaAccionEnUso: String? = null
+
     private val _notificacionPausa = MutableStateFlow<Partida.RespuestaSolicitudPausa?>(null)
     val notificacionPausa = _notificacionPausa.asStateFlow()
 
@@ -146,58 +148,9 @@ class PartidaViewModel : ViewModel() {
                                 _estado.value = resultado.nuevoEstado
                             }
 
-                            is Partida.RespuestaTrampaActivada -> {
-                                val fila = END - mensaje.fila
-                                val columna = END - mensaje.columna
-
-                                val nuevoTablero = actual.tablero.map {
-                                    it.toMutableList()
-                                }.toMutableList()
-
-                                nuevoTablero[fila][columna] = nuevoTablero[fila][columna].copy(
-                                    ficha = null,
-                                    esTrampaEquipo = -1
-                                )
-
-                                _estado.value = actual.copy(
-                                    tablero = nuevoTablero
-                                )
-                            }
-
-                            is Partida.RespuestaCartaAccionJugada -> {
-                                val jugador = if (mensaje.equipo == 1) {
-                                    EquipoID.AZUL
-                                }
-                                else {
-                                    EquipoID.ROJO
-                                }
-
-                                val tipoAccion = obtenerCartaAccion(mensaje.carta_accion)
-
-                                _estado.value = aplicarCartaAccion(
-                                    estado = actual,
-                                    equipo = jugador,
-                                    cartaNombre = mensaje.carta_accion,
-                                    x = if (mensaje.x != -1) END - mensaje.x else -1,
-                                    y = if (mensaje.y != -1) END - mensaje.y else -1,
-                                    x_op = if (mensaje.x_op != -1) END - mensaje.x_op else -1,
-                                    y_op = if (mensaje.y_op != -1) END - mensaje.y_op else -1,
-                                    cartaRobar = mensaje.carta_robar,
-                                    tipo = tipoAccion
-                                )
-                            }
-
                             is Partida.RespuestaMovimientoInvalido -> {
                                 Log.e("Partida", "Error: Movimiento inválido")
                                 desSeleccionarCarta()
-                            }
-
-                            is Partida.RespuestaTrampaInvalida -> {
-                                Log.e("Partida", "Error: No se puede poner una trampa en esa casilla")
-                            }
-
-                            is Partida.RespuestaCartaAccionInvalida -> {
-                                Log.e("Partida", "Error: No puedes usar esta carta de acción ahora")
                             }
 
                             is Partida.RespuestaDerrota -> {
@@ -247,6 +200,76 @@ class PartidaViewModel : ViewModel() {
 
                             is Partida.RespuestaPartidaPausada -> { }
 
+                            is Partida.RespuestaPausaRechazada -> { }
+
+                            is Partida.RespuestaPartidaLista -> {
+                                _estado.value = actual.copy(
+                                    fasePartida = FasePartida.JUGANDO,
+                                    cartasAccionPropia = mensaje.cartas_accion.map { it.nombre }
+                                )
+                            }
+
+                            is Partida.RespuestaSeleccioneCartaAccion -> {
+                                _estado.value = actual.copy(
+                                    fasePartida = FasePartida.ELEGIR_CARTA_ACCION,
+                                    cartasAccionPropia = mensaje.cartas_accion.map { it.nombre }
+                                )
+                            }
+
+
+                            is Partida.RespuestaTrampaActivada -> {
+                                val fila = END - mensaje.fila
+                                val columna = END - mensaje.columna
+
+                                val nuevoTablero = actual.tablero.map {
+                                    it.toMutableList()
+                                }.toMutableList()
+
+                                nuevoTablero[fila][columna] = nuevoTablero[fila][columna].copy(
+                                    ficha = null,
+                                    esTrampaEquipo = -1
+                                )
+
+                                _estado.value = actual.copy(
+                                    tablero = nuevoTablero
+                                )
+                            }
+
+                            is Partida.RespuestaCartaAccionJugada -> {
+                                val jugador = if (mensaje.equipo == 1) {
+                                    EquipoID.AZUL
+                                }
+                                else {
+                                    EquipoID.ROJO
+                                }
+
+                                val tipoAccion = obtenerCartaAccion(mensaje.carta_accion)
+
+                                _estado.value = aplicarCartaAccion(
+                                    estado = actual,
+                                    equipo = jugador,
+                                    cartaNombre = mensaje.carta_accion,
+                                    x = if (mensaje.x != -1) END - mensaje.x else -1,
+                                    y = if (mensaje.y != -1) END - mensaje.y else -1,
+                                    x_op = if (mensaje.x_op != -1) END - mensaje.x_op else -1,
+                                    y_op = if (mensaje.y_op != -1) END - mensaje.y_op else -1,
+                                    cartaRobar = mensaje.carta_robar,
+                                    tipo = tipoAccion
+                                )
+
+                                if (jugador == equipoPropio) {
+                                    cartaAccionEnUso = null
+                                }
+                            }
+
+                            is Partida.RespuestaTrampaInvalida -> {
+                                Log.e("Partida", "Error: No se puede poner una trampa en esa casilla")
+                            }
+
+                            is Partida.RespuestaCartaAccionInvalida -> {
+                                Log.e("Partida", "Error: No puedes usar esta carta de acción ahora")
+                            }                           
+
                             else -> {
                                 println("LOG: Mensaje recibido no reconocido: $mensaje")
                             }
@@ -283,7 +306,7 @@ class PartidaViewModel : ViewModel() {
             FasePartida.JUGANDO -> {
                 if (actual.modoAccion != null) {
                     val cartaAccion = actual.modoAccion ?: return
-                    val nombreCarta = actual.cartaAccionPropia ?: return
+                    val nombreCarta = cartaAccionEnUso ?: return
 
                     when (cartaAccion) {
                         "REVIVIR" -> {
@@ -363,6 +386,18 @@ class PartidaViewModel : ViewModel() {
         }
     }
 
+    fun elegirCartaAccionInicial(
+        nombreCarta: String
+    ) {
+        val actual = _estado.value
+        if (actual.fasePartida == FasePartida.ELEGIR_CARTA_ACCION) {
+            partida.enviarSeleccionAccion(
+                nombreCarta, 
+                equipoPropio.id
+            )
+        }
+    }
+
     fun seleccionarCarta(carta: Carta) {
         val actual = _estado.value
 
@@ -409,6 +444,8 @@ class PartidaViewModel : ViewModel() {
 
         if (actual.turnoActual == equipoPropio) {
             val carta = obtenerCartaAccion(nombreCarta) ?: return
+
+            cartaAccionEnUso = nombreCarta
 
             if (carta == "ESPEJO" || 
                 carta == "CEGAR" ||
@@ -462,14 +499,14 @@ class PartidaViewModel : ViewModel() {
             _estado.value = _estado.value.copy(
                 modoAccion = null
             )
+            cartaAccionEnUso = null
         }
     }
 
     fun seleccionarCartaRobar(
         nombreCarta: String
     ) {
-        val actual = _estado.value
-        val cartaAccion = actual.cartaAccionPropia ?: return 
+        val cartaAccion = cartaAccionEnUso ?: return 
 
         ejecucionCartaAccion(
             nombreCarta = cartaAccion,
