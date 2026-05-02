@@ -35,7 +35,7 @@ class ViewModelInicioSesion() : ViewModel() {
      * Comprueba que los datos se han rellenado correctamente y envía
      * la solicitud al servidor.
      */
-    fun onEntrarClick(context: Context) {
+    fun onEntrarClick(context: Context, keepLogged: Boolean) {
         val estadoActual = _estadoUI.value
         if (estadoActual.nombre.isEmpty() || estadoActual.contrasenya.isEmpty()) {
             _estadoUI.value = estadoActual.copy(error = "Completa todos los campos")
@@ -54,6 +54,10 @@ class ViewModelInicioSesion() : ViewModel() {
                     //con esto otro se actualiza el perfil (iniciarsesión no tiene partidas ganadas o jugadas)
                     val datos = authClient.obtenerPerfil(estadoActual.nombre)
 
+                    if(keepLogged && datos != null){
+                        AutoLogin.mantenerSesion(context, estadoActual.nombre, estadoActual.contrasenya)
+                    }
+
                     // Guardamos la sesión en el Singleton 'AutoLogin'
                     AutoLogin.inicioSesion(
                         context,
@@ -64,6 +68,8 @@ class ViewModelInicioSesion() : ViewModel() {
                         datos.skin_activa,
                     )
                     AutoLogin.actualizar(context, datos as DatosPerfil?)
+
+
 
                     _estadoUI.value = _estadoUI.value.copy(isLoading = false, iniciada = true)
                 }

@@ -43,7 +43,7 @@ import com.example.onitama.AutoLogin
 import com.example.onitama.AutoLogin.cerrarSesion
 import com.example.onitama.R
 import com.example.onitama.api.ManejadorGlobal
-import com.example.onitama.ui.activities.Ini_Activity
+import com.example.onitama.ui.inicial.Ini_Activity
 import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.notificaciones.Notificaciones_Activity
 import com.example.onitama.ui.activities.cartas.Cartas_activity

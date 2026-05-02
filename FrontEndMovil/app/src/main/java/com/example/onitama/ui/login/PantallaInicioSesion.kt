@@ -2,6 +2,7 @@ package com.example.onitama.ui.login
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement.Absolute.spacedBy
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.onitama.R
 import com.example.onitama.api.ManejadorGlobal
 import com.example.onitama.ui.components.*
@@ -35,6 +37,7 @@ fun PantallaInicioSesion(
 ) {
     val estado by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val keepLogged = remember { mutableStateOf(false) }
 
     LaunchedEffect(estado.iniciada) {
         if (estado.iniciada) {
@@ -121,13 +124,38 @@ fun PantallaInicioSesion(
                         etiqueta = "Contraseña"
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = spacedBy(5.dp)
+                    ){
+                        Checkbox(
+                            checked = keepLogged.value,
+                            onCheckedChange = { keepLogged.value = !keepLogged.value },
+                            modifier = Modifier
+                                .align(Alignment.CenterVertically)
+                                .padding(start = 15.dp)
+                                .size(10.dp)
+
+                        )
+                        Text(
+                            text = "Mantenerme logueado (Esto podría suponer un riesgo)",
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier
+                                .align(Alignment.CenterVertically)
+                                .padding(start = 8.dp)
+                        )
+                    }
+
+
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Botón 'Entrar' para acceder con el correo y la contraseña
                     BotonPrincipal(
                         texto = "Entrar",
                         onClick = {
-                            viewModel.onEntrarClick(context)
+                            viewModel.onEntrarClick(context, keepLogged.value)
                         }
                     )
 

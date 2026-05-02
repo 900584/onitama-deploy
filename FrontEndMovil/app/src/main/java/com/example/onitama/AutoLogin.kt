@@ -17,12 +17,19 @@ data class DatosPerfil(
     val avatar_id: String
 )
 
+data class LoginTool(
+    val nombre: String,
+    val contrasenya: String
+)
+
 object AutoLogin {
 
     private const val NOMBREINICIO = "Onitama"
     private const val HAINICIADO = "yaHaIniciado"
     private const val NOMBRE = "nombre"
     private const val CORREO = "correo"
+
+    private const val PWD = "password"
     private const val JUGADAS = "jugadas"
     private const val GANADAS = "ganadas"
     private const val KATANAS = "katanas"
@@ -37,29 +44,17 @@ object AutoLogin {
     val sesion: StateFlow<DatosPerfil?> = _sesion.asStateFlow()
 
 
+
+
+
     private fun obtenerPreferences(context: Context): SharedPreferences {
         return context.getSharedPreferences(NOMBREINICIO, Context.MODE_PRIVATE)
     }
 
-    fun cargarDatosAlIniciarApp(context: Context) {
-        if (yaHaIniciadoSesion(context)) {
-            val pref = obtenerPreferences(context)
-            _sesion.value = DatosPerfil(
-                nombre = pref.getString(NOMBRE, "Jugador") ?: "Jugador",
-                correo = pref.getString(CORREO, "") ?: "",
-                puntos = pref.getInt(KATANAS, 0),
-                partidas_ganadas = pref.getInt(GANADAS, 0),
-                partidas_jugadas = pref.getInt(JUGADAS, 0),
-                cores = pref.getInt(CORES, 0),
-                skin_activa = pref.getString(SKIN, "")?: "",
-                avatar_id = pref.getString(AVATAR, "")?: ""
-            )
-        }
-    }
+
 
     fun inicioSesion(context: Context, nombre: String, katanas: Int, cores: Int, avatar: String, skin: String){
         val pref = obtenerPreferences(context).edit()
-        pref.putBoolean(HAINICIADO, true)
         pref.putString(NOMBRE, nombre)
         pref.putInt(KATANAS, katanas)
         pref.putInt(CORES, cores)
@@ -105,7 +100,7 @@ object AutoLogin {
         _sesion.value = datos
     }
 
-    fun yaHaIniciadoSesion(context: Context): Boolean {
+    fun haySesionActiva(context: Context): Boolean {
         return obtenerPreferences(context).getBoolean(HAINICIADO, false)
     }
 
@@ -114,8 +109,25 @@ object AutoLogin {
     fun obtenerCores(context: Context): Int = obtenerPreferences(context).getInt(CORES, 0)
 
     fun cerrarSesion(context: Context){
+        obtenerPreferences(context).edit().putBoolean(HAINICIADO, false).apply()
         obtenerPreferences(context).edit().clear().apply()
         _sesion.value = null
         //ws?.close(1000, "Sesión cerrada por el usuario")
+    }
+
+    fun mantenerSesion(context: Context, nombre: String, contrasenya: String){
+        obtenerPreferences(context).edit().putBoolean(HAINICIADO, true).apply()
+        obtenerPreferences(context).edit().putString(NOMBRE, nombre).apply()
+        obtenerPreferences(context).edit().putString(PWD, contrasenya).apply()
+    }
+
+    fun datosIni(context: Context): LoginTool? {
+        val pref = obtenerPreferences(context)
+        val nombre = pref.getString(NOMBRE, null)
+        val pwd = pref.getString(PWD, null)
+        if (nombre != null && pwd != null) {
+            return LoginTool(nombre, pwd)
+        }
+        return null
     }
 }

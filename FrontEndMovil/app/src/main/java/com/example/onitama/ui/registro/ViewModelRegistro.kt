@@ -76,7 +76,7 @@ class ViewModelRegistro() : ViewModel() {
 
     }
 
-    fun registrarDelTodo(context: Context){
+    fun registrarDelTodo(context: Context, keepLogged: Boolean){
         val estadoActual = _estadoUI.value
         viewModelScope.launch {
             _estadoUI.value = estadoActual.copy(isLoading = true, error = null)
@@ -91,7 +91,9 @@ class ViewModelRegistro() : ViewModel() {
                     )
 
                     val datos = authClient.obtenerPerfil(estadoActual.nombre)
-
+                    if(keepLogged && datos != null){
+                        AutoLogin.mantenerSesion(context, estadoActual.nombre, estadoActual.contrasenya)
+                    }
                     // Guardamos la sesión en el Singleton 'AutoLogin'
                     AutoLogin.inicioSesion(
                         context,

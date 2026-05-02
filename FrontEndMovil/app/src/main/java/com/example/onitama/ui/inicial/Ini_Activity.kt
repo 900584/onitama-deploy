@@ -20,10 +20,12 @@ class Ini_Activity : ComponentActivity() {
                     onNavigateToLogin = {
                         val intent = Intent(this, Ini_Ses_Activity::class.java)
                         startActivity(intent)
+                        finish()
                     },
                     onNavigateToRegistro = {
                         val intent = Intent(this, Reg_Activity::class.java)
                         startActivity(intent)
+                        finish()
                     }
                 )
             }
