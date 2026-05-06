@@ -148,7 +148,7 @@ export default function IniciarSesionPage() {
                   placeholder="tu@correo.com"
                   value={correoRecuperar}
                   onChange={(e) => { setCorreoRecuperar(e.target.value); setEstadoRecuperar("idle" as "idle"); }}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a2d4a]"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 text-black focus:outline-none focus:ring-2 focus:ring-[#1a2d4a]"
                 />
                 {estadoRecuperar === "error_noexiste" && (
                   <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-center">
@@ -213,7 +213,7 @@ export default function IniciarSesionPage() {
                 }}
                 placeholder="Tu nombre de usuario"
                 autoComplete="username"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a2d4a] focus:border-transparent"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-black focus:outline-none focus:ring-2 focus:ring-[#1a2d4a] focus:border-transparent"
               />
               {errorNombre && (
                 <p className="mt-1 text-sm text-red-600">{errorNombre}</p>
@@ -240,7 +240,7 @@ export default function IniciarSesionPage() {
                   }}
                   placeholder="Al menos 8 caracteres con letras y números"
                   autoComplete="current-password"
-                  className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a2d4a] focus:border-transparent"
+                  className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300 text-black focus:outline-none focus:ring-2 focus:ring-[#1a2d4a] focus:border-transparent"
                 />
                 <button
                   type="button"
