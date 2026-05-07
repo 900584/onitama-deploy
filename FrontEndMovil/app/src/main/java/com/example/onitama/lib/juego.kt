@@ -95,7 +95,11 @@ data class EstadoJuego (
 
     val espejoActivadoPor: EquipoID? = null,
 
-    val restriccionSolo: RestriccionSolo? = null
+    val restriccionSolo: RestriccionSolo? = null,
+    
+    val posicionTrampaLocal: Posicion? = null,
+    val mensajeErrorTrampa: String? = null,
+    val posicionErrorTrampa: Posicion? = null
 )
 
 enum class TipoRestriccion {

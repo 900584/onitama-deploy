@@ -288,20 +288,71 @@ class PartidaViewModel : ViewModel() {
         Log.d("LOG", "Toque en $pos durante fase ${actual.fasePartida}")
         when (actual.fasePartida) {
             FasePartida.COLOCAR_TRAMPA -> {
+                if (actual.posicionTrampaLocal != null) {
+                    return
+                }
+
+                val hayFicha = actual.tablero[pos.fila][pos.col]
+
+                if (hayFicha.ficha != null) {
+                     val mensaje = "No puedes colocar la trampa sobre una pieza."
+
+                    _estado.value = actual.copy(
+                        mensajeErrorTrampa = mensaje,
+                        posicionErrorTrampa = pos
+                    )
+                    
+                    viewModelScope.launch {
+                        delay(2000)
+                        val estadoActual = _estado.value
+                        if (estadoActual.posicionErrorTrampa == pos) {
+                            _estado.value = estadoActual.copy(
+                                mensajeErrorTrampa = null,
+                                posicionErrorTrampa = null
+                            )
+                        }
+                    }
+                    return
+                }
 
                 val sePuede = if (equipoPropio == EquipoID.AZUL) {
-                    pos.fila >= 4
+                    pos.fila == 4 || pos.fila == 5
                 }
                 else {
-                    pos.fila <= 2
+                    pos.fila == 1 || pos.fila == 2
                 }
 
                 if (sePuede) {
+                    _estado.value = actual.copy(
+                        posicionTrampaLocal = pos,
+                        mensajeErrorTrampa = null,
+                        posicionErrorTrampa = null
+                    )
+
                     partida.enviarPonerTrampa(
                         equipo = equipoPropio.id,
                         fila = END - pos.fila,
                         columna = END - pos.col
                     )
+                    
+                } else {
+                    val mensaje = "Debe colocarse en la 2º o 3º fila de tu lado."
+
+                    _estado.value = actual.copy(
+                        mensajeErrorTrampa = mensaje,
+                        posicionErrorTrampa = pos
+                    )
+                    
+                    viewModelScope.launch {
+                        delay(2000)
+                        val estadoActual = _estado.value
+                        if (estadoActual.posicionErrorTrampa == pos) {
+                            _estado.value = estadoActual.copy(
+                                mensajeErrorTrampa = null,
+                                posicionErrorTrampa = null
+                            )
+                        }
+                    }
                 }
             }
 

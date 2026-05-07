@@ -522,17 +522,87 @@ class PartidaActivity : AppCompatActivity() {
             if (estado.fasePartida == FasePartida.COLOCAR_TRAMPA) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .padding(horizontal = 5.dp),
+                    contentAlignment = Alignment.TopCenter
                 ) {
-                    Column() {
-                        Text(
-                            text = "COLOCA TU TRAMPA",
-                            color = Color.Red,
-                            fontFamily = quattrocentoBold,
-                            fontSize = 24.sp,
-                            textAlign = TextAlign.Center
-                        )
+                    Column(
+                        modifier = Modifier.padding(top = 40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        val yaPuesta = estado.posicionTrampa != null
+                        val texto = when {
+                            yaPuesta -> "ESPERANDO A QUE EL RIVAL COLOQUE SU TRAMPA....."
+                            else -> "COLOCA TU CASILLA TRAMPA"
+                        }
+                        
+                        
+                        val colorFondo = Color(0xFFFF5252)  
+                        
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    colorFondo,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .border(
+                                    1.dp,
+                                    color = Color.Red,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                                
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "!",
+                                    fontSize = 20.sp,
+                                    color = Color.Black
+                                )
+                                
+                                Spacer(Modifier.width(12.dp))
+
+                                Text(
+                                    text = texto,
+                                    color = Color.White,
+                                    fontFamily = quattrocentoBold,
+                                    fontSize = 16.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+
+                        AnimatedVisibility(
+                            visible = estado.mensajeErrorTrampa != null
+                        ) {
+                            estado.mensajeErrorTrampa?.let { error ->
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            Color(0xFF2C2C2C)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            Color.Gray
+                                        )
+                                        .padding (
+                                            horizontal = 16.dp,
+                                            vertical = 6.dp
+                                        )
+                                ) {
+                                    Text(
+                                        text = error,
+                                        color = Color.White,
+                                        fontSize = 16.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -864,17 +934,32 @@ class PartidaActivity : AppCompatActivity() {
                         val posLogica = Posicion(logicaF, logicaC)
                         val celda = estado.tablero[logicaF][logicaC]
 
+                        val esTrampaSeleccionada = estado.posicionTrampa == posLogica
+                      
+                        val esErrorEnEstaCasilla = estado.posicionErrorTrampa == posLogica
+
                         Box(
                             modifier = Modifier
                                 .size(50.dp)
                                 .clip(RoundedCornerShape(5))
                                 .background(
                                     when {
-                                        celda.esTrampaEquipo == -1 -> Color.Companion.Black
                                         estado.fichaSeleccionada == posLogica -> Color.Yellow
                                         estado.movimientosValidos.contains(posLogica) -> Color.Green
                                         celda.esTrono -> Color.DarkGray
                                         else -> Color.White.copy(alpha = 0.3f)
+                                    }
+                                )
+                                .border(
+                                    width = when {
+                                        celda.esTrampaEquipo == -1 -> 2.dp
+                                        esTrampaSeleccionada -> 3.dp
+                                        else -> 1.dp
+                                    },
+                                    color = when {
+                                        celda.esTrampaEquipo == -1 -> Color.DarkGray
+                                        esTrampaSeleccionada -> Color.Red
+                                        else -> Color.Black
                                     }
                                 )
                                 // Mandamos SIEMPRE la posición lógica al ViewModel
@@ -902,21 +987,22 @@ class PartidaActivity : AppCompatActivity() {
                                         .fillMaxSize()
                                         .padding(1.dp)
                                 )
-                            } else if (celda.esTrampaEquipo == equipoLocal.id) {
-                                Image(
-                                    painter = painterResource(
-                                        id = R.drawable.casilla_trampa
-                                    ),
-                                    contentDescription = "Trampa",
-                                    modifier = Modifier.Companion
-                                        .fillMaxSize()
-                                )
                             } else if (celda.esTrampaEquipo == -1) {
                                 Image(
                                     painter = painterResource(
                                         id = R.drawable.lapida
                                     ),
                                     contentDescription = "Esta casilla ha quedado inactiva",
+                                    modifier = Modifier.Companion
+                                        .fillMaxSize()
+                                )
+                            }
+                            else if (celda.esTrampaEquipo == equipoLocal.id || esTrampaSeleccionada) {
+                                Image(
+                                    painter = painterResource(
+                                        id = R.drawable.casilla_trampa
+                                    ),
+                                    contentDescription = "Trampa",
                                     modifier = Modifier.Companion
                                         .fillMaxSize()
                                 )
