@@ -899,9 +899,12 @@ public class Servidor extends WebSocketServer {
     private void aceptarAmistad(WebSocket conn, JSONObject obj) {
         GestorNotificaciones gestorNotif = new GestorNotificaciones();
         try {
-            gestorNotif.borrar(obj.getInt("idNotificacion")); // DUDA, ARREGLAR
+            // modificado: no se recibía AMISTAD_ACEPTADA mientras remitente está desconectado
+            //gestorNotif.borrar(obj.getInt("idNotificacion")); DUDA, ARREGLAR
             GestorJugador gestorJugador = new GestorJugador();
             if (gestorJugador.insertarAmistad(obj.getString("remitente"), obj.getString("destinatario"))) {
+               // actualizamos estdo a ACEPTADA en lugar de borrar en la bd
+                gestorNotif.actualizarEstado(obj.getInt("idNotificacion"), Notificacion.ESTADO_ACEPTADA); 
                 System.out.println("Amistad registrada entre " + obj.getString("remitente") + " y "
                         + obj.getString("destinatario"));
                 WebSocket ws = buscarConexion(obj.getString("remitente"));
@@ -910,13 +913,16 @@ public class Servidor extends WebSocketServer {
                     msg.put("tipo", "AMISTAD_ACEPTADA");
                     msg.put("amigo", obj.getString("destinatario"));
                     ws.send(msg.toString());
-                    JSONObject msg2 = new JSONObject();
-                    msg2.put("tipo", "AMISTAD_ACEPTADA");
-                    msg2.put("amigo", obj.getString("remitente"));
-                    conn.send(msg2.toString());
                 }
+                // que la confirmación llegue siempre al remitente esté o no conectado
+                JSONObject msg2 = new JSONObject();
+                msg2.put("tipo", "AMISTAD_ACEPTADA");
+                msg2.put("amigo", obj.getString("remitente"));
+                conn.send(msg2.toString());
             }
         } catch (SQLException e) {
+            System.err.println("Error al aceptar amistad: " + e.getMessage());
+            conn.send(new JSONObject().put("tipo", "ERROR_BD").toString());
         }
     }
 
