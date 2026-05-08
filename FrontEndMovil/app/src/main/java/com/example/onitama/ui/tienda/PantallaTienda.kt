@@ -1,4 +1,4 @@
-package com.example.onitama.ui.notificaciones
+package com.example.onitama.ui.tienda
 
 import android.app.Activity
 import android.content.Intent
@@ -18,12 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,25 +36,28 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.onitama.AutoLogin
 import com.example.onitama.R
-import com.example.onitama.api.Amigos
 import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.activities.cartas.Cartas_activity
-import com.example.onitama.ui.amigos.Amigos_Activity
 import com.example.onitama.ui.perfil.Perfil_Activity
+import com.example.onitama.api.Skin as SkinAPI
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.text.font.FontWeight
 
-/**
- * Pantalla que muestra las notificaciones.
- */
 @Composable
-fun PantallaNotificaciones(
-    viewModel: ViewModelNotificaciones
-) {
+fun PantallaTienda(viewModel: ViewModelTienda = viewModel()) {
+
     val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
     val context = LocalContext.current
     val datosUsuario by AutoLogin.sesion.collectAsState()
-    val listaNotif by viewModel.notificaciones.collectAsState()
 
     Box(
         modifier = Modifier
@@ -77,7 +75,7 @@ fun PantallaNotificaciones(
                 .background(colorResource(id = R.color.azulFondo))
                 .padding(horizontal = 16.dp)
         ) {
-            if(datosUsuario != null) {
+            if (datosUsuario != null) {
                 Log.d("DEBUG", "Imagen: ${datosUsuario?.avatar_id}")
                 val imageResId = context.resources.getIdentifier(
                     datosUsuario?.avatar_id,
@@ -174,52 +172,68 @@ fun PantallaNotificaciones(
         }
 
         // ==========================================
-        // 2. LISTA DE NOTIFICACIONES
+        // 2. LISTA DE SKINS
         // ==========================================
+        val skins by viewModel.skins.collectAsState()
+        val cores by viewModel.cores.collectAsState()
+        val skinActivaId by viewModel.skinActivaId.collectAsState()
+
+        androidx.compose.runtime.LaunchedEffect(datosUsuario) {
+            datosUsuario?.nombre?.let {
+                viewModel.obtenerTiendaSkins(it)
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 130.dp, start = 16.dp, end = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(top = 120.dp, bottom = 63.dp)
+                .padding(horizontal = 24.dp)
         ) {
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Título de la sección
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "TIENDA",
+                    fontSize = 24.sp,
+                    fontFamily = quattrocentoBold,
+                    color = Color.Black
+                )
+            }
 
             Text(
-                text = "Tus Notificaciones",
-                fontFamily = quattrocentoBold,
-                fontSize = 24.sp,
-                color = Color.Black,
-                modifier = Modifier.padding(bottom = 16.dp)
+                text = "Tus cores:  $cores",
+                fontSize = 16.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(top = 4.dp, start = 4.dp)
             )
 
-            if (listaNotif.isEmpty()) {
-                Text(
-                    text = "No tienes notificaciones pendientes",
-                    fontFamily = quattrocentoBold,
-                    fontSize = 16.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(top = 40.dp)
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(listaNotif) { notif ->
-                        NotificacionItem(
-                            notif = notif,
-                            fontFamily = quattrocentoBold,
-                            onAceptar = { viewModel.aceptar(notif, datosUsuario?.nombre ?: "") },
-                            onRechazar = { viewModel.rechazar(notif) }
-                        )
-                    }
+            Spacer(modifier = Modifier.height(20.dp))
+
+            androidx.compose.foundation.lazy.LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(skins.size) { index ->
+                    val skin = skins[index]
+                    SkinCard(
+                        skin = skin,
+                        isActiva = skin.skin_id == skinActivaId,
+                        onBuyClick = {
+                            datosUsuario?.nombre?.let { viewModel.comprarSkin(it, skin.skin_id) }
+                        },
+                        onActivateClick = {
+                            datosUsuario?.nombre?.let { viewModel.activarSkin(it, skin.skin_id) }
+                        }
+                    )
+                }
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
                 }
             }
         }
 
-        // ==========================================
-        // 3. BARRA INFERIOR DE TAREAS
-        // ==========================================
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -238,11 +252,9 @@ fun PantallaNotificaciones(
                 IconButton(
                     onClick = {},
                     modifier = Modifier.size(60.dp)
-                ) {
-                    Image(
-                        painterResource(R.drawable.tablero),
-                        contentDescription = "Skins"
-                    )
+                ){
+                    Image(painterResource(R.drawable.tablero),
+                        contentDescription = "Skins")
                 }
                 IconButton(
                     onClick = {
@@ -253,39 +265,34 @@ fun PantallaNotificaciones(
 
                     modifier = Modifier.size(60.dp)
                 ) {
-                    Image(
-                        painterResource(R.drawable.cards),
-                        contentDescription = "Cards"
-                    )
+                    Image(painterResource(R.drawable.cards),
+                        contentDescription = "Cards")
                 }
 
                 Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
 
                 IconButton(
                     onClick = {
-                        val intent = Intent(context, Amigos_Activity::class.java)
+                        val intent = Intent(context, MenuPrincipalActivity::class.java)
                         context.startActivity(intent)
                         (context as? Activity)?.finish()
                     },
                     modifier = Modifier.size(60.dp)
-                ) {
-                    Image(
-                        painterResource(R.drawable.amigos),
-                        contentDescription = "Amigos"
-                    )
+                ){
+                    Image(painterResource(R.drawable.espadas),
+                        contentDescription = "Jugar")
                 }
                 IconButton(
                     onClick = {},
                     modifier = Modifier.size(60.dp)
                 ) {
                     Image(
-                        painterResource(R.drawable.carrito),
-                        contentDescription = "Tienda"
-                    )
+                        painterResource(R.drawable.amigos),
+                        contentDescription = "Tienda")
                 }
             }
 
-            // Botón central "A JUGAR" sobresaliendo
+            // Botón central "Carrito" sobresaliendo
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -293,17 +300,13 @@ fun PantallaNotificaciones(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 IconButton(
-                    onClick = {
-                        val intent = Intent(context, MenuPrincipalActivity::class.java)
-                        context.startActivity(intent)
-                        (context as? Activity)?.finish()
-                    },
+                    onClick = {},
                     modifier = Modifier.size(70.dp)
                 ) {
-                    Image(painterResource(R.drawable.espadas), contentDescription = "Jugar")
+                    Image(painterResource(R.drawable.carrito), contentDescription = "Amigos")
                 }
                 Text(
-                    text = "¡A JUGAR!",
+                    text = "AMIGOS",
                     fontFamily = quattrocentoBold,
                     fontSize = 12.sp,
                     color = Color.White,
@@ -315,44 +318,166 @@ fun PantallaNotificaciones(
 }
 
 @Composable
-fun NotificacionItem(
-    notif: Amigos.MensajeSolicitudAmistadS,
-    fontFamily: FontFamily,
-    onAceptar: () -> Unit,
-    onRechazar: () -> Unit
+fun SkinCard(
+    skin: SkinAPI.Skin,
+    isActiva: Boolean,
+    onBuyClick: () -> Unit,
+    onActivateClick: () -> Unit
 ) {
-    Column(
+    val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
+    val skinName = getSkinName(skin.skin_id)
+    
+    Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.LightGray.copy(alpha = 0.3f))
-            .padding(16.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Text(
-            text = "${notif.remitente} te ha enviado una solicitud de amistad",
-            fontFamily = fontFamily,
-            fontSize = 16.sp,
-            color = Color.Black
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
         ) {
-            Button(
-                onClick = onAceptar,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = colorResource(id = R.color.azulFondo))
+            // Fila superior: Nombre y Botón
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Aceptar", color = Color.White)
+                Column {
+                    Text(
+                        text = skinName,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = quattrocentoBold,
+                        color = Color.Black
+                    )
+                    Text(
+                        text = "${skin.precio} CORES",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+
+                if (skin.owned) {
+                    if (isActiva) {
+                        Button(
+                            onClick = { },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFE8F5E9),
+                                contentColor = Color(0xFF4CAF50),
+                                disabledContainerColor = Color(0xFFE8F5E9),
+                                disabledContentColor = Color(0xFF4CAF50)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            enabled = false
+                        ) {
+                            Text(text = "Activa")
+                        }
+                    } else {
+                        Button(
+                            onClick = onActivateClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE67E22)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Activar", color = Color.White)
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = onBuyClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE67E22)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Comprar", color = Color.White)
+                    }
+                }
             }
-            Button(
-                onClick = onRechazar,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.7f))
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Fila inferior: Previsualizaciones de equipos
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Rechazar", color = Color.White)
+                TeamPreview(
+                    teamName = "EQUIPO ROJO",
+                    skinId = skin.skin_id,
+                    isRed = true,
+                    modifier = Modifier.weight(1f)
+                )
+                TeamPreview(
+                    teamName = "EQUIPO AZUL",
+                    skinId = skin.skin_id,
+                    isRed = false,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
+    }
+}
+
+@Composable
+fun TeamPreview(
+    teamName: String,
+    skinId: String,
+    isRed: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    
+    // Obtener los IDs de recursos dinámicamente
+    val suffix = skinId.lowercase()
+    val colorPart = if (isRed) "rojo" else "azul"
+    
+    val peonResId = context.resources.getIdentifier("peon${colorPart}$suffix", "drawable", context.packageName)
+    val reyResId = context.resources.getIdentifier("rey${colorPart}$suffix", "drawable", context.packageName)
+    val temploResId = context.resources.getIdentifier("templo${colorPart}$suffix", "drawable", context.packageName)
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFF8F9FA))
+            .padding(8.dp)
+    ) {
+        Column {
+            Text(
+                text = teamName,
+                fontSize = 10.sp,
+                color = Color.Gray,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (peonResId != 0) Image(painterResource(peonResId), null, modifier = Modifier.size(40.dp))
+                if (reyResId != 0) Image(painterResource(reyResId), null, modifier = Modifier.size(50.dp))
+                if (temploResId != 0) {
+                    Image(
+                        painter = painterResource(temploResId), 
+                        contentDescription = null, 
+                        modifier = Modifier.size(40.dp),
+                        alpha = 0.5f
+                    )
+                }
+            }
+        }
+    }
+}
+
+fun getSkinName(skinId: String): String {
+    return when (skinId.lowercase()) {
+        "skin0" -> "Onitama"
+        "skin1" -> "Ajedrez"
+        "skin2" -> "El Clásico"
+        "skin3" -> "Medieval"
+        "skin4" -> "Minimalista"
+        "skin5" -> "Pradera Solar"
+        "skin6" -> "Hechizo de Calabaza"
+        else -> skinId
     }
 }

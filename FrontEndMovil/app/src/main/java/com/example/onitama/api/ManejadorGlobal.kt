@@ -7,8 +7,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -25,6 +28,36 @@ object ManejadorGlobal {
 
     private val _mensajesEntrantes = MutableSharedFlow<JSONObject>(extraBufferCapacity = 10)
     val mensajesEntrantes = _mensajesEntrantes.asSharedFlow()
+
+    private val jsonSerializer = Json {
+        ignoreUnknownKeys = true
+        classDiscriminator = "tipo"
+    }
+
+    private val _notificaciones = MutableStateFlow<List<Amigos.MensajeSolicitudAmistadS>>(emptyList())
+    val notificaciones = _notificaciones.asStateFlow()
+
+    init {
+        CoroutineScope(Dispatchers.IO).launch {
+            mensajesEntrantes.collect { json ->
+                val tipo = json.optString("tipo")
+                if (tipo == "SOLICITUD_AMISTAD") {
+                    try {
+                        val solicitud = jsonSerializer.decodeFromString<Amigos.MensajeSolicitudAmistadS>(json.toString())
+                        if (_notificaciones.value.none { it.idNotificacion == solicitud.idNotificacion }) {
+                            _notificaciones.value = _notificaciones.value + solicitud
+                        }
+                    } catch (e: Exception) {
+                        Log.e("GESTOR_WS", "Error al decodificar solicitud de amistad", e)
+                    }
+                }
+            }
+        }
+    }
+
+    fun eliminarNotificacion(idNotificacion: Int) {
+        _notificaciones.value = _notificaciones.value.filter { it.idNotificacion != idNotificacion }
+    }
 
     // 1. Nueva función para conectar y mantener vivo el socket
     suspend fun conectarYMantener(): Boolean {

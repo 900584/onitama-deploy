@@ -62,6 +62,9 @@
         <activity
             android:name=".ui.notificaciones.Notificaciones_Activity">
         </activity>
+        <activity
+            android:name=".ui.tienda.Tienda_Activity">
+        </activity>
 
     </application>
 </manifest>
