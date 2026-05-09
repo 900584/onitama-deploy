@@ -26,7 +26,7 @@
  *  3. Clic en casilla azul      → ejecutar movimiento y enviar MOVER al servidor
  */
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
@@ -50,6 +50,7 @@ import { calcularMejorMovimientoIA, type Dificultad } from "@/lib/ia";
 import { getBoardStyle, getColorMovimiento, getEquipoNombre, getPiezaSrc, normalizarSkinId } from "@/lib/skins";
 import { CartaAccionFicha, getDescripcionCartaAccion } from "@/lib/cartasAccionVisual";
 import { AvatarCircle } from "@/lib/avatar";
+import TutorialOverlay, { type PasoTutorial } from "@/components/TutorialOverlay";
 import { usarServidor } from "@/api/ws";
 import * as WS from "@/api/ws";
 import {
@@ -137,12 +138,12 @@ function MiniGrid({
                 height: size,
                 ...(esA
                   ? {
-                      background: colorDots,
-                      boxShadow:
-                        colorDots === "#f8fafc"
-                          ? "inset 0 0 0 1px rgba(15,23,42,0.45)"
-                          : undefined,
-                    }
+                    background: colorDots,
+                    boxShadow:
+                      colorDots === "#f8fafc"
+                        ? "inset 0 0 0 1px rgba(15,23,42,0.45)"
+                        : undefined,
+                  }
                   : {}),
               }}
             />
@@ -316,9 +317,8 @@ function Celda({
       {/* Fondo del Templo */}
       {esTrono && equipoTrono && (
         <div
-          className={`absolute inset-0 ${
-            normalizarSkinId(skinActiva) === "Skin1" ? "opacity-75" : "opacity-40"
-          }`}
+          className={`absolute inset-0 ${normalizarSkinId(skinActiva) === "Skin1" ? "opacity-75" : "opacity-40"
+            }`}
         >
           {(() => {
             const skin = normalizarSkinId(skinActiva);
@@ -329,13 +329,13 @@ function Celda({
                   ? "object-contain p-[2px]"
                   : "object-contain p-[1px]";
             return (
-          <Image
-            src={getPiezaSrc("templo", equipoTrono, normalizarSkinId(skinActiva))}
-            alt="Templo"
-            fill
-            sizes="(max-width: 768px) 100vw, 100px"
-            className={templeClass}
-          />
+              <Image
+                src={getPiezaSrc("templo", equipoTrono, normalizarSkinId(skinActiva))}
+                alt="Templo"
+                fill
+                sizes="(max-width: 768px) 100vw, 100px"
+                className={templeClass}
+              />
             );
           })()}
         </div>
@@ -357,11 +357,11 @@ function Celda({
             style={
               normalizarSkinId(skinActiva) === "Skin1"
                 ? {
-                    filter:
-                      ficha.equipo === 1
-                        ? "drop-shadow(0 0 3px rgba(0,0,0,0.95)) drop-shadow(0 0 1px rgba(0,0,0,0.9))"
-                        : "drop-shadow(0 0 4px rgba(255,255,255,0.95)) drop-shadow(0 0 2px rgba(255,255,255,0.9))",
-                  }
+                  filter:
+                    ficha.equipo === 1
+                      ? "drop-shadow(0 0 3px rgba(0,0,0,0.95)) drop-shadow(0 0 1px rgba(0,0,0,0.9))"
+                      : "drop-shadow(0 0 4px rgba(255,255,255,0.95)) drop-shadow(0 0 2px rgba(255,255,255,0.9))",
+                }
                 : undefined
             }
           />
@@ -445,10 +445,12 @@ function PartidaInterna({
   partidaId,
   dificultad,
   modoEntrenamiento,
+  tutorial = false,
 }: {
   partidaId: string;
   dificultad: Dificultad;
   modoEntrenamiento: boolean;
+  tutorial?: boolean;
 }) {
   const router = useRouter();
 
@@ -487,10 +489,55 @@ function PartidaInterna({
 
   const [mounted, setMounted] = useState(false);
   const [tipoPartida, setTipoPartida] = useState<"PUBLICA" | "PRIVADA" | "ENTRENAMIENTO">("ENTRENAMIENTO");
+  const [tutorialActivo, setTutorialActivo] = useState(tutorial);
+
+  // montamos el array de pasos del tutorial in-game.
+  // Lo envuelvo en un useMemo porque si no react se vuelve loco re-renderizando el overlay
+  // y a veces saltaba el paso doble
+  const pasosTutorialJuego = useMemo<PasoTutorial[]>(() => [
+    {
+      targetId: "tutorial-tablero",
+      // Texto explicativo para el usuario
+      titulo: "El Tablero y las Piezas",
+      descripcion: "Este es el campo de batalla de 7x7. Cada jugador controla 1 Maestro (Rey) y 6 estudiantes (peones). Para ganar, debes capturar al Maestro rival o llevar tu Maestro a la casilla inicial del rival (el Trono central de la última fila).",
+      icono: "⛩️", preferencia: "derecha",
+    },
+    {
+      targetId: "tutorial-mis-cartas",
+      titulo: "Tus Movimientos",
+      // El recuadro central
+      descripcion: "A diferencia del ajedrez, tus piezas se mueven según las cartas que tienes. Siempre tienes 2 cartas activas. El patrón azul oscuro muestra los movimientos posibles de cualquier pieza respecto a su posición (el recuadro central azul claro).",
+      icono: "🃏", preferencia: "izquierda",
+    },
+    {
+      targetId: "tutorial-mazo",
+      titulo: "El Mazo (Carta Neutra)",
+      descripcion: "La carta en el mazo central es la 'siguiente carta'. Al usar una de tus cartas para moverte, esa carta se va al mazo y robas la que estaba aquí. ¡Esto significa que las cartas rotan entre los dos jugadores!",
+      icono: "🔄", preferencia: "izquierda",
+    },
+    // Aqui le explicamos que el rival puede ver sus cartas
+    {
+      targetId: "tutorial-oponente",
+      titulo: "Las Cartas del Rival",
+      descripcion: "Tu oponente también tiene 2 cartas visibles. Piensa que al intercambiar cartas a través del Mazo, eventualmente tendrás tú las cartas que él use ahora, y viceversa.",
+      icono: "👀", preferencia: "derecha",
+    },
+    {
+      targetId: "tutorial-timer",
+      titulo: "El Tiempo Corre",
+      descripcion: "En partidas reales hay un tiempo límite por turno. Si llega a cero, el turno pasará al rival automáticamente o la partida se cancelará, según el modo.",
+      icono: "⏱️", preferencia: "derecha",
+    },
+    {
+      targetId: "tutorial-panel-acciones",
+      titulo: "¡Todo Listo!",
+      // Este es el ultimo paso y lo suelta a jugar
+      descripcion: "Este es un bot de Entrenamiento (Principiante). Es tu turno de empezar a jugar. Selecciona una de tus cartas y luego una de tus piezas para moverte. ¡A jugar!",
+      icono: "⚔️", preferencia: "izquierda",
+    }
+  ], []);
+
   const [estado, setEstado] = useState<EstadoJuego>(() => {
-    // Inicialización conservadora. 
-    // Si modoEntrenamiento es true, empezamos JUGANDO.
-    // Si no, asumimos que habrá fase de trampas (COLOCAR_TRAMPA) hasta que se carguen los datos.
     const est = crearEstadoInicial();
     est.fasePartida = modoEntrenamiento ? "JUGANDO" : "COLOCAR_TRAMPA";
     est.cartasJugador = [TODAS_LAS_CARTAS[0], TODAS_LAS_CARTAS[1]];
@@ -668,9 +715,9 @@ function PartidaInterna({
         const marcar = (carta: CartaAccionJuego | null): CartaAccionJuego | null =>
           carta
             ? {
-                ...carta,
-                estado: carta.nombre === cartaNombre ? "ACTIVA" : "NO_USABLE",
-              }
+              ...carta,
+              estado: carta.nombre === cartaNombre ? "ACTIVA" : "NO_USABLE",
+            }
             : null;
         return {
           cartaAccionPropia: marcar(base.cartaAccionPropia),
@@ -686,7 +733,7 @@ function PartidaInterna({
             : null;
       // 1º accionForzada (servidor o click), 2º carta coincidente por nombre; no usar el nombre como acción
       const c = (accionForzada || metaPorNombre?.accion || "").toUpperCase();
-      
+
       if (c === "REVIVIR") {
         if (y >= 0 && x >= 0) {
           nuevoTablero[y][x].ficha = { equipo: equipoEjecutor as 1 | 2, esRey: false };
@@ -758,43 +805,43 @@ function PartidaInterna({
           }
         }
       } else if (c === "CEGAR") {
-          // Brujería: el equipo que jugó la carta queda "opaco" para el rival durante toda la partida
-          // equipoCiego almacena el equipo CUYAS cartas están ocultas (el ejecutor)
-          return {
-            ...base,
-            ...limpiezaTurno,
-            equipoCiego: equipoEjecutor as 1 | 2,
-            ...accionesTrasUso(),
-          };
+        // Brujería: el equipo que jugó la carta queda "opaco" para el rival durante toda la partida
+        // equipoCiego almacena el equipo CUYAS cartas están ocultas (el ejecutor)
+        return {
+          ...base,
+          ...limpiezaTurno,
+          equipoCiego: equipoEjecutor as 1 | 2,
+          ...accionesTrasUso(),
+        };
       } else if (c === "ESPEJO") {
-          const invertir = (cartas: CartaMovDef[]) =>
-            cartas.map((ca) => ({
-              ...ca,
-              movimientos: (ca.movimientos || []).map((m) => ({ dc: -m.dc, df: m.df })),
-            }));
-          return {
-            ...base,
-            ...limpiezaTurno,
-            cartasJugador: invertir(base.cartasJugador),
-            cartasOponente: invertir(base.cartasOponente),
-            cartasSiguientes: invertir(base.cartasSiguientes),
-            espejoActivadoPor: equipoEjecutor as EquipoID,
-            ...accionesTrasUso(),
-          };
+        const invertir = (cartas: CartaMovDef[]) =>
+          cartas.map((ca) => ({
+            ...ca,
+            movimientos: (ca.movimientos || []).map((m) => ({ dc: -m.dc, df: m.df })),
+          }));
+        return {
+          ...base,
+          ...limpiezaTurno,
+          cartasJugador: invertir(base.cartasJugador),
+          cartasOponente: invertir(base.cartasOponente),
+          cartasSiguientes: invertir(base.cartasSiguientes),
+          espejoActivadoPor: equipoEjecutor as EquipoID,
+          ...accionesTrasUso(),
+        };
       } else if (c === "SOLO_PARA_ADELANTE") {
-          return {
-            ...base,
-            ...limpiezaTurno,
-            restriccionSolo: activarRestriccionSolo(equipoEjecutor as EquipoID, "SOLO_PARA_ADELANTE"),
-            ...accionesTrasUso(),
-          };
+        return {
+          ...base,
+          ...limpiezaTurno,
+          restriccionSolo: activarRestriccionSolo(equipoEjecutor as EquipoID, "SOLO_PARA_ADELANTE"),
+          ...accionesTrasUso(),
+        };
       } else if (c === "SOLO_PARA_ATRAS") {
-          return {
-            ...base,
-            ...limpiezaTurno,
-            restriccionSolo: activarRestriccionSolo(equipoEjecutor as EquipoID, "SOLO_PARA_ATRAS"),
-            ...accionesTrasUso(),
-          };
+        return {
+          ...base,
+          ...limpiezaTurno,
+          restriccionSolo: activarRestriccionSolo(equipoEjecutor as EquipoID, "SOLO_PARA_ATRAS"),
+          ...accionesTrasUso(),
+        };
       }
 
       return {
@@ -898,7 +945,7 @@ function PartidaInterna({
 
         case "MOVER": {
           const m = msg as RespuestaMover & { trampa_activada?: boolean; equipo?: number };
-          
+
           // Si el movimiento es de nuestro propio equipo, es el servidor confirmando nuestra predicción optimista.
           if (m.equipo === equipoJugadorRef.current) {
             setEstado((prev) => {
@@ -1030,9 +1077,9 @@ function PartidaInterna({
         case "SELECCIONE_CARTA_ACCION": {
           const res = msg as RespuestaSeleccioneCartaAccion;
           setEstado((prev) => ({
-             ...prev,
-             fasePartida: "ELEGIR_CARTA_ACCION",
-             opcionesCartasAccion: res.cartas_accion
+            ...prev,
+            fasePartida: "ELEGIR_CARTA_ACCION",
+            opcionesCartasAccion: res.cartas_accion
           }));
           break;
         }
@@ -1205,7 +1252,7 @@ function PartidaInterna({
         // Ya he puesto mi trampa localmente, ignoro clicks (estoy esperando al rival)
         return;
       }
-      
+
       // El jugador clickea para enviar su trampa
       enviarPonerTrampa(miEquipoActual, fila, col);
       // Asume éxito momentáneamente dibujando la trampa
@@ -1263,13 +1310,13 @@ function PartidaInterna({
           x: col, y: fila, x_op: -1, y_op: -1, cartaRobar: "ninguna"
         });
         aplicarCartaAccionLocal(miEquipoActual, cartaAccionModo.nombre, col, fila, -1, -1, "ninguna", m);
-        setEstado(curr => ({...curr, modoAccion: null, accionParams: {}, cartaAccionParaModo: null}));
+        setEstado(curr => ({ ...curr, modoAccion: null, accionParams: {}, cartaAccionParaModo: null }));
         return;
       } else if (m === "SACRIFICIO_PROPIO") {
         if (!celda.ficha || celda.ficha.equipo !== miEquipo || celda.ficha.esRey) {
           showMsgInGame("Debes seleccionar un PEÓN PROPIO para sacrificar."); return;
         }
-        setEstado(curr => ({...curr, modoAccion: "SACRIFICIO_RIVAL", accionParams: { ...p, x: col, y: fila }}));
+        setEstado(curr => ({ ...curr, modoAccion: "SACRIFICIO_RIVAL", accionParams: { ...p, x: col, y: fila } }));
         return;
       } else if (m === "SACRIFICIO_RIVAL") {
         if (!celda.ficha || celda.ficha.equipo === miEquipo || celda.ficha.esRey) {
@@ -1282,7 +1329,7 @@ function PartidaInterna({
           x: p.x!, y: p.y!, x_op: col, y_op: fila, cartaRobar: "ninguna"
         });
         aplicarCartaAccionLocal(miEquipoActual, cartaAccionModo.nombre, p.x!, p.y!, col, fila, "ninguna", "SACRIFICIO");
-        setEstado(curr => ({...curr, modoAccion: null, accionParams: {}, cartaAccionParaModo: null}));
+        setEstado(curr => ({ ...curr, modoAccion: null, accionParams: {}, cartaAccionParaModo: null }));
         return;
       } else if (m === "ROBAR") {
         showMsgInGame("Debes hacer click en la carta del rival para robársela.");
@@ -1332,13 +1379,13 @@ function PartidaInterna({
     if (celda.ficha?.equipo === miEquipo) {
       const movimientosValidos = estado.cartaSeleccionada
         ? calcularMovimientosValidos(
-            estado.tablero,
-            fila,
-            col,
-            estado.cartaSeleccionada,
-            miEquipo,
-            estado.restriccionSolo
-          )
+          estado.tablero,
+          fila,
+          col,
+          estado.cartaSeleccionada,
+          miEquipo,
+          estado.restriccionSolo
+        )
         : [];
       setEstado((prev) => ({ ...prev, fichaSeleccionada: { fila, col }, movimientosValidos }));
       return;
@@ -1464,27 +1511,27 @@ function PartidaInterna({
       ? "RIVAL ABANDONO"
       : razonFin === "TIEMPO_AGOTADO"
         ? "TE QUEDASTE SIN TIEMPO"
-      : razonFin === "TRONO"
-        ? "LLEGASTE AL TEMPLO RIVAL"
-        : razonFin === "REY_CAPTURADO"
-          ? "CAPTURASTE EL REY RIVAL"
-          : "FIN DE PARTIDA";
+        : razonFin === "TRONO"
+          ? "LLEGASTE AL TEMPLO RIVAL"
+          : razonFin === "REY_CAPTURADO"
+            ? "CAPTURASTE EL REY RIVAL"
+            : "FIN DE PARTIDA";
   const nombreOponente = infoOponenteUI.nombre;
   const descripcionFin = esVictoria
     ? razonFin === "ABANDONO"
       ? "Tu rival ha abandonado la partida."
       : razonFin === "TIEMPO_AGOTADO"
         ? "Ganaste porque tu rival superó el tiempo límite."
-      : razonFin === "TRONO"
-        ? "Has ganado por victoria de templo."
-        : razonFin === "REY_CAPTURADO"
-          ? "Has ganado capturando al rey rival."
-          : "¡Excelente partida! Has dominado el tablero."
+        : razonFin === "TRONO"
+          ? "Has ganado por victoria de templo."
+          : razonFin === "REY_CAPTURADO"
+            ? "Has ganado capturando al rey rival."
+            : "¡Excelente partida! Has dominado el tablero."
     : razonFin === "ABANDONO"
       ? "Has abandonado la partida."
       : razonFin === "TIEMPO_AGOTADO"
         ? "Te has tomado demasiado tiempo para pensar."
-      : `@${nombreOponente} ha ganado esta vez.`;
+        : `@${nombreOponente} ha ganado esta vez.`;
   const equipoOponente: EquipoID = miEquipoActual === 1 ? 2 : 1;
   const ultimoMovJugador =
     [...historialMovimientos].reverse().find((m) => m.equipo === miEquipoActual) ?? null;
@@ -1511,6 +1558,7 @@ function PartidaInterna({
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#111d2c" }}>
+      <TutorialOverlay pasos={pasosTutorialJuego} activo={tutorialActivo} onFinish={() => setTutorialActivo(false)} />
 
       {/* ═══ HEADER ════════════════════════════════════════════════════════ */}
       <header className="bg-[#1a2d4a] px-5 py-2 flex items-center justify-between shrink-0 shadow-lg">
@@ -1531,10 +1579,10 @@ function PartidaInterna({
             </span>
           </div>
           <div className="w-8 h-8 rounded-full bg-[#2a4a6a] border-2 border-white/30 overflow-hidden">
-            <AvatarCircle 
-              nombre={mounted ? jugadorActual.nombre : "..."} 
-              avatarId={mounted ? jugadorActual.avatar_id : null} 
-              sizeClass="w-full h-full" textClass="text-xs" 
+            <AvatarCircle
+              nombre={mounted ? jugadorActual.nombre : "..."}
+              avatarId={mounted ? jugadorActual.avatar_id : null}
+              sizeClass="w-full h-full" textClass="text-xs"
             />
           </div>
         </div>
@@ -1726,7 +1774,7 @@ function PartidaInterna({
         {/* ─── PANEL IZQUIERDO: oponente ──────────────────────────────────── */}
         {/* El oponente siempre es el equipo contrario al jugador local */}
         {/* Equipo 1 = Azul, Equipo 2 = Rojo */}
-        <aside className="w-64 shrink-0 flex flex-col gap-3 px-3 pt-3 pb-2 bg-[#162235] border-r border-white/10 overflow-hidden min-h-0">
+        <aside id="tutorial-oponente" className="w-64 shrink-0 flex flex-col gap-3 px-3 pt-3 pb-2 bg-[#162235] border-r border-white/10 overflow-hidden min-h-0">
           <div className="flex flex-col items-center gap-1">
             <div className={`${!esModoServidor && nombreOponente.startsWith("Iron Bot") ? "w-16 h-16" : "w-11 h-11"} rounded-full overflow-hidden shrink-0 ${!esModoServidor && nombreOponente.startsWith("Iron Bot")
               ? "bg-transparent border-0"
@@ -1805,7 +1853,7 @@ function PartidaInterna({
 
           <div className="flex-1 min-h-2" />
 
-          <div className="flex flex-col items-center gap-1 shrink-0">
+          <div id="tutorial-timer" className="flex flex-col items-center gap-1 shrink-0">
             <p className={`text-center text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${!aguardandoInicio && estado.turnoActual !== miEquipoActual && !hayFinPartida
               ? miEquipoActual === 2
                 ? "text-blue-300 bg-blue-900/30 animate-pulse"
@@ -1826,8 +1874,8 @@ function PartidaInterna({
         </aside>
 
         {/* ─── CENTRO: tablero + cola de cartas ───────────────────────────── */}
-        <main className="flex-1 bg-[#dbeafe] flex flex-col items-center justify-center gap-2 px-3 min-h-0 min-w-0 overflow-hidden">
-          
+        <main id="tutorial-tablero" className="flex-1 bg-[#dbeafe] flex flex-col items-center justify-center gap-2 px-3 min-h-0 min-w-0 overflow-hidden">
+
           {estado.modoAccion && (
             <div className="bg-yellow-100 border-2 border-yellow-400 text-yellow-800 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest animate-bounce shadow-md">
               {estado.modoAccion === "REVIVIR" && "✨ Selecciona una casilla vacía en tu mitad del campo para colocar un peón"}
@@ -1839,91 +1887,91 @@ function PartidaInterna({
           )}
 
           <div className="relative shrink-0" style={{ width: "min(min(52vh, 440px), calc(100vw - 520px))", aspectRatio: "1" }}>
-          <div
-            className="grid border-2 border-[#1a2d4a]/30 shadow-2xl bg-white w-full h-full"
-            style={{
-              gridTemplateColumns: `repeat(${DIM}, 1fr)`,
-            }}
-          >
-            {/*
+            <div
+              className="grid border-2 border-[#1a2d4a]/30 shadow-2xl bg-white w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${DIM}, 1fr)`,
+              }}
+            >
+              {/*
               Cada jugador ve siempre sus piezas abajo y las del rival arriba.
               Para equipo 1: rotación 180° completa (filas Y columnas invertidas).
               Esto es necesario porque calcularMovimientosValidos usa signo=-1 que
               espeja ambos ejes; sin invertir columnas los movimientos válidos aparecerían
               en el lado contrario al que muestra el MiniGrid de la carta.
             */}
-            {Array.from({ length: DIM }, (_, filaVisual) => {
-              const fila = miEquipoActual === 1 ? (DIM - 1 - filaVisual) : filaVisual;
-              return Array.from({ length: DIM }, (_, colVisual) => {
-                const col = miEquipoActual === 1 ? (DIM - 1 - colVisual) : colVisual;
-                const celda = estado.tablero[fila][col];
-                const esSel = estado.fichaSeleccionada?.fila === fila && estado.fichaSeleccionada?.col === col;
-                const esValido = estado.movimientosValidos.some((m) => m.fila === fila && m.col === col);
-                const esUlt =
-                  !!estado.ultimoMovimiento &&
-                  ((estado.ultimoMovimiento.origen.fila === fila && estado.ultimoMovimiento.origen.col === col) ||
-                    (estado.ultimoMovimiento.destino.fila === fila && estado.ultimoMovimiento.destino.col === col));
-                const esBlanca = (fila + col) % 2 === 0;
-                const baseClase =
-                  boardStyle === "ajedrez"
-                    ? (esBlanca ? "bg-[#3a3a3a] hover:bg-[#4a4a4a]" : "bg-[#c8c5c1] hover:bg-[#b8b5b1]")
-                    : boardStyle === "clasico-futbol"
-                      ? "bg-emerald-700/90 hover:bg-emerald-600/90"
-                      : "bg-gray-100 hover:bg-gray-200";
-                const bordeClase = boardStyle === "clasico-futbol" ? "border-white/35" : "border-gray-300";
-                
-                const enMiMitadCelda = miEquipoActual === 1 ? fila <= 3 : fila >= 3;
-                let esZonaAcc = false;
-                let esObjAcc = false;
-                if (estado.modoAccion === "REVIVIR") {
+              {Array.from({ length: DIM }, (_, filaVisual) => {
+                const fila = miEquipoActual === 1 ? (DIM - 1 - filaVisual) : filaVisual;
+                return Array.from({ length: DIM }, (_, colVisual) => {
+                  const col = miEquipoActual === 1 ? (DIM - 1 - colVisual) : colVisual;
+                  const celda = estado.tablero[fila][col];
+                  const esSel = estado.fichaSeleccionada?.fila === fila && estado.fichaSeleccionada?.col === col;
+                  const esValido = estado.movimientosValidos.some((m) => m.fila === fila && m.col === col);
+                  const esUlt =
+                    !!estado.ultimoMovimiento &&
+                    ((estado.ultimoMovimiento.origen.fila === fila && estado.ultimoMovimiento.origen.col === col) ||
+                      (estado.ultimoMovimiento.destino.fila === fila && estado.ultimoMovimiento.destino.col === col));
+                  const esBlanca = (fila + col) % 2 === 0;
+                  const baseClase =
+                    boardStyle === "ajedrez"
+                      ? (esBlanca ? "bg-[#3a3a3a] hover:bg-[#4a4a4a]" : "bg-[#c8c5c1] hover:bg-[#b8b5b1]")
+                      : boardStyle === "clasico-futbol"
+                        ? "bg-emerald-700/90 hover:bg-emerald-600/90"
+                        : "bg-gray-100 hover:bg-gray-200";
+                  const bordeClase = boardStyle === "clasico-futbol" ? "border-white/35" : "border-gray-300";
+
+                  const enMiMitadCelda = miEquipoActual === 1 ? fila <= 3 : fila >= 3;
+                  let esZonaAcc = false;
+                  let esObjAcc = false;
+                  if (estado.modoAccion === "REVIVIR") {
                     esZonaAcc = enMiMitadCelda && !celda.ficha;
-                } else if (estado.modoAccion === "SALVAR_REY") {
+                  } else if (estado.modoAccion === "SALVAR_REY") {
                     esZonaAcc = enMiMitadCelda && !celda.ficha;
-                } else if (estado.modoAccion === "SACRIFICIO_PROPIO") {
+                  } else if (estado.modoAccion === "SACRIFICIO_PROPIO") {
                     esZonaAcc = celda.ficha?.equipo === miEquipoActual && !celda.ficha?.esRey;
-                } else if (estado.modoAccion === "SACRIFICIO_RIVAL") {
+                  } else if (estado.modoAccion === "SACRIFICIO_RIVAL") {
                     esObjAcc = celda.ficha?.equipo !== miEquipoActual && !!celda.ficha && !celda.ficha.esRey;
                     // Resaltar el peón que vamos a sacrificar para recordarlo
                     esZonaAcc = estado.accionParams?.x === col && estado.accionParams?.y === fila;
-                }
+                  }
 
-                return (
-                  <Celda
-                    key={`${fila}-${col}`}
-                    ficha={celda.ficha}
-                    esTrono={celda.esTrono}
-                    equipoTrono={celda.esTrono ? (fila === 0 ? 1 : 2) : null}
-                    esSeleccionada={esSel}
-                    esMovimientoValido={esValido}
-                    esUltimoMov={esUlt && !esSel && !esValido}
-                    esZonaAccion={esZonaAcc}
-                    esObjetivoAccion={esObjAcc}
-                    onClick={() => handleCelda(fila, col)}
-                    skinActiva={skinActiva}
-                    baseClase={baseClase}
-                    bordeClase={bordeClase}
-                    esTrampaEquipo={celda.esTrampaEquipo ?? null}
-                    miEquipoActual={miEquipoActual}
-                  />
-                );
-              });
-            })}
-          </div>
-          {boardStyle === "clasico-futbol" && (
-            <svg
-              className="pointer-events-none absolute inset-0"
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              aria-hidden
-            >
-              <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.62)" strokeWidth="0.8" />
-              <circle cx="50" cy="50" r="9" fill="none" stroke="rgba(255,255,255,0.62)" strokeWidth="0.8" />
-              <circle cx="50" cy="50" r="0.9" fill="rgba(255,255,255,0.8)" />
-            </svg>
-          )}
+                  return (
+                    <Celda
+                      key={`${fila}-${col}`}
+                      ficha={celda.ficha}
+                      esTrono={celda.esTrono}
+                      equipoTrono={celda.esTrono ? (fila === 0 ? 1 : 2) : null}
+                      esSeleccionada={esSel}
+                      esMovimientoValido={esValido}
+                      esUltimoMov={esUlt && !esSel && !esValido}
+                      esZonaAccion={esZonaAcc}
+                      esObjetivoAccion={esObjAcc}
+                      onClick={() => handleCelda(fila, col)}
+                      skinActiva={skinActiva}
+                      baseClase={baseClase}
+                      bordeClase={bordeClase}
+                      esTrampaEquipo={celda.esTrampaEquipo ?? null}
+                      miEquipoActual={miEquipoActual}
+                    />
+                  );
+                });
+              })}
+            </div>
+            {boardStyle === "clasico-futbol" && (
+              <svg
+                className="pointer-events-none absolute inset-0"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                aria-hidden
+              >
+                <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.62)" strokeWidth="0.8" />
+                <circle cx="50" cy="50" r="9" fill="none" stroke="rgba(255,255,255,0.62)" strokeWidth="0.8" />
+                <circle cx="50" cy="50" r="0.9" fill="rgba(255,255,255,0.8)" />
+              </svg>
+            )}
           </div>
 
-          <div className="flex items-center justify-center gap-2 shrink-0">
+          <div id="tutorial-mazo" className="flex items-center justify-center gap-2 shrink-0">
             <p className="text-[#1a2d4a]/70 font-bold text-[9px] uppercase tracking-widest shrink-0">Mazo:</p>
             {estado.cartasSiguientes.filter(Boolean).map((carta, i) => {
               // Color según el equipo que recibirá esa carta al salir de la cola.
@@ -1946,7 +1994,7 @@ function PartidaInterna({
         </main>
 
         {/* ─── PANEL DERECHO: acciones del jugador ────────────────────────── */}
-        <aside className="w-64 shrink-0 flex flex-col min-h-0 gap-2 px-3 pt-3 pb-3 bg-[#162235] border-l border-white/10 overflow-hidden">
+        <aside id="tutorial-panel-acciones" className="w-64 shrink-0 flex flex-col min-h-0 gap-2 px-3 pt-3 pb-3 bg-[#162235] border-l border-white/10 overflow-hidden">
           {/* Botón ABANDONAR (reemplaza PAUSAR) */}
           <button
             type="button"
@@ -1975,7 +2023,7 @@ function PartidaInterna({
 
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 pr-0.5">
             {/* Cartas de movimiento — arriba */}
-            <div className="flex flex-col gap-1 shrink-0">
+            <div id="tutorial-mis-cartas" className="flex flex-col gap-1 shrink-0">
               {estado.cartasJugador.length > 2 && esTurnoJugador ? (
                 <p className="text-yellow-300 text-[9px] uppercase tracking-widest text-center font-bold animate-pulse">
                   🃏 3 cartas — ¡elige con cuál mover!
@@ -2001,7 +2049,7 @@ function PartidaInterna({
 
             {/* Cartas de acción */}
             {(estado.cartaAccionPropia || estado.cartaAccionRival) && (
-              <div className="flex flex-col gap-1.5 shrink-0 pb-1">
+              <div id="tutorial-mis-poderes" className="flex flex-col gap-1.5 shrink-0 pb-1">
                 <p className="text-white/80 text-[9px] uppercase tracking-widest text-center font-bold">
                   Cartas de acción
                 </p>
@@ -2111,14 +2159,14 @@ function PartidaInterna({
 
       {/* ═══ MENSAJE DE FASE COLOCAR TRAMPA ════════════════════════════════════════ */}
       {estado.fasePartida === "COLOCAR_TRAMPA" && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-red-800/90 py-2 border border-red-500 rounded-full px-6 text-white font-bold text-sm tracking-widest shadow-xl flex items-center gap-2 z-10 animate-bounce">
-              <span>⚠️</span>
-              <span>
-                {estado.tablero.some(f => f.some(c => c.esTrampaEquipo === miEquipoActual)) 
-                  ? "Esperando a que el rival coloque su trampa..."
-                  : "Coloca tu Casilla Trampa en el Tablero"}
-              </span>
-          </div>
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-red-800/90 py-2 border border-red-500 rounded-full px-6 text-white font-bold text-sm tracking-widest shadow-xl flex items-center gap-2 z-10 animate-bounce">
+          <span>⚠️</span>
+          <span>
+            {estado.tablero.some(f => f.some(c => c.esTrampaEquipo === miEquipoActual))
+              ? "Esperando a que el rival coloque su trampa..."
+              : "Coloca tu Casilla Trampa en el Tablero"}
+          </span>
+        </div>
       )}
 
       {/* ═══ TOAST IN-GAME (reemplaza alert del navegador) ══════════════════════════ */}
@@ -2173,7 +2221,7 @@ function PartidaInterna({
               ))}
             </div>
             {estado.opcionesCartasAccion.length === 0 && (
-                <p className="text-white/60 text-sm animate-pulse">Esperando al rival...</p>
+              <p className="text-white/60 text-sm animate-pulse">Esperando al rival...</p>
             )}
           </div>
         </div>
@@ -2192,11 +2240,13 @@ function PartidaConParams() {
   const dificultad: Dificultad = (["facil", "medio", "dificil"] as const).includes(dificultadParam as Dificultad)
     ? (dificultadParam as Dificultad)
     : "medio";
+  const tutorial = searchParams.get("tutorial") === "true";
   return (
     <PartidaInterna
       partidaId={partidaId}
       dificultad={dificultad}
       modoEntrenamiento={modoEntrenamiento}
+      tutorial={tutorial}
     />
   );
 }

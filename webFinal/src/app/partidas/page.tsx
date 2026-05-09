@@ -13,7 +13,7 @@
  * como con las que llegan en tiempo real por WebSocket.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { obtenerJugadorActivo, guardarSesion, cerrarSesion, type DatosSesion } from "@/lib/sesion";
@@ -54,6 +54,7 @@ import { getSkinNombre, getPiezaSrc, getSkinPrecio, normalizarSkinId, type SkinI
 import { getImagenCarta, TODAS_LAS_CARTAS, type CartaMovDef } from "@/lib/cartas";
 import { getAvatarSrc, AvatarCircle } from "@/lib/avatar";
 import { validarContrasena, HINT_CONTRASENA } from "@/lib/validacion";
+import TutorialOverlay, { type PasoTutorial } from "@/components/TutorialOverlay";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -119,6 +120,8 @@ const NIVELES_DIFICULTAD = [
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
+const TUTORIAL_LS_KEY = "onitama_tutorial_completado";
+
 export default function PartidasPage() {
   const router = useRouter();
   const [jugador, setJugador] = useState<DatosSesion>(obtenerJugadorActivo);
@@ -133,6 +136,10 @@ export default function PartidasPage() {
   const [mounted, setMounted] = useState(false);
   const [tiempoEsperaPrivada, setTiempoEsperaPrivada] = useState(120);
   const [tiempoEsperaReanudar, setTiempoEsperaReanudar] = useState(120);
+
+  // ── Tutorial ─────────────────────────────────────────────────────────────────
+  const [tutorialActivo, setTutorialActivo] = useState(false);
+  const [mostrarModalTutorial, setMostrarModalTutorial] = useState(false);
 
   // ── Reanudar partida pausada ─────────────────────────────────────────────────
   /** Solicitud de reanudar entrante desde el amigo */
@@ -198,6 +205,20 @@ export default function PartidasPage() {
 
 
   // ── Efectos ─────────────────────────────────────────────────────────────────
+
+  /** Mostrar modal de bienvenida al tutorial si es la primera visita. */
+  useEffect(() => {
+    try {
+      const completado = localStorage.getItem(TUTORIAL_LS_KEY);
+      if (!completado) {
+        // Pequeño delay para que la pantalla cargue antes de mostrar el modal
+        const t = setTimeout(() => setMostrarModalTutorial(true), 1200);
+        return () => clearTimeout(t);
+      }
+    } catch {
+      // localStorage no disponible (modo privado, etc.)
+    }
+  }, []);
 
   /** Cargar notificaciones del sessionStorage y suscribirse a nuevas por WS. */
   useEffect(() => {
@@ -316,7 +337,7 @@ export default function PartidasPage() {
       .then((res) => {
         setCartas(res.cartas);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setCargandoCartas(false));
 
     setCargandoCartasAccion(true);
@@ -324,7 +345,7 @@ export default function PartidasPage() {
       .then((res) => {
         setCartasAccion(res.cartas);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setCargandoCartasAccion(false));
   }, [panelActivo]);
 
@@ -695,6 +716,202 @@ export default function PartidasPage() {
     await confirmarUsarSkin(actual.skinId);
   }, [confirmacionSkin, confirmarComprarSkin, confirmarUsarSkin]);
 
+  // ── Handlers tutorial ────────────────────────────────────────────────────────
+
+  const handleIniciarTutorial = useCallback(() => {
+    setMostrarModalTutorial(false);
+    setPanelActivo(null);
+    setTutorialActivo(true);
+  }, []);
+
+  const handleFinalizarTutorial = useCallback((completado?: boolean) => {
+    setTutorialActivo(false);
+    setPanelActivo(null);
+    try { localStorage.setItem(TUTORIAL_LS_KEY, "1"); } catch { /* ignorar */ }
+    if (completado) {
+      router.push("/partida?modo=entrenamiento&dificultad=Principiante&tutorial=true");
+    }
+  }, [router]);
+
+  // Array con todos los pasos explicativos del menú.
+  // CUIDADO: en algunos pasos meto un setTimeout con promesa (el await new Promise) 
+  // porque si el panel lateral no le da tiempo a abrirse en el DOM, el targetId no existe 
+  // y el tutorial peta por debajo dejando la pantalla congelada. 
+  const pasosTutorial = useMemo<PasoTutorial[]>(() => [
+    // ── Pantalla principal ─────────────────────────────────────────────────
+    {
+      targetId: "tutorial-header-info",
+      titulo: "Tu perfil y recursos",
+      descripcion: "Tu identidad en Onitama. El avatar te representa. Las Katanas son tu puntuación de ranking: suben al ganar partidas públicas y bajan al perder. Los Cores son la moneda premium para comprar skins en la Tienda.",
+      icono: "👤", preferencia: "abajo",
+      antesDeIr: () => setPanelActivo(null),
+    },
+    {
+      targetId: "tutorial-btn-tutorial",
+      titulo: "Botón de ayuda (?)",
+      descripcion: "Si en cualquier momento necesitas repasar algo, pulsa este botón para volver a lanzar este tutorial desde el principio. Siempre estará visible en el encabezado.",
+      icono: "❓", preferencia: "abajo",
+      antesDeIr: () => setPanelActivo(null),
+    },
+    {
+      targetId: "tutorial-btn-logout",
+      titulo: "Cerrar sesión",
+      descripcion: "Cuando termines de jugar usa este botón. Se cerrará la conexión con el servidor de forma segura y volverás a la pantalla de inicio de sesión.",
+      icono: "🚪", preferencia: "abajo",
+      antesDeIr: () => setPanelActivo(null),
+    },
+    {
+      targetId: "tutorial-btn-jugar",
+      titulo: "¡A jugar! — Inicio",
+      descripcion: "El botón de regreso al menú principal. Desde cualquier panel del menú lateral (cartas, amigos, tienda…) pulsa aquí para volver a esta pantalla con las tres modalidades de partida.",
+      icono: "⚔️", preferencia: "derecha",
+      antesDeIr: () => setPanelActivo(null),
+    },
+    {
+      targetId: "tutorial-tarjeta-publica",
+      titulo: "Partida Pública",
+      descripcion: "El matchmaking global. El sistema busca un rival de nivel similar y os conecta automáticamente. Las partidas públicas afectan a tu ranking (±Katanas) e incluyen trampas ocultas en el tablero y cartas de acción (poderes especiales).",
+      icono: "🌐", preferencia: "abajo",
+      antesDeIr: () => setPanelActivo(null),
+    },
+    {
+      targetId: "tutorial-tarjeta-entrenamiento",
+      titulo: "Partida Entrenamiento",
+      descripcion: "Juega contra Iron Bot, la IA del juego. Tiene tres niveles: Principiante (bueno para aprender), Guerrero (desafío real) y Maestro (muy difícil). El entrenamiento NO afecta al ranking y NO incluye trampas ni cartas de acción.",
+      icono: "🤖", preferencia: "abajo",
+      antesDeIr: () => setPanelActivo(null),
+    },
+    {
+      targetId: "tutorial-tarjeta-privada",
+      titulo: "Partida Privada",
+      descripcion: "Reta a un amigo de tu lista. Le llegará una invitación y cuando la acepte la partida arrancará. También puedes reanudar partidas privadas pausadas desde la pestaña «Reanudar» del mismo modal.",
+      icono: "🤝", preferencia: "abajo",
+      antesDeIr: () => setPanelActivo(null),
+    },
+    // ── Mis Cartas (sidebar — siempre visible, sin cerrar panel) ───────────
+    {
+      targetId: "tutorial-menu-cartas",
+      titulo: "Mis Cartas",
+      descripcion: "Tu colección de cartas. Hay dos tipos: las de Movimiento definen cómo pueden moverse tus piezas cada turno, y las de Acción son poderes especiales de un solo uso por partida que pueden cambiar el rumbo del juego.",
+      icono: "🃏", preferencia: "derecha",
+      // Sin antesDeIr: el sidebar siempre es visible, no necesitamos cerrar el panel actual
+    },
+    {
+      targetId: "tutorial-panel-cartas",
+      titulo: "Cartas de Movimiento",
+      descripcion: "La pestaña «Movimientos» muestra las cartas que determinan los saltos posibles de tus piezas. Cada carta tiene un patrón de casillas en las que puedes mover. Haz clic en cualquier carta para ver su descripción completa, el diagrama de movimiento y los Katanas necesarios para desbloquearla.",
+      icono: "🃏", preferencia: "izquierda",
+      antesDeIr: () => setPanelActivo("cartas"),
+      esperaMs: 600,
+    },
+    {
+      targetId: "tutorial-panel-cartas",
+      titulo: "Cartas de Acción (Poderes)",
+      descripcion: "Pulsa la pestaña «Poderes» para ver las cartas de acción. Cada una tiene un efecto especial: revivir un peón, mover al rey a una casilla segura, cegar al rival para que no vea tus cartas, sacrificar piezas, robar una carta del rival… Se usan una sola vez por partida.",
+      icono: "✨", preferencia: "izquierda",
+      antesDeIr: async () => {
+        setPanelActivo("cartas");
+        await new Promise(r => setTimeout(r, 100));
+        const tabs = document.querySelectorAll('button');
+        const tabPoderes = Array.from(tabs).find(b => b.textContent?.includes('Poderes'));
+        if (tabPoderes) (tabPoderes as HTMLElement).click();
+      },
+      esperaMs: 300,
+    },
+    // ── Mis Tableros (sin cerrar panel) ───────────────────────────────────
+    {
+      targetId: "tutorial-menu-tableros",
+      titulo: "Mis Tableros",
+      descripcion: "Tu colección de skins visuales. Cada skin cambia la apariencia de tus piezas (maestro y peones) en el tablero. Puramente estético: no afecta al juego.",
+      icono: "🎨", preferencia: "derecha",
+    },
+    {
+      targetId: "tutorial-panel-tableros",
+      titulo: "Panel — Skins de piezas",
+      descripcion: "Visualiza las skins que tienes. La marcada con borde dorado es la activa. Pulsa «Usar» en otra para cambiarla. Si no tienes skins, visita la Tienda para comprarlas con Cores.",
+      icono: "🎨", preferencia: "izquierda",
+      antesDeIr: () => setPanelActivo("tableros"),
+      esperaMs: 600,
+    },
+    // ── Tienda ─────────────────────────────────────────────────────────────
+    {
+      targetId: "tutorial-menu-tienda",
+      titulo: "Tienda",
+      descripcion: "Aquí puedes comprar skins con tus Cores. Las Cores se ganan jugando partidas públicas y ganando combates. Cuantas más Katanas tengas, más Cores ganarás por partida.",
+      icono: "🛒", preferencia: "derecha",
+    },
+    {
+      targetId: "tutorial-panel-tienda",
+      titulo: "Panel — Tienda de skins",
+      descripcion: "Cada skin tiene su precio en Cores y una vista previa de las piezas. Si tienes Cores suficientes pulsa «Comprar». Después actívala desde «Mis Tableros» para usarla en tus partidas.",
+      icono: "🛒", preferencia: "izquierda",
+      antesDeIr: () => setPanelActivo("tienda"),
+      esperaMs: 600,
+    },
+    // ── Mis Amigos ─────────────────────────────────────────────────────────
+    {
+      targetId: "tutorial-menu-amigos",
+      titulo: "Mis Amigos",
+      descripcion: "Tu red social en Onitama. Gestiona tus amigos, búscalos por nombre y reta a partidas privadas. Tener amigos es imprescindible para jugar partidas privadas.",
+      icono: "👥", preferencia: "derecha",
+    },
+    {
+      targetId: "tutorial-panel-amigos",
+      titulo: "Lista de amigos",
+      descripcion: "Aquí ves todos tus amigos. Haz clic en uno para ver vuestro historial de partidas juntos, retarle a una partida privada o eliminarle de tu lista.",
+      icono: "👥", preferencia: "izquierda",
+      antesDeIr: () => { setPanelActivo("amigos"); setTabAmigos("lista"); },
+      esperaMs: 600,
+    },
+    {
+      targetId: "tutorial-panel-amigos",
+      titulo: "Buscar jugadores",
+      descripcion: "La pestaña «Buscar» (que puedes ver arriba en el panel) te permite encontrar a cualquier jugador por su nombre de usuario y enviarle una solicitud de amistad. Cuando la acepte aparecerá en tu lista.",
+      icono: "🔍", preferencia: "izquierda",
+      antesDeIr: () => { setPanelActivo("amigos"); setTabAmigos("buscar"); },
+      esperaMs: 400,
+    },
+    // ── Notificaciones ─────────────────────────────────────────────────────
+    {
+      targetId: "tutorial-menu-notificaciones",
+      titulo: "Notificaciones",
+      descripcion: "El badge rojo indica notificaciones pendientes. Aquí llegan solicitudes de amistad de otros jugadores e invitaciones a partidas privadas que te manden.",
+      icono: "🔔", preferencia: "derecha",
+    },
+    {
+      targetId: "tutorial-panel-notificaciones",
+      titulo: "Panel — Notificaciones",
+      descripcion: "Acepta o rechaza cada notificación. Las invitaciones a partida tienen temporizador: si no respondes a tiempo caducan. Las solicitudes de amistad permanecen hasta que decidas.",
+      icono: "🔔", preferencia: "izquierda",
+      antesDeIr: () => setPanelActivo("notificaciones"),
+      esperaMs: 600,
+    },
+    // ── Mi Cuenta ──────────────────────────────────────────────────────────
+    {
+      targetId: "tutorial-menu-cuenta",
+      titulo: "Mi Cuenta",
+      descripcion: "Tu perfil completo: estadísticas, historial de partidas, personalización del avatar y seguridad de la cuenta.",
+      icono: "⚙️", preferencia: "derecha",
+    },
+    {
+      targetId: "tutorial-panel-cuenta",
+      titulo: "Panel — Mi Cuenta",
+      descripcion: "Consulta tus victorias, derrotas y Katanas actuales. Cambia tu avatar eligiendo entre los disponibles y actualiza tu contraseña si lo necesitas. También puedes revisar el historial completo de partidas públicas.",
+      icono: "⚙️", preferencia: "izquierda",
+      antesDeIr: () => setPanelActivo("cuenta"),
+      esperaMs: 600,
+    },
+    // ── Final: ir a practicar ──────────────────────────────────────────────
+    {
+      targetId: "tutorial-tarjeta-entrenamiento",
+      titulo: "¡Ahora, a practicar!",
+      descripcion: "Ya conoces todo el sistema. Ahora vamos a aprender a jugar una partida real. Al pulsar «¡Listo!» se abrirá una partida de entrenamiento contra Iron Bot (Principiante) donde se te explicará paso a paso: el tablero y el uso básico de las cartas. ¡Cuando termine el tutorial puedes jugar libremente!",
+      icono: "🥋", preferencia: "abajo",
+      antesDeIr: () => { setPanelActivo(null); },
+    },
+  ], [setPanelActivo, setTabAmigos]);
+
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const notifPendientes = notificaciones.length;
@@ -714,13 +931,13 @@ export default function PartidasPage() {
           />
         </div>
 
-        <div className="flex items-center gap-4 sm:gap-6 min-w-0 flex-1 justify-end">
+        <div id="tutorial-header-info" className="flex items-center gap-4 sm:gap-6 min-w-0 flex-1 justify-end">
           <button
             type="button"
             onClick={() => handleMenuClick("cuenta")}
             className={`w-11 h-11 shrink-0 rounded-full border-2 flex items-center justify-center overflow-hidden transition-colors ${panelActivo === "cuenta"
-                ? "bg-white/20 border-white/60"
-                : "bg-[#2a4a6a] border-white/30 hover:bg-white/10"
+              ? "bg-white/20 border-white/60"
+              : "bg-[#2a4a6a] border-white/30 hover:bg-white/10"
               }`}
             title="Mi cuenta"
             aria-label="Abrir Mi cuenta"
@@ -740,7 +957,19 @@ export default function PartidasPage() {
             </span>
           </div>
           <div className="hidden sm:block h-8 w-px bg-white/20 shrink-0" aria-hidden />
+          {/* Botón tutorial */}
           <button
+            id="tutorial-btn-tutorial"
+            type="button"
+            onClick={() => setMostrarModalTutorial(true)}
+            className="shrink-0 w-8 h-8 rounded-full border border-white/30 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-bold"
+            title="Tutorial de la aplicación"
+            aria-label="Abrir tutorial"
+          >
+            ?
+          </button>
+          <button
+            id="tutorial-btn-logout"
             type="button"
             onClick={() => setMostrarModalCerrarSesion(true)}
             className="shrink-0 p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
@@ -762,6 +991,7 @@ export default function PartidasPage() {
         {/* ─── Sidebar ─────────────────────────────────────────────────── */}
         <aside className="w-60 bg-[#7b8fa8] flex flex-col shrink-0">
           <button
+            id="tutorial-btn-jugar"
             type="button"
             onClick={() => setPanelActivo(null)}
             className="px-6 pt-6 pb-3 text-left w-full hover:bg-white/10 transition-colors"
@@ -782,6 +1012,7 @@ export default function PartidasPage() {
             {MENU_LATERAL.map((item) => (
               <button
                 key={item.id}
+                id={`tutorial-menu-${item.id}`}
                 type="button"
                 onClick={() => handleMenuClick(item.id)}
                 className={`flex items-center text-sm font-semibold tracking-widest uppercase px-6 py-4 text-left transition-colors border-b border-white/10 last:border-0
@@ -833,7 +1064,11 @@ export default function PartidasPage() {
             <div className="flex items-center justify-center min-h-full px-8 py-10">
               <div className="flex flex-wrap gap-10 items-center justify-center">
                 {TIPOS_PARTIDA.map((tipo) => (
-                  <div key={tipo.id} className="flex flex-col items-center gap-4">
+                  <div
+                    key={tipo.id}
+                    id={`tutorial-tarjeta-${tipo.id}`}
+                    className="flex flex-col items-center gap-4"
+                  >
                     <button
                       type="button"
                       className="group"
@@ -861,81 +1096,93 @@ export default function PartidasPage() {
 
           {/* Panel: Mis amigos */}
           {panelActivo === "amigos" && (
-            <PanelAmigos
-              jugador={jugador}
-              amigos={amigos}
-              amigoSeleccionado={amigoSeleccionado}
-              partidasConAmigo={partidasConAmigo}
-              cargandoPartidasAmigo={cargandoPartidasAmigo}
-              mostrarModalPartidasAmigo={mostrarModalPartidasAmigo}
-              tabActiva={tabAmigos}
-              onCambiarTab={setTabAmigos}
-              textoBusqueda={textoBusqueda}
-              onCambiarBusqueda={setTextoBusqueda}
-              resultados={resultados}
-              buscando={buscando}
-              solicitudesEnviadas={solicitudesEnviadas}
-              onEnviarSolicitud={handleEnviarSolicitud}
-              onSeleccionarAmigo={handleSeleccionarAmigo}
-              onBorrarAmigo={handleBorrarAmigo}
-              onCerrarModalPartidas={() => setMostrarModalPartidasAmigo(false)}
-            />
+            <div id="tutorial-panel-amigos" className="h-full">
+              <PanelAmigos
+                jugador={jugador}
+                amigos={amigos}
+                amigoSeleccionado={amigoSeleccionado}
+                partidasConAmigo={partidasConAmigo}
+                cargandoPartidasAmigo={cargandoPartidasAmigo}
+                mostrarModalPartidasAmigo={mostrarModalPartidasAmigo}
+                tabActiva={tabAmigos}
+                onCambiarTab={setTabAmigos}
+                textoBusqueda={textoBusqueda}
+                onCambiarBusqueda={setTextoBusqueda}
+                resultados={resultados}
+                buscando={buscando}
+                solicitudesEnviadas={solicitudesEnviadas}
+                onEnviarSolicitud={handleEnviarSolicitud}
+                onSeleccionarAmigo={handleSeleccionarAmigo}
+                onBorrarAmigo={handleBorrarAmigo}
+                onCerrarModalPartidas={() => setMostrarModalPartidasAmigo(false)}
+              />
+            </div>
           )}
 
           {/* Panel: Notificaciones */}
           {panelActivo === "notificaciones" && (
-            <PanelNotificaciones
-              notificaciones={notificaciones}
-              onAceptarAmistad={handleAceptarSolicitud}
-              onRechazarAmistad={handleRechazarSolicitud}
-              onAceptarInvitacionPartida={handleAceptarInvitacionPartida}
-              onRechazarInvitacionPartida={handleRechazarInvitacionPartida}
-            />
+            <div id="tutorial-panel-notificaciones" className="h-full">
+              <PanelNotificaciones
+                notificaciones={notificaciones}
+                onAceptarAmistad={handleAceptarSolicitud}
+                onRechazarAmistad={handleRechazarSolicitud}
+                onAceptarInvitacionPartida={handleAceptarInvitacionPartida}
+                onRechazarInvitacionPartida={handleRechazarInvitacionPartida}
+              />
+            </div>
           )}
 
           {panelActivo === "cuenta" && (
-            <PanelMiCuenta
-              jugador={jugador}
-              partidasPublicas={partidasPublicas}
-              cargandoPartidasPublicas={cargandoPartidasPublicas}
-              onPerfilActualizado={(nuevosDatos) => {
-                setJugador((prev) => {
-                  const s = { ...prev, ...nuevosDatos };
-                  guardarSesion(s);
-                  return s;
-                });
-              }}
-            />
+            <div id="tutorial-panel-cuenta" className="h-full">
+              <PanelMiCuenta
+                jugador={jugador}
+                partidasPublicas={partidasPublicas}
+                cargandoPartidasPublicas={cargandoPartidasPublicas}
+                onPerfilActualizado={(nuevosDatos) => {
+                  setJugador((prev) => {
+                    const s = { ...prev, ...nuevosDatos };
+                    guardarSesion(s);
+                    return s;
+                  });
+                }}
+              />
+            </div>
           )}
 
           {panelActivo === "cartas" && (
-            <PanelMisCartas
-              jugador={jugador}
-              cartas={cartas}
-              cargando={cargandoCartas}
-              cartasAccion={cartasAccion}
-              cargandoAccion={cargandoCartasAccion}
-            />
+            <div id="tutorial-panel-cartas" className="h-full">
+              <PanelMisCartas
+                jugador={jugador}
+                cartas={cartas}
+                cargando={cargandoCartas}
+                cartasAccion={cartasAccion}
+                cargandoAccion={cargandoCartasAccion}
+              />
+            </div>
           )}
 
           {panelActivo === "tableros" && (
-            <PanelMisTableros
-              jugador={jugador}
-              skins={skins}
-              cargando={cargandoSkins}
-              accionSkinEnCurso={accionSkinEnCurso}
-              onUsarSkin={handleUsarSkin}
-            />
+            <div id="tutorial-panel-tableros" className="h-full">
+              <PanelMisTableros
+                jugador={jugador}
+                skins={skins}
+                cargando={cargandoSkins}
+                accionSkinEnCurso={accionSkinEnCurso}
+                onUsarSkin={handleUsarSkin}
+              />
+            </div>
           )}
 
           {panelActivo === "tienda" && (
-            <PanelTiendaSkins
-              jugador={jugador}
-              skins={skins}
-              cargando={cargandoSkins}
-              accionSkinEnCurso={accionSkinEnCurso}
-              onComprarSkin={handleComprarSkin}
-            />
+            <div id="tutorial-panel-tienda" className="h-full">
+              <PanelTiendaSkins
+                jugador={jugador}
+                skins={skins}
+                cargando={cargandoSkins}
+                accionSkinEnCurso={accionSkinEnCurso}
+                onComprarSkin={handleComprarSkin}
+              />
+            </div>
           )}
         </main>
       </div>
@@ -1012,8 +1259,8 @@ export default function PartidasPage() {
                 type="button"
                 onClick={() => setTabPartidaPrivada("crear")}
                 className={`px-5 py-3 text-sm font-semibold uppercase tracking-wider ${tabPartidaPrivada === "crear"
-                    ? "border-b-2 border-[#1a2d4a] text-[#1a2d4a]"
-                    : "text-stone-500 hover:text-stone-700"
+                  ? "border-b-2 border-[#1a2d4a] text-[#1a2d4a]"
+                  : "text-stone-500 hover:text-stone-700"
                   }`}
               >
                 Crear nueva partida
@@ -1022,8 +1269,8 @@ export default function PartidasPage() {
                 type="button"
                 onClick={() => setTabPartidaPrivada("reanudar")}
                 className={`px-5 py-3 text-sm font-semibold uppercase tracking-wider ${tabPartidaPrivada === "reanudar"
-                    ? "border-b-2 border-[#1a2d4a] text-[#1a2d4a]"
-                    : "text-stone-500 hover:text-stone-700"
+                  ? "border-b-2 border-[#1a2d4a] text-[#1a2d4a]"
+                  : "text-stone-500 hover:text-stone-700"
                   }`}
               >
                 Reanudar partida
@@ -1292,6 +1539,139 @@ export default function PartidasPage() {
           </div>
         </div>
       )}
+
+      {/* ─── Modal de bienvenida al tutorial ──────────────────────────────── */}
+      {mostrarModalTutorial && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div
+            style={{
+              background: "#1a2d4a",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 18,
+              padding: "40px 36px 32px",
+              maxWidth: 440,
+              width: "100%",
+              boxShadow: "0 32px 80px rgba(0,0,0,0.7)",
+              textAlign: "center",
+              position: "relative",
+            }}
+          >
+            {/* Línea accent top */}
+            <div style={{
+              position: "absolute", top: 0, left: 32, right: 32, height: 2,
+              background: "linear-gradient(to right, transparent, #b85c38 30%, #c9a84c 70%, transparent)",
+              borderRadius: 99,
+            }} />
+
+            {/* Icono */}
+            <div style={{
+              width: 64, height: 64,
+              background: "rgba(184,92,56,0.12)",
+              borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              margin: "0 auto 20px",
+              fontSize: 28,
+              border: "1px solid rgba(184,92,56,0.3)",
+            }}>
+              🥋
+            </div>
+
+            <h2 style={{
+              fontFamily: "var(--font-rajdhani), sans-serif",
+              fontSize: 22,
+              fontWeight: 700,
+              color: "#f0ebe1",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              marginBottom: 12,
+            }}>
+              ¡Bienvenido al Dojo!
+            </h2>
+
+            <p style={{
+              color: "#8a9bb0",
+              fontSize: 14,
+              lineHeight: 1.7,
+              marginBottom: 28,
+              fontFamily: "var(--font-geist-sans), sans-serif",
+            }}>
+              Parece que es tu primera vez aquí. ¿Quieres que te guiemos por todas las secciones de la aplicación? El tutorial solo dura un minuto.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                type="button"
+                onClick={handleIniciarTutorial}
+                style={{
+                  background: "#b85c38",
+                  border: "none",
+                  borderRadius: 10,
+                  color: "#f0ebe1",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  padding: "13px 24px",
+                  textTransform: "uppercase",
+                  fontFamily: "var(--font-rajdhani), sans-serif",
+                  transition: "background 0.2s",
+                  width: "100%",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#a04e2e"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#b85c38"; }}
+              >
+                Sí, mostrar tutorial →
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMostrarModalTutorial(false);
+                  try { localStorage.setItem(TUTORIAL_LS_KEY, "1"); } catch { /* ignorar */ }
+                }}
+                style={{
+                  background: "transparent",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  borderRadius: 10,
+                  color: "rgba(255,255,255,0.5)",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  padding: "11px 24px",
+                  fontFamily: "var(--font-geist-sans), sans-serif",
+                  transition: "background 0.2s, color 0.2s",
+                  width: "100%",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.75)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                  (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.5)";
+                }}
+              >
+                No, ya sé cómo funciona
+              </button>
+            </div>
+
+            <p style={{
+              marginTop: 18,
+              color: "rgba(255,255,255,0.2)",
+              fontSize: 11,
+              fontFamily: "var(--font-geist-sans), sans-serif",
+            }}>
+              Siempre puedes volver a verlo pulsando el botón <strong style={{ color: "rgba(255,255,255,0.35)" }}>?</strong> del encabezado
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Tutorial interactivo ─────────────────────────────────────────── */}
+      <TutorialOverlay
+        pasos={pasosTutorial}
+        activo={tutorialActivo}
+        onFinish={handleFinalizarTutorial}
+      />
     </div>
   );
 }
@@ -1427,7 +1807,7 @@ function PanelMiCuenta({
 
   const [modalAvatar, setModalAvatar] = useState(false);
   const [modalPass, setModalPass] = useState(false);
-  
+
   const [avatarSeleccionado, setAvatarSeleccionado] = useState(jugador.avatar_id || "avatar_01");
   const [guardandoAvatar, setGuardandoAvatar] = useState(false);
 
@@ -1502,7 +1882,7 @@ function PanelMiCuenta({
           <div className="flex items-center gap-4">
             <div className="relative group">
               <AvatarCircle nombre={jugador.nombre} avatarId={jugador.avatar_id} sizeClass="w-20 h-20 shrink-0" textClass="text-3xl" />
-              <button 
+              <button
                 onClick={() => { setAvatarSeleccionado(jugador.avatar_id || "avatar_01"); setModalAvatar(true); }}
                 className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-full text-xs font-semibold uppercase tracking-wider transition-opacity"
               >
@@ -1514,8 +1894,8 @@ function PanelMiCuenta({
               <p className="text-sm text-stone-500">{jugador.correo}</p>
             </div>
           </div>
-          <button 
-            onClick={() => { setPassError(""); setPassExito(false); setPassForm({actual:"", nueva:"", confirmar:""}); setModalPass(true); }}
+          <button
+            onClick={() => { setPassError(""); setPassExito(false); setPassForm({ actual: "", nueva: "", confirmar: "" }); setModalPass(true); }}
             className="px-4 py-2 border border-stone-300 rounded-lg text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-colors shrink-0"
           >
             Cambiar contraseña
@@ -1584,7 +1964,7 @@ function PanelMiCuenta({
             <h3 className="text-lg font-bold uppercase tracking-widest text-stone-800 mb-6">Selecciona un Avatar</h3>
             <div className="grid grid-cols-4 gap-4 mb-6">
               {AVATARES_DISPONIBLES.map(id => (
-                <button 
+                <button
                   key={id}
                   onClick={() => setAvatarSeleccionado(id)}
                   className={`relative aspect-square rounded-full overflow-hidden border-4 transition-all ${avatarSeleccionado === id ? "border-[#b85c38] shadow-lg scale-105" : "border-transparent hover:border-stone-200"}`}
@@ -1626,7 +2006,7 @@ function PanelMiCuenta({
                   <input
                     type={mostrarPassModal ? "text" : "password"}
                     value={passForm.actual}
-                    onChange={e => setPassForm(prev => ({...prev, actual: e.target.value}))}
+                    onChange={e => setPassForm(prev => ({ ...prev, actual: e.target.value }))}
                     className="w-full bg-stone-50 border border-stone-200 text-stone-800 px-4 py-2 rounded-lg outline-none focus:border-[#b85c38] focus:ring-1 focus:ring-[#b85c38] transition-all"
                     required
                   />
@@ -1636,7 +2016,7 @@ function PanelMiCuenta({
                   <input
                     type={mostrarPassModal ? "text" : "password"}
                     value={passForm.nueva}
-                    onChange={e => setPassForm(prev => ({...prev, nueva: e.target.value}))}
+                    onChange={e => setPassForm(prev => ({ ...prev, nueva: e.target.value }))}
                     className="w-full bg-stone-50 border border-stone-200 text-stone-800 px-4 py-2 rounded-lg outline-none focus:border-[#b85c38] focus:ring-1 focus:ring-[#b85c38] transition-all"
                     required
                   />
@@ -1647,7 +2027,7 @@ function PanelMiCuenta({
                   <input
                     type={mostrarPassModal ? "text" : "password"}
                     value={passForm.confirmar}
-                    onChange={e => setPassForm(prev => ({...prev, confirmar: e.target.value}))}
+                    onChange={e => setPassForm(prev => ({ ...prev, confirmar: e.target.value }))}
                     className="w-full bg-stone-50 border border-stone-200 text-stone-800 px-4 py-2 rounded-lg outline-none focus:border-[#b85c38] focus:ring-1 focus:ring-[#b85c38] transition-all"
                     required
                   />
@@ -1676,10 +2056,10 @@ function PanelMiCuenta({
                     </span>
                   </button>
                   <div className="flex justify-end gap-3">
-                  <button type="button" onClick={() => setModalPass(false)} className="px-4 py-2 rounded-lg font-semibold text-stone-500 hover:bg-stone-100 transition-colors">Cancelar</button>
-                  <button type="submit" disabled={guardandoPass} className="px-5 py-2 rounded-lg font-semibold bg-[#1a2d4a] text-white hover:bg-[#203a60] transition-colors disabled:opacity-50">
-                    {guardandoPass ? "Guardando..." : "Actualizar"}
-                  </button>
+                    <button type="button" onClick={() => setModalPass(false)} className="px-4 py-2 rounded-lg font-semibold text-stone-500 hover:bg-stone-100 transition-colors">Cancelar</button>
+                    <button type="submit" disabled={guardandoPass} className="px-5 py-2 rounded-lg font-semibold bg-[#1a2d4a] text-white hover:bg-[#203a60] transition-colors disabled:opacity-50">
+                      {guardandoPass ? "Guardando..." : "Actualizar"}
+                    </button>
                   </div>
                 </div>
               </form>
@@ -1926,8 +2306,8 @@ function PanelAmigos({
                   <li
                     key={amigo.nombre}
                     className={`flex items-center gap-3 bg-white rounded-xl px-4 py-3 shadow-sm border ${amigoSeleccionado?.nombre === amigo.nombre
-                        ? "border-[#1a2d4a]"
-                        : "border-transparent"
+                      ? "border-[#1a2d4a]"
+                      : "border-transparent"
                       }`}
                   >
                     <button
@@ -2228,12 +2608,12 @@ function MiniGrid({
                 height: size,
                 ...(esA
                   ? {
-                      background: colorDots,
-                      boxShadow:
-                        colorDots === "#f8fafc"
-                          ? "inset 0 0 0 1px rgba(15,23,42,0.45)"
-                          : undefined,
-                    }
+                    background: colorDots,
+                    boxShadow:
+                      colorDots === "#f8fafc"
+                        ? "inset 0 0 0 1px rgba(15,23,42,0.45)"
+                        : undefined,
+                  }
                   : {}),
               }}
             />
@@ -2263,7 +2643,7 @@ const FRASES_EPICAS: Record<string, string> = {
   Oso: "Fuerza abrumadora, protege su territorio con zarpazos brutales.",
   Aguila: "Desde los cielos domina todo, cae en picado y no deja escapatoria.",
   Cobra: "Letal y sigilosa, un solo toque basta para acabar el combate.",
-  
+
   // Cartas de Acción / Poderes
   "Pensatorium": "Un reflejo etéreo distorsiona la realidad de la batalla.",
   "Santo Grial": "El cáliz vital devuelve la esperanza a los caídos del templo.",
@@ -2322,7 +2702,7 @@ function PanelMisCartas({
   // Maestría
   const cartasDesbloqueadasOriginal = cartasActuales.filter((c) => jugador.puntos >= c.puntos_necesarios);
   const porcentajeDesbloqueado = cartasActuales.length > 0 ? (cartasDesbloqueadasOriginal.length / cartasActuales.length) * 100 : 0;
-  
+
   const tituloMaestria = (() => {
     const p = porcentajeDesbloqueado;
     if (p === 100) return "Gran Maestro del Templo";
@@ -2338,7 +2718,7 @@ function PanelMisCartas({
   const desbloqueadas = cartasFiltradasGlobal
     .filter((c) => jugador.puntos >= c.puntos_necesarios)
     .sort((a, b) => b.puntos_necesarios - a.puntos_necesarios);
-  
+
   // Las cartas bloqueadas (ordenadas para ver cuáles serán las siguientes en conseguirse)
   const bloqueadas = cartasFiltradasGlobal
     .filter((c) => jugador.puntos < c.puntos_necesarios)
@@ -2357,11 +2737,10 @@ function PanelMisCartas({
       <div className="flex gap-6 border-b border-stone-200 mb-8">
         <button
           onClick={() => setTabCartas("movimientos")}
-          className={`pb-3 uppercase tracking-wider text-sm font-bold transition-all relative ${
-            tabCartas === "movimientos"
-              ? "text-stone-800"
-              : "text-stone-400 hover:text-stone-600"
-          }`}
+          className={`pb-3 uppercase tracking-wider text-sm font-bold transition-all relative ${tabCartas === "movimientos"
+            ? "text-stone-800"
+            : "text-stone-400 hover:text-stone-600"
+            }`}
         >
           Movimientos
           {tabCartas === "movimientos" && (
@@ -2370,11 +2749,10 @@ function PanelMisCartas({
         </button>
         <button
           onClick={() => setTabCartas("poderes")}
-          className={`pb-3 uppercase tracking-wider text-sm font-bold transition-all relative flex items-center gap-2 ${
-            tabCartas === "poderes"
-              ? "text-stone-800"
-              : "text-stone-400 hover:text-stone-600"
-          }`}
+          className={`pb-3 uppercase tracking-wider text-sm font-bold transition-all relative flex items-center gap-2 ${tabCartas === "poderes"
+            ? "text-stone-800"
+            : "text-stone-400 hover:text-stone-600"
+            }`}
         >
           <span>Poderes</span>
           {tabCartas === "poderes" && (
@@ -2384,92 +2762,92 @@ function PanelMisCartas({
       </div>
 
       <>
-          <div className="flex items-start md:items-center justify-between mb-6 gap-4">
-            <p className="text-stone-500 text-sm flex flex-wrap items-center gap-2">
-              <span>{tabCartas === "poderes" ? "Poderes que pueden" : "Cartas que pueden"} aparecer en tus partidas según tu ELO actual (</span>
-              <Image src="/katanas.png" alt="Katanas" width={16} height={16} className="object-contain" />
-              <span className="font-semibold">{jugador.puntos.toLocaleString()}</span>
-              <span>):</span>
-            </p>
-            <button 
-              onClick={() => setMostrarInfoMovimientos(true)}
-              className="text-stone-400 hover:text-stone-700 transition-colors bg-white border border-stone-200 rounded-full p-1.5 shadow-sm hover:shadow shrink-0"
-              title="Información sobre la aparición de cartas"
-              aria-label="Información sobre la aparición de cartas"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-          </div>
-          
-          {cargandoActual ? (
-            <p className="text-stone-500 animate-pulse">Cargando catálogo...</p>
-          ) : (
-            <div className="space-y-8 animate-in fade-in duration-300">
-              
-              {/* Barra de Progreso de Maestría */}
-              <div className="bg-white px-4 py-3 rounded-xl shadow-sm border border-stone-200">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-stone-800 font-bold uppercase tracking-widest text-xs">Maestría</h4>
-                    <span className="text-stone-300 text-[10px] hidden sm:inline">|</span>
-                    <p className="text-stone-500 text-xs">{tituloMaestria}</p>
-                  </div>
-                  <div className="text-right text-sm">
-                    <span className="font-extrabold text-emerald-600">{cartasDesbloqueadasOriginal.length}</span>
-                    <span className="text-stone-400 font-semibold text-[10px]"> / {cartasActuales.length}</span>
-                  </div>
+        <div className="flex items-start md:items-center justify-between mb-6 gap-4">
+          <p className="text-stone-500 text-sm flex flex-wrap items-center gap-2">
+            <span>{tabCartas === "poderes" ? "Poderes que pueden" : "Cartas que pueden"} aparecer en tus partidas según tu ELO actual (</span>
+            <Image src="/katanas.png" alt="Katanas" width={16} height={16} className="object-contain" />
+            <span className="font-semibold">{jugador.puntos.toLocaleString()}</span>
+            <span>):</span>
+          </p>
+          <button
+            onClick={() => setMostrarInfoMovimientos(true)}
+            className="text-stone-400 hover:text-stone-700 transition-colors bg-white border border-stone-200 rounded-full p-1.5 shadow-sm hover:shadow shrink-0"
+            title="Información sobre la aparición de cartas"
+            aria-label="Información sobre la aparición de cartas"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+        </div>
+
+        {cargandoActual ? (
+          <p className="text-stone-500 animate-pulse">Cargando catálogo...</p>
+        ) : (
+          <div className="space-y-8 animate-in fade-in duration-300">
+
+            {/* Barra de Progreso de Maestría */}
+            <div className="bg-white px-4 py-3 rounded-xl shadow-sm border border-stone-200">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-stone-800 font-bold uppercase tracking-widest text-xs">Maestría</h4>
+                  <span className="text-stone-300 text-[10px] hidden sm:inline">|</span>
+                  <p className="text-stone-500 text-xs">{tituloMaestria}</p>
                 </div>
-                <div className="w-full bg-stone-100 rounded-full h-1.5 overflow-hidden shadow-inner">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-1000 ease-in-out relative"
-                    style={{ width: `${porcentajeDesbloqueado}%` }}
-                  >
-                    <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_2s_infinite]"></div>
-                  </div>
+                <div className="text-right text-sm">
+                  <span className="font-extrabold text-emerald-600">{cartasDesbloqueadasOriginal.length}</span>
+                  <span className="text-stone-400 font-semibold text-[10px]"> / {cartasActuales.length}</span>
                 </div>
+              </div>
+              <div className="w-full bg-stone-100 rounded-full h-1.5 overflow-hidden shadow-inner">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-1000 ease-in-out relative"
+                  style={{ width: `${porcentajeDesbloqueado}%` }}
+                >
+                  <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_2s_infinite]"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Buscador y Filtros */}
+            <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 flex flex-col md:flex-row gap-4 justify-between items-center">
+              <div className="relative w-full md:w-64">
+                <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Buscar carta..."
+                  value={filtroTexto}
+                  onChange={(e) => setFiltroTexto(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-semibold text-stone-700"
+                />
               </div>
 
-              {/* Buscador y Filtros */}
-              <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 flex flex-col md:flex-row gap-4 justify-between items-center">
-                <div className="relative w-full md:w-64">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <input 
-                    type="text" 
-                    placeholder="Buscar carta..." 
-                    value={filtroTexto}
-                    onChange={(e) => setFiltroTexto(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-semibold text-stone-700" 
-                  />
-                </div>
-                
-                <div className="flex bg-white rounded-lg border border-stone-300 p-1 shadow-sm w-full md:w-auto">
-                  <button 
-                    onClick={() => setFiltroEstado("todas")}
-                    className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-colors ${filtroEstado === 'todas' ? 'bg-stone-800 text-white shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'}`}
-                  >
-                    Todas
-                  </button>
-                  <button 
-                    onClick={() => setFiltroEstado("desbloqueadas")}
-                    className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-colors ${filtroEstado === 'desbloqueadas' ? 'bg-emerald-600 text-white shadow' : 'text-stone-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
-                  >
-                    Desbloqueadas
-                  </button>
-                  <button 
-                    onClick={() => setFiltroEstado("bloqueadas")}
-                    className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-colors ${filtroEstado === 'bloqueadas' ? 'bg-stone-300 text-stone-800 shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'}`}
-                  >
-                    Bloqueadas
-                  </button>
-                </div>
+              <div className="flex bg-white rounded-lg border border-stone-300 p-1 shadow-sm w-full md:w-auto">
+                <button
+                  onClick={() => setFiltroEstado("todas")}
+                  className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-colors ${filtroEstado === 'todas' ? 'bg-stone-800 text-white shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'}`}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => setFiltroEstado("desbloqueadas")}
+                  className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-colors ${filtroEstado === 'desbloqueadas' ? 'bg-emerald-600 text-white shadow' : 'text-stone-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
+                >
+                  Desbloqueadas
+                </button>
+                <button
+                  onClick={() => setFiltroEstado("bloqueadas")}
+                  className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-colors ${filtroEstado === 'bloqueadas' ? 'bg-stone-300 text-stone-800 shadow' : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'}`}
+                >
+                  Bloqueadas
+                </button>
               </div>
-          
-              {/* Cartas Desbloqueadas */}
-              {(filtroEstado === "todas" || filtroEstado === "desbloqueadas") && (
+            </div>
+
+            {/* Cartas Desbloqueadas */}
+            {(filtroEstado === "todas" || filtroEstado === "desbloqueadas") && (
               <div>
                 <h3 className="text-lg font-bold text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-300 pb-2 flex justify-between items-center">
                   <span>Disponibles</span>
@@ -2485,11 +2863,11 @@ function PanelMisCartas({
                           <div key={c.nombre} className="relative group cursor-pointer" onClick={() => setCartaAmpliada(c)}>
                             <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-200"></div>
                             <div className="relative h-full flex flex-col justify-between">
-                              <CartaAccionFicha 
-                                nombre={c.nombre} 
-                                descripcion={getDescripcionCartaAccion(c.descripcion ?? "")} 
+                              <CartaAccionFicha
+                                nombre={c.nombre}
+                                descripcion={getDescripcionCartaAccion(c.descripcion ?? "")}
                                 variante="mano"
-                                className="h-full pointer-events-none" 
+                                className="h-full pointer-events-none"
                               />
                             </div>
                             <div className="absolute top-2 right-2 bg-emerald-100/90 backdrop-blur-sm text-emerald-800 text-[9px] font-bold px-2 py-1 rounded-full shadow-sm flex items-center gap-1 z-20">
@@ -2498,118 +2876,120 @@ function PanelMisCartas({
                           </div>
                         );
                       }
-                      
+
                       const cartaDef = TODAS_LAS_CARTAS.find(cd => cd.nombre === c.nombre);
                       return (
-                      <button 
-                        key={c.nombre} 
-                        type="button"
-                        onClick={() => setCartaAmpliada(c)}
-                        className="rounded-2xl border border-emerald-200 bg-emerald-50/30 p-4 shadow-sm flex flex-col items-center hover:scale-[1.03] hover:shadow-md transition-all cursor-pointer text-left relative overflow-hidden group h-full"
-                      >
-                        <div className="absolute top-0 left-0 w-1 h-0 bg-emerald-500 transition-all duration-300 group-hover:h-full"></div>
-                        <p className="text-sm font-bold text-stone-800 uppercase tracking-wider mb-3 flex items-center justify-between w-full">
-                          <span>{c.nombre}</span>
-                          <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-100 px-1.5 py-0.5 rounded whitespace-nowrap flex items-center gap-1">
-                            Desbloqueo: {c.puntos_necesarios.toLocaleString()} <Image src="/katanas.png" alt="Katanas" width={10} height={10} className="object-contain" />
-                          </span>
-                        </p>
-                        <div className="bg-white rounded-lg p-3 shadow-inner w-full flex flex-col md:flex-row items-center justify-center gap-4 flex-1">
-                          <Image 
-                            src={getImagenCarta(c.nombre)} 
-                            alt={c.nombre} 
-                            width={68} 
-                            height={68} 
-                            className="object-contain" 
-                          />
-                          {cartaDef && (
-                            <div className="flex flex-col items-center md:border-l md:border-stone-200 md:pl-4">
-                              <MiniGrid carta={cartaDef} size={6} colorDots="#10b981" />
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    )})}
+                        <button
+                          key={c.nombre}
+                          type="button"
+                          onClick={() => setCartaAmpliada(c)}
+                          className="rounded-2xl border border-emerald-200 bg-emerald-50/30 p-4 shadow-sm flex flex-col items-center hover:scale-[1.03] hover:shadow-md transition-all cursor-pointer text-left relative overflow-hidden group h-full"
+                        >
+                          <div className="absolute top-0 left-0 w-1 h-0 bg-emerald-500 transition-all duration-300 group-hover:h-full"></div>
+                          <p className="text-sm font-bold text-stone-800 uppercase tracking-wider mb-3 flex items-center justify-between w-full">
+                            <span>{c.nombre}</span>
+                            <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-100 px-1.5 py-0.5 rounded whitespace-nowrap flex items-center gap-1">
+                              Desbloqueo: {c.puntos_necesarios.toLocaleString()} <Image src="/katanas.png" alt="Katanas" width={10} height={10} className="object-contain" />
+                            </span>
+                          </p>
+                          <div className="bg-white rounded-lg p-3 shadow-inner w-full flex flex-col md:flex-row items-center justify-center gap-4 flex-1">
+                            <Image
+                              src={getImagenCarta(c.nombre)}
+                              alt={c.nombre}
+                              width={68}
+                              height={68}
+                              className="object-contain"
+                            />
+                            {cartaDef && (
+                              <div className="flex flex-col items-center md:border-l md:border-stone-200 md:pl-4">
+                                <MiniGrid carta={cartaDef} size={6} colorDots="#10b981" />
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </div>
-              )}
+            )}
 
-          {/* Cartas Bloqueadas */}
-          {(filtroEstado === "todas" || filtroEstado === "bloqueadas") && (
-            <div>
-              <h3 className="text-lg font-bold text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-300 pb-2 flex items-center justify-between">
-                <span>Bloqueadas</span>
-                <span className="bg-stone-200 text-stone-600 px-2 py-0.5 rounded text-xs">{bloqueadas.length}</span>
-              </h3>
-              {bloqueadas.length === 0 ? (
-                <p className="text-stone-500 text-sm">No hay cartas bloqueadas.</p>
-              ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {bloqueadas.map((c) => {
-                  if (tabCartas === "poderes") {
-                    return (
-                      <div key={c.nombre} className="relative group cursor-pointer opacity-80 hover:opacity-100 grayscale hover:grayscale-0 transition-all duration-300" onClick={() => setCartaAmpliada(c)}>
-                        <div className="relative h-full flex flex-col justify-between">
-                          <CartaAccionFicha 
-                            nombre={c.nombre} 
-                            descripcion={getDescripcionCartaAccion(c.descripcion ?? "")} 
-                            variante="mano"
-                            className="h-full pointer-events-none"
-                          />
-                          <div className="absolute inset-0 flex items-center justify-center z-10 bg-stone-900/40 rounded-xl group-hover:bg-transparent transition-colors">
-                            <span className="text-4xl drop-shadow-md group-hover:scale-110 transition-transform" aria-label="Bloqueada">🔒</span>
+            {/* Cartas Bloqueadas */}
+            {(filtroEstado === "todas" || filtroEstado === "bloqueadas") && (
+              <div>
+                <h3 className="text-lg font-bold text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-300 pb-2 flex items-center justify-between">
+                  <span>Bloqueadas</span>
+                  <span className="bg-stone-200 text-stone-600 px-2 py-0.5 rounded text-xs">{bloqueadas.length}</span>
+                </h3>
+                {bloqueadas.length === 0 ? (
+                  <p className="text-stone-500 text-sm">No hay cartas bloqueadas.</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {bloqueadas.map((c) => {
+                      if (tabCartas === "poderes") {
+                        return (
+                          <div key={c.nombre} className="relative group cursor-pointer opacity-80 hover:opacity-100 grayscale hover:grayscale-0 transition-all duration-300" onClick={() => setCartaAmpliada(c)}>
+                            <div className="relative h-full flex flex-col justify-between">
+                              <CartaAccionFicha
+                                nombre={c.nombre}
+                                descripcion={getDescripcionCartaAccion(c.descripcion ?? "")}
+                                variante="mano"
+                                className="h-full pointer-events-none"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center z-10 bg-stone-900/40 rounded-xl group-hover:bg-transparent transition-colors">
+                                <span className="text-4xl drop-shadow-md group-hover:scale-110 transition-transform" aria-label="Bloqueada">🔒</span>
+                              </div>
+                            </div>
+                            <div className="absolute top-2 right-2 bg-stone-200/90 backdrop-blur-sm text-stone-600 text-[9px] font-bold px-2 py-1 rounded-full shadow-sm flex items-center gap-1 z-20">
+                              {c.puntos_necesarios.toLocaleString()} <Image src="/katanas.png" alt="Katanas" width={10} height={10} className="object-contain opacity-60" />
+                            </div>
                           </div>
-                        </div>
-                        <div className="absolute top-2 right-2 bg-stone-200/90 backdrop-blur-sm text-stone-600 text-[9px] font-bold px-2 py-1 rounded-full shadow-sm flex items-center gap-1 z-20">
-                          {c.puntos_necesarios.toLocaleString()} <Image src="/katanas.png" alt="Katanas" width={10} height={10} className="object-contain opacity-60" />
-                        </div>
-                      </div>
-                    );
-                  }
+                        );
+                      }
 
-                  const cartaDef = TODAS_LAS_CARTAS.find(cd => cd.nombre === c.nombre);
-                  return (
-                  <button 
-                    key={c.nombre} 
-                    type="button"
-                    onClick={() => setCartaAmpliada(c)}
-                    className="rounded-2xl border border-stone-200 bg-stone-100 p-4 shadow-sm flex flex-col items-center opacity-80 grayscale hover:opacity-100 hover:scale-[1.03] hover:shadow-md transition-all cursor-pointer text-left relative overflow-hidden group h-full"
-                  >
-                    <div className="absolute top-0 left-0 w-1 h-0 bg-stone-400 transition-all duration-300 group-hover:h-full z-20"></div>
-                    <p className="text-sm font-bold text-stone-600 uppercase tracking-wider mb-3 flex items-center justify-between w-full">
-                      <span>{c.nombre}</span>
-                      <span className="text-[10px] text-stone-500 font-semibold bg-stone-200 px-1.5 py-0.5 rounded whitespace-nowrap flex items-center gap-1">
-                        Desbloqueo: {c.puntos_necesarios.toLocaleString()} <Image src="/katanas.png" alt="Katanas" width={10} height={10} className="object-contain opacity-60" />
-                      </span>
-                    </p>
-                    <div className="bg-stone-200 rounded-lg p-3 shadow-inner w-full flex flex-col md:flex-row items-center justify-center gap-4 relative overflow-hidden flex-1">
-                      <div className="absolute inset-0 flex items-center justify-center z-10 bg-stone-200/40">
-                        <span className="text-4xl drop-shadow-md group-hover:scale-110 transition-transform" aria-label="Bloqueada">🔒</span>
-                      </div>
-                      <Image 
-                        src={getImagenCarta(c.nombre)} 
-                        alt={c.nombre} 
-                        width={68} 
-                        height={68} 
-                        className="object-contain opacity-50" 
-                      />
-                      {cartaDef && (
-                        <div className="flex flex-col items-center md:border-l md:border-stone-300 md:pl-4 opacity-50">
-                          <MiniGrid carta={cartaDef} size={6} colorDots="#64748b" />
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                )})}
+                      const cartaDef = TODAS_LAS_CARTAS.find(cd => cd.nombre === c.nombre);
+                      return (
+                        <button
+                          key={c.nombre}
+                          type="button"
+                          onClick={() => setCartaAmpliada(c)}
+                          className="rounded-2xl border border-stone-200 bg-stone-100 p-4 shadow-sm flex flex-col items-center opacity-80 grayscale hover:opacity-100 hover:scale-[1.03] hover:shadow-md transition-all cursor-pointer text-left relative overflow-hidden group h-full"
+                        >
+                          <div className="absolute top-0 left-0 w-1 h-0 bg-stone-400 transition-all duration-300 group-hover:h-full z-20"></div>
+                          <p className="text-sm font-bold text-stone-600 uppercase tracking-wider mb-3 flex items-center justify-between w-full">
+                            <span>{c.nombre}</span>
+                            <span className="text-[10px] text-stone-500 font-semibold bg-stone-200 px-1.5 py-0.5 rounded whitespace-nowrap flex items-center gap-1">
+                              Desbloqueo: {c.puntos_necesarios.toLocaleString()} <Image src="/katanas.png" alt="Katanas" width={10} height={10} className="object-contain opacity-60" />
+                            </span>
+                          </p>
+                          <div className="bg-stone-200 rounded-lg p-3 shadow-inner w-full flex flex-col md:flex-row items-center justify-center gap-4 relative overflow-hidden flex-1">
+                            <div className="absolute inset-0 flex items-center justify-center z-10 bg-stone-200/40">
+                              <span className="text-4xl drop-shadow-md group-hover:scale-110 transition-transform" aria-label="Bloqueada">🔒</span>
+                            </div>
+                            <Image
+                              src={getImagenCarta(c.nombre)}
+                              alt={c.nombre}
+                              width={68}
+                              height={68}
+                              className="object-contain opacity-50"
+                            />
+                            {cartaDef && (
+                              <div className="flex flex-col items-center md:border-l md:border-stone-300 md:pl-4 opacity-50">
+                                <MiniGrid carta={cartaDef} size={6} colorDots="#64748b" />
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-              )}
-            </div>
-          )}
+            )}
 
-            </div>
-          )}
-        </>
+          </div>
+        )}
+      </>
       {/* Modal Información Movimientos */}
       {mostrarInfoMovimientos && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -2632,10 +3012,10 @@ function PanelMisCartas({
                 El Destino y los Maestros
               </h3>
             </div>
-            
+
             <div className="space-y-4 text-base text-stone-600 leading-relaxed bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
               <p>
-                {tabCartas === "poderes" 
+                {tabCartas === "poderes"
                   ? <>En el templo de Onitama, cada maestro empuña <strong>dos poderes</strong> únicos que desafían las normas, pero las leyes ancestrales imponen una regla sagrada: <strong>jamás recibirás un poder que aún no hayas logrado dominar en tu camino.</strong></>
                   : <>En el templo de Onitama, el azar reparte cinco cartas entre ambos contendientes, pero las leyes de los maestros imponen una restricción sagrada: <strong>jamás recibirás una carta que aún no hayas logrado desbloquear en tu camino.</strong></>
                 }
@@ -2645,7 +3025,7 @@ function PanelMisCartas({
                   La Regla del Oponente
                 </h4>
                 <p className="text-emerald-800 text-sm">
-                  {tabCartas === "poderes" 
+                  {tabCartas === "poderes"
                     ? <>Los poderes disponibles en una batalla están limitados por el maestro con menor rango. Puesto que <strong>ambos</strong> contendientes deben poseer el poder para que este pueda formar parte del nivel de la partida, <strong>aquellos con mayores requisitos de Katanas serán más raros de ver</strong>, requiriendo que te enfrentes a oponentes igual de experimentados.</>
                     : <>Las cartas disponibles en una batalla están limitadas por el maestro con menor rango. Puesto que <strong>ambos</strong> contendientes deben poseer la carta para que esta pueda formar parte del reparto, <strong>aquellas con mayores requisitos de Katanas serán más raras de ver</strong>, requiriendo que te enfrentes a oponentes igual de experimentados.</>
                   }
@@ -2654,7 +3034,7 @@ function PanelMisCartas({
             </div>
 
             <div className="mt-8 flex justify-end">
-              <button 
+              <button
                 type="button"
                 onClick={() => setMostrarInfoMovimientos(false)}
                 className="px-6 py-3 bg-stone-800 text-stone-100 font-bold uppercase tracking-widest text-sm rounded-xl hover:bg-stone-700 hover:scale-[1.02] transition-all shadow-md"
@@ -2684,26 +3064,26 @@ function PanelMisCartas({
             <p className="text-sm text-stone-500 font-semibold mb-6 italic text-center px-4">
               "{FRASES_EPICAS[cartaAmpliada.nombre] ?? "Una carta misteriosa que esconde un poder oculto."}"
             </p>
-            
+
             <div className="w-full bg-stone-100 rounded-2xl p-6 flex flex-col items-center justify-center gap-8 shadow-inner mb-6">
               <div className="flex flex-col md:flex-row items-center justify-center gap-8 w-full">
                 {tabCartas === "poderes" ? (
                   <div className="w-full max-w-[200px] sm:max-w-xs shadow-2xl rounded-2xl overflow-hidden ring-4 ring-white">
-                    <CartaAccionFicha 
-                      nombre={cartaAmpliada.nombre} 
-                      descripcion={getDescripcionCartaAccion(cartaAmpliada.descripcion ?? "")} 
-                      variante="elegir" 
-                      className="w-full min-h-[250px] sm:min-h-[300px] pointer-events-none" 
+                    <CartaAccionFicha
+                      nombre={cartaAmpliada.nombre}
+                      descripcion={getDescripcionCartaAccion(cartaAmpliada.descripcion ?? "")}
+                      variante="elegir"
+                      className="w-full min-h-[250px] sm:min-h-[300px] pointer-events-none"
                     />
                   </div>
                 ) : (
                   <>
-                    <Image 
-                      src={getImagenCarta(cartaAmpliada.nombre)} 
-                      alt={cartaAmpliada.nombre} 
-                      width={160} 
-                      height={160} 
-                      className="object-contain drop-shadow-2xl" 
+                    <Image
+                      src={getImagenCarta(cartaAmpliada.nombre)}
+                      alt={cartaAmpliada.nombre}
+                      width={160}
+                      height={160}
+                      className="object-contain drop-shadow-2xl"
                     />
                     {TODAS_LAS_CARTAS.find(cd => cd.nombre === cartaAmpliada.nombre) && (
                       <div className="bg-white p-4 rounded-xl shadow-md border border-stone-200">
@@ -2713,7 +3093,7 @@ function PanelMisCartas({
                   </>
                 )}
               </div>
-              
+
               {/* Estadísticas / Lore Generado */}
               {ENFOQUES_CARTAS[cartaAmpliada.nombre] && (
                 <div className="flex flex-wrap gap-3 w-full justify-center">
@@ -2732,11 +3112,11 @@ function PanelMisCartas({
 
             <div className="text-xs text-stone-400 uppercase tracking-widest font-bold flex items-center justify-between w-full">
               <div className="flex items-center gap-2 bg-stone-100 px-3 py-2 rounded-lg border border-stone-200">
-                <span className="text-stone-500">Desbloqueo:</span> 
-                <Image src="/katanas.png" alt="Katanas" width={14} height={14} /> 
+                <span className="text-stone-500">Desbloqueo:</span>
+                <Image src="/katanas.png" alt="Katanas" width={14} height={14} />
                 <span className="text-stone-800">{cartaAmpliada.puntos_necesarios.toLocaleString()}</span>
               </div>
-              
+
               {jugador.puntos >= cartaAmpliada.puntos_necesarios ? (
                 <div className="flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
