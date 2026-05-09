@@ -48,6 +48,11 @@ class PartidaViewModel : ViewModel() {
     val estado: StateFlow<EstadoJuego> = _estado.asStateFlow()
 
     private var cartaAccionEnUso: String? = null
+    private var sacrificioPieza: Posicion? = null
+    private var estadoAntesCartaAccion: EstadoJuego? = null
+
+    private val _mensajeCartaAccion = MutableStateFlow<String>("")
+    val mensajeCartaAccion = _mensajeCartaAccion.asStateFlow()    
 
     private val _notificacionPausa = MutableStateFlow<Partida.RespuestaSolicitudPausa?>(null)
     val notificacionPausa = _notificacionPausa.asStateFlow()
@@ -117,6 +122,7 @@ class PartidaViewModel : ViewModel() {
                         when (mensaje) {
                             is Partida.RespuestaTuTurno -> {
                                 _estado.value = actual.copy(turnoActual = equipoPropio)
+                                _mensajeCartaAccion.value = "¡Es tu turno!"
                             }
 
                             is Partida.RespuestaMover -> {
@@ -206,7 +212,9 @@ class PartidaViewModel : ViewModel() {
                             is Partida.RespuestaPartidaLista -> {
                                 _estado.value = actual.copy(
                                     fasePartida = FasePartida.JUGANDO,
-                                    cartasAccionPropia = mensaje.cartas_accion.map { it.nombre }
+                                    cartasAccionPropia = mensaje.cartas_accion.map { it.nombre },
+                                    cartaAccionInicialElegida = null,
+                                    cartaAccionYaUsada = false 
                                 )
                             }
 
@@ -244,22 +252,28 @@ class PartidaViewModel : ViewModel() {
                                     EquipoID.ROJO
                                 }
 
-                                val tipoAccion = obtenerCartaAccion(mensaje.carta_accion)
+                                val tipoAccion = obtenerCartaAccion(mensaje.cartaAccion)
 
-                                _estado.value = aplicarCartaAccion(
-                                    estado = actual,
+                                val nuevoEstado = aplicarCartaAccion(
+                                    estado = _estado.value,
                                     equipo = jugador,
-                                    cartaNombre = mensaje.carta_accion,
+                                    cartaNombre = mensaje.cartaAccion,
                                     x = if (mensaje.x != -1) END - mensaje.x else -1,
                                     y = if (mensaje.y != -1) END - mensaje.y else -1,
                                     x_op = if (mensaje.x_op != -1) END - mensaje.x_op else -1,
                                     y_op = if (mensaje.y_op != -1) END - mensaje.y_op else -1,
-                                    cartaRobar = mensaje.carta_robar,
+                                    cartaRobar = mensaje.cartaRobar,
                                     tipo = tipoAccion
+                                )
+
+                                _estado.value = nuevoEstado.copy(
+                                    cartaAccionYaUsada = if (jugador == equipoPropio) true else actual.cartaAccionYaUsada,
+                                    modoAccion = null
                                 )
 
                                 if (jugador == equipoPropio) {
                                     cartaAccionEnUso = null
+                                    sacrificioPieza = null
                                 }
                             }
 
@@ -269,6 +283,12 @@ class PartidaViewModel : ViewModel() {
 
                             is Partida.RespuestaCartaAccionInvalida -> {
                                 Log.e("Partida", "Error: No puedes usar esta carta de acción ahora")
+                                if (estadoAntesCartaAccion != null) {
+                                    _estado.value = estadoAntesCartaAccion!!
+                                    estadoAntesCartaAccion = null
+                                    cartaAccionEnUso = null
+                                    sacrificioPieza = null
+                                }
                             }                           
 
                             else -> {
@@ -288,7 +308,7 @@ class PartidaViewModel : ViewModel() {
         Log.d("LOG", "Toque en $pos durante fase ${actual.fasePartida}")
         when (actual.fasePartida) {
             FasePartida.COLOCAR_TRAMPA -> {
-                if (actual.posicionTrampaLocal != null) {
+                if (actual.posicionTrampa != null) {
                     return
                 }
 
@@ -324,7 +344,7 @@ class PartidaViewModel : ViewModel() {
 
                 if (sePuede) {
                     _estado.value = actual.copy(
-                        posicionTrampaLocal = pos,
+                        posicionTrampa = pos,
                         mensajeErrorTrampa = null,
                         posicionErrorTrampa = null
                     )
@@ -368,7 +388,13 @@ class PartidaViewModel : ViewModel() {
                         }
 
                         "SACRIFICIO" -> {
-                            ejecucionCartaAccion(nombreCarta, cartaAccion, posicionRival = pos)
+                            if (sacrificioPieza == null){
+                                sacrificioPieza = pos
+                                _mensajeCartaAccion.value = "Ahora selecciona el peón rival"
+                            }
+                            else {
+                                ejecucionCartaAccion(nombreCarta, cartaAccion, posicionPropia = sacrificioPieza, posicionRival = pos)
+                            }
                         }
 
                         "SALVAR_REY" -> {
@@ -452,11 +478,20 @@ class PartidaViewModel : ViewModel() {
         nombreCarta: String
     ) {
         val actual = _estado.value
+
+        if (actual.cartaAccionInicialElegida != null) {
+            return
+        }
+        
         if (actual.fasePartida == FasePartida.ELEGIR_CARTA_ACCION) {
+            _estado.value = actual.copy(
+                cartaAccionInicialElegida = nombreCarta
+            )
+            
             partida.enviarSeleccionAccion(
                 nombreCarta, 
                 equipoPropio.id
-            )
+            )        
         }
     }
 
@@ -504,11 +539,11 @@ class PartidaViewModel : ViewModel() {
     ) {
         val actual = _estado.value
 
-        if (actual.turnoActual == equipoPropio) {
+        if (actual.turnoActual == equipoPropio && !actual.cartaAccionYaUsada) {
             val carta = obtenerCartaAccion(nombreCarta) ?: return
 
             cartaAccionEnUso = nombreCarta
-
+        
             if (carta == "ESPEJO" || 
                 carta == "CEGAR" ||
                 carta == "SOLO_PARA_ADELANTE" ||
@@ -519,7 +554,16 @@ class PartidaViewModel : ViewModel() {
                 _estado.value = actual.copy(
                     modoAccion = carta
                 )
+                _mensajeCartaAccion.value = when (carta) {
+                    "REVIVIR" -> "Selecciona una casilla vacía de tu campo." 
+                    "SACRIFICIO" -> "Selecciona uno de tus peones."
+                    "SALVAR_REY" -> "Selecciona destino para tu rey."
+                    else -> ""
+                }
             }
+        }
+        else {
+            return
         }
     }
 
@@ -556,12 +600,33 @@ class PartidaViewModel : ViewModel() {
             cartaRobar = cartaARobar
         )
 
+        estadoAntesCartaAccion = _estado.value
+
+        val estadoConAccion = aplicarCartaAccion(
+            estado = _estado.value,
+            equipo = equipoPropio,
+            cartaNombre = nombreCarta,
+            x = if (posicionPropia != null) END - posicionPropia.col else -1,
+            y = if (posicionPropia != null) END - posicionPropia.fila else -1,
+            x_op = if (posicionRival != null) END - posicionRival.col else -1,
+            y_op = if (posicionRival != null) END - posicionRival.fila else -1,
+            cartaRobar = cartaARobar,
+            tipo = cartaAccion
+        )
+
+        _estado.value = estadoConAccion.copy(
+            modoAccion = null,
+            cartaAccionYaUsada = true
+        )
+
         val sePuedeJugar = partida.enviarJugarCartaAccion(mensaje)
-        if (sePuedeJugar) {
-            _estado.value = _estado.value.copy(
-                modoAccion = null
-            )
+        if (!sePuedeJugar) {
+            _estado.value = estadoAntesCartaAccion!!
+            estadoAntesCartaAccion = null
             cartaAccionEnUso = null
+            sacrificioPieza = null
+        } else {
+            estadoAntesCartaAccion = null
         }
     }
 

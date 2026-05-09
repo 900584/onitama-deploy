@@ -915,7 +915,13 @@ fun MainMenuScreen(
                         contentDescription = "Amigos")
                 }
                 IconButton(
-                    onClick = {},
+                    onClick = {
+                        val intent = Intent(
+                            context, 
+                            Cartas_activity::class.java)
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    },
                      enabled = !esperar,
                     modifier = Modifier.size(60.dp)
                 ) {

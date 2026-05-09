@@ -284,13 +284,15 @@ class Partida(
     @Serializable
     @SerialName("CARTA_ACCION_JUGADA")
     data class RespuestaCartaAccionJugada(
-        val carta_accion: String,
+        @SerialName("carta_accion")
+        val cartaAccion: String,
         val equipo: Int,
         val x: Int,
         val y: Int,
         val x_op: Int,
         val y_op: Int,
-        val carta_robar: String
+        @SerialName("carta_robar")
+        val cartaRobar: String
     ) : MensajeServidor()
 
     @Serializable

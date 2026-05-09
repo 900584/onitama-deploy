@@ -295,7 +295,13 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                         contentDescription = "Jugar")
                 }
                 IconButton(
-                    onClick = {},
+                    onClick = {
+                        al intent = Intent(
+                            context, 
+                            Tienda_Activity::class.java)
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    },
                     modifier = Modifier.size(60.dp)
                 ) {
                     Image(

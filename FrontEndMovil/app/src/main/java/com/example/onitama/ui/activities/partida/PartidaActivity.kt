@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -125,6 +127,18 @@ class PartidaActivity : AppCompatActivity() {
         val context = LocalContext.current
         val partida = Partida()
         var vermazo by remember { mutableStateOf(false) }
+        var verAcciones by remember { mutableStateOf(false) }
+        val infoCartasAccion by viewModel.mensajeCartaAccion.collectAsState()
+
+        LaunchedEffect(estado.modoAccion, estado.cartaAccionYaUsada) {
+            if (estado.modoAccion != null) {
+                verAcciones = false
+            }
+
+            if (estado.cartaAccionYaUsada){
+                verAcciones = true
+            }
+        }
 
         val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
 
@@ -459,14 +473,19 @@ class PartidaActivity : AppCompatActivity() {
                     }
                 }
             }
+
             Box(
                 Modifier
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    .padding(10.dp),
                 contentAlignment = Alignment.BottomStart,
             ) {
                 Column {
                     Button(
-                        onClick = { vermazo = !vermazo },
+                        onClick = { 
+                            vermazo = !vermazo
+                            if (vermazo) verAcciones = false
+                        },
                         shape = RoundedCornerShape(15.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
                         modifier = Modifier.size(50.dp)
@@ -515,6 +534,109 @@ class PartidaActivity : AppCompatActivity() {
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            if (estado.fasePartida == FasePartida.JUGANDO && estado.cartasAccionPropia.isNotEmpty()) {
+                Box(
+                    Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Button(
+                            onClick = { 
+                                verAcciones = !verAcciones 
+                                if (verAcciones) vermazo = false
+                            },
+                            shape = RoundedCornerShape(15.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
+                            modifier = Modifier.size(50.dp)
+                        ) {
+                            Text(
+                                text = if (verAcciones) "v" else "^",
+                                fontSize = 25.sp,
+                                textAlign = TextAlign.Center,
+                                color = Color.Black
+                            )
+                        }
+
+                        AnimatedVisibility(
+                            visible = verAcciones,
+                            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(
+                                        width = 300.dp, 
+                                        height = 500.dp
+                                    )
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color.DarkGray)
+                                    .border(
+                                        2.dp,
+                                        Color.White,
+                                        RoundedCornerShape(16.dp)
+                                    )
+                            ) {
+                                Column(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(20.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        "CARTAS DE ACCION",
+                                        fontSize = 20.sp,
+                                        fontFamily = quattrocentoBold,
+                                        textAlign = TextAlign.Center,
+                                        color = Color.White
+                                    )
+
+                                    estado.cartasAccionPropia.take(2).forEach { nombreCarta ->
+                                        SeleccionarCartaAccion(
+                                            nombre = nombreCarta,
+                                            esSeleccionable = estado.cartaAccionYaUsada,
+                                            yaUsada = estado.cartaAccionYaUsada,
+                                            onClick = { 
+                                                if (!estado.cartaAccionYaUsada) {
+                                                    viewModel.activarCartaAccion(nombreCarta)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }                    
+                }
+            }
+
+            AnimatedVisibility(
+                visible = infoCartasAccion != null,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 130.dp, start = 20.dp, end = 20.dp),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Box(
+                        modifier = Modifier
+                        
+                    ) {
+                        Text(
+                            text = infoCartasAccion ?: "",
+                            color = Color.White,
+                            fontFamily = quattrocentoBold,
+                            fontSize = 18.sp,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             }
@@ -610,52 +732,88 @@ class PartidaActivity : AppCompatActivity() {
             if (estado.fasePartida == FasePartida.ELEGIR_CARTA_ACCION) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.6f)), 
                     contentAlignment = Alignment.Center
                 ) {
+                    val yaElegida = estado.cartaAccionInicialElegida != null
+                    
                     Column(
+                        modifier = Modifier
+                            .then(
+                                if (!yaElegida) {
+                                    Modifier
+                                        .fillMaxWidth(0.85f)
+                                        .fillMaxHeight(0.70f)
+                                } else {
+                                    Modifier
+                                        .fillMaxWidth(0.85f)
+                                        .fillMaxHeight(0.45f)
+                                }
+                            )
+                            .background(
+                                colorResource(id = R.color.azulFondo),  
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .border(
+                                3.dp, 
+                                Color.White, 
+                                RoundedCornerShape(16.dp)
+                            )
+                            .padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = "ELIGE TU CARTA DE ACCION",
-                            color = Color.Red,
-                            fontFamily = quattrocentoBold,
-                            fontSize = 24.sp,
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            estado.cartasAccionPropia.take(2).forEach { nombre ->
+                            Text(
+                                text = "SELECCIONA TU CARTA DE ACCION",
+                                color = Color.White,
+                                fontFamily = quattrocentoBold,
+                                fontSize = 30.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            
+                            Spacer(Modifier.height(10.dp))
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(Color.Gray)
+                            )
+                            
+                            Spacer(Modifier.height(20.dp))
+                            
+                            if (!yaElegida) {
                                 Column(
                                     modifier = Modifier
-                                        .clickable { viewModel.elegirCartaAccionInicial(nombre) },
+                                        .fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(40.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    estado.cartasAccionPropia.take(2).forEach { nombre ->
+                                        SeleccionarCartaAccion(
+                                            nombre = nombre,
+                                            esSeleccionable = true,
+                                            yaUsada = false,
+                                            onClick = { viewModel.elegirCartaAccionInicial(nombre) },
+                                            
+                                        )
+                                    } 
+                                }
+                            } 
+                            else {
+                                Column(
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
-                                        text = nombre,
+                                        text = "esperando el rival...",
                                         color = Color.White,
-                                        fontSize = 16.sp
-                                    )
-
-                                    Spacer(Modifier.height(5.dp))
-
-                                    Text(
-                                        text = when (nombre) {
-                                            "Pensatorium" -> "Invierte en espejo los movimientos de todas las cartas del tablero. Dura hasta que el rival realice un movimiento."
-                                            "Atrapasueños" -> "Elige una carta de movimiento del oponente y añádela a tu mano."
-                                            "Requiem" -> "Selecciona un peón tuyo y un peón rival; ambos mueren."
-                                            "Santo Grial" -> "Añade un peón extra a una casilla vacía de tu mitad del campo."
-                                            "La Dama del Mar" -> "Solo se pueden hacer movimientos para  adelante. Dura hasta que el rival realice un movimiento."
-                                            "Finisterra" -> "Solo se pueden hacer movimientos para atrás. Dura hasta que el rival realice un movimiento."
-                                            "Brujeria" -> "Durante toda la partida tu rival no verá qué cartas de movimiento tienes."
-                                            "Illusia" -> "Mueve a tu Rey a una casilla vacía de tu mitad del campo."
-                                            else -> "NADA"
-                                        },
-                                        color = Color.LightGray,
-                                        fontSize = 10.sp,
-                                        textAlign = TextAlign.Center
+                                        fontSize = 20.sp
                                     )
                                 }
                             }
@@ -731,66 +889,68 @@ class PartidaActivity : AppCompatActivity() {
                     shape = RoundedCornerShape(15.dp),
                 )
             }
-        }
+        
 
-        if (estado.ganador != null) {
-            val motivo = viewModel.razon
-            val equipo = viewModel.equipoPropio
-            val winner = estado.ganador
-            val victoria = winner == equipo
+            if (estado.ganador != null) {
+                val motivo = viewModel.razon
+                val equipo = viewModel.equipoPropio
+                val winner = estado.ganador
+                val victoria = winner == equipo
 
-            AlertDialog(
-                // Evita que el jugador cierre el popup pulsando fuera de él
-                onDismissRequest = { },
-                title = {
-                    Text(
-                        text = if (victoria) "VICTORIA" else "DERROTA",
-                        fontFamily = quattrocentoBold,
-                        fontSize = 24.sp
-                    )
-                },
+                AlertDialog(
+                    // Evita que el jugador cierre el popup pulsando fuera de él
+                    onDismissRequest = { },
+                    title = {
+                        Text(
+                            text = if (victoria) "VICTORIA" else "DERROTA",
+                            fontFamily = quattrocentoBold,
+                            fontSize = 24.sp
+                        )
+                    },
 
-                /*image = {
-                    Image(
-                        painter = painterResource(id = R.drawable.emote_derrota),
-                        contentDescription = "Imagen de resultado",
-                        modifier = Modifier.size(100.dp)
-                    )
-                },*/
+                    /*image = {
+                        Image(
+                            painter = painterResource(id = R.drawable.emote_derrota),
+                            contentDescription = "Imagen de resultado",
+                            modifier = Modifier.size(100.dp)
+                        )
+                    },*/
 
-                text = {
-                    Text(
-                        text = when (motivo) {
-                            "TRONO" -> if (victoria) "Colocaste tu rey en el trono del rival" else "Tu rival llevó su rey hasta tu trono"
-                            "REY CAPTURADO" -> if (victoria) "Capturaste el rey de tu rival" else "Tu rival ha capturado tu rey"
-                            "ABANDONO" -> if (victoria) "Tu rival abandonó la partida" else "Has abandonado la partida"
-                            "SIN MOVIMIENTOS" -> if (victoria) "El rival no tiene movimientos disponibles" else "Te has quedado sin mvimientos disponibles"
-                            else -> if (victoria) "El Rey del rival ha caído en tu trampa" else "Tu rey ha caido en una trampa. Esta vez tu rival te ha vencido, más suerte a la próxima"
+                    text = {
+                        Text(
+                            text = when (motivo) {
+                                "TRONO" -> if (victoria) "Colocaste tu rey en el trono del rival" else "Tu rival llevó su rey hasta tu trono"
+                                "REY CAPTURADO" -> if (victoria) "Capturaste el rey de tu rival" else "Tu rival ha capturado tu rey"
+                                "ABANDONO" -> if (victoria) "Tu rival abandonó la partida" else "Has abandonado la partida"
+                                "SIN MOVIMIENTOS" -> if (victoria) "El rival no tiene movimientos disponibles" else "Te has quedado sin mvimientos disponibles"
+                                else -> if (victoria) "El Rey del rival ha caído en tu trampa" else "Tu rey ha caido en una trampa. Esta vez tu rival te ha vencido, más suerte a la próxima"
 
-                        },
-                        fontSize = 18.sp,
-                        textAlign = TextAlign.Center
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (modo == ModoJuego.PUBLICA) {
-                                val datos = runBlocking {
-                                    authClient.obtenerPerfil(datosUsuario!!.nombre)
+                            },
+                            fontSize = 18.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if (modo == ModoJuego.PUBLICA) {
+                                    val datos = runBlocking {
+                                        authClient.obtenerPerfil(datosUsuario!!.nombre)
+                                    }
+                                    AutoLogin.actualizar(context, datos)
                                 }
-                                AutoLogin.actualizar(context, datos)
-                            }
-                            finish()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = colorResource(R.color.azulFondo))
-                    ) {
-                        Text("Volver al Menú", color = Color.White)
+                                finish()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colorResource(R.color.azulFondo))
+                        ) {
+                            Text("Volver al Menú", color = Color.White)
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     }
+       
 
 
     fun cambiarEstadoCarta(carta: Carta, estado: EstadoJuego) {
@@ -862,6 +1022,114 @@ class PartidaActivity : AppCompatActivity() {
             }
         }
     }
+
+    @Composable
+    fun SeleccionarCartaAccion(
+        nombre: String,
+        esSeleccionable: Boolean,
+        yaUsada: Boolean,
+        onClick: () -> Unit
+    ) {
+        val context = LocalContext.current
+        
+        val nombreSeguro = nombre.replace(" ", "_").lowercase()
+        val imageResId = context.resources.getIdentifier(
+            nombreSeguro,
+            "drawable",
+            context.packageName
+        )
+        val idSeguro = if (imageResId != 0) imageResId else R.drawable.onitama_text
+        
+        val descripcion = when (nombre) {
+            "Pensatorium" -> "Invierte en espejo los movimientos de todas las cartas del tablero. Dura hasta que el rival realice un movimiento."
+            "Atrapasueños" -> "Elige una carta de movimiento del oponente y añádela a tu mano."
+            "Requiem" -> "Selecciona un peón tuyo y un peón rival; ambos mueren."
+            "Santo Grial" -> "Añade un peón extra a una casilla vacía de tu mitad del campo."
+            "La Dama del Mar" -> "Solo se pueden hacer movimientos para adelante."
+            "Finisterra" -> "Solo se pueden hacer movimientos para atrás."
+            "Brujeria" -> "Tu rival no verá qué cartas tienes."
+            "Illusia" -> "Mueve a tu Rey a una casilla vacía."
+            else -> "Carta de acción"
+        }
+        
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .border(
+                    3.dp,
+                    if (yaUsada) Color.Red else Color.White,
+                    RoundedCornerShape(16.dp)
+                )
+                .clickable { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = idSeguro),
+                contentDescription = nombre,
+                modifier = Modifier
+                    .fillMaxSize(),
+                contentScale = ContentScale.Crop
+            ) 
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = if (yaUsada) 0.8f else 0.4f))
+            ) 
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = nombre.uppercase(),
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                    
+                Text(
+                    text = descripcion,
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            if (yaUsada) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .background(
+                            Color.Red.copy(alpha = 0.8f),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .border(
+                            3.dp,
+                            Color(0xFF8B0000),
+                            RoundedCornerShape(12.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "YA USADA",
+                        color = Color.White,
+                        fontFamily = FontFamily(Font(R.font.quattrocento_bold)),
+                        fontSize = 20.sp
+                    )
+                }
+            }
+        }
+    }
+
 
     @Composable
     fun Minigrid(movimientos: List<Movimiento>, isEnemy: Boolean) {

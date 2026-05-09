@@ -89,6 +89,9 @@ data class EstadoJuego (
     val cartasAccionPropia : List<String> = emptyList(),
     val cartasAccionRival: List<String> = emptyList(),
 
+    val cartaAccionInicialElegida: String? = null,
+    val cartaAccionYaUsada: Boolean = false,
+
     val modoAccion: String? = null,
     
     val equipoCiego: EquipoID? = null,
@@ -97,7 +100,7 @@ data class EstadoJuego (
 
     val restriccionSolo: RestriccionSolo? = null,
     
-    val posicionTrampaLocal: Posicion? = null,
+    val posicionTrampa: Posicion? = null,
     val mensajeErrorTrampa: String? = null,
     val posicionErrorTrampa: Posicion? = null
 )
@@ -330,41 +333,8 @@ fun aplicarCartaAccion(
     val tablero = estado.tablero.map {
         fila -> fila.toMutableList()
     }.toMutableList()
-
-    val cambioTurno = tipo != "ROBAR"
-    val siguiente = if (equipo == EquipoID.AZUL) {
-        EquipoID.ROJO
-    }
-    else {
-        EquipoID.AZUL
-    }
-
-    val nuevasCartasAccionPropia = if (equipo == EquipoID.AZUL) {
-        estado.cartasAccionPropia - cartaNombre
-    }
-    else {
-        estado.cartasAccionPropia
-    }
-
-    val nuevasCartasAccionRival = if (equipo == EquipoID.ROJO) {
-        estado.cartasAccionRival - cartaNombre
-    }
-    else {
-        estado.cartasAccionRival
-    }
-
-    val nuevoEstado = estado.copy(
-        tablero = tablero,
-        turnoActual = if (cambioTurno) siguiente else equipo,
-        fichaSeleccionada = null,
-        cartaSeleccionada = null,
-        movimientosValidos = emptyList(),
-        modoAccion = null,
-        cartasAccionPropia = nuevasCartasAccionPropia,
-        cartasAccionRival = nuevasCartasAccionRival 
-    )
-
-    return when (tipo) {
+    
+    when (tipo) {
         "REVIVIR" -> {
             if (y in 0 until DIM && x in 0 until DIM) {
                 tablero[y][x] = tablero[y][x].copy(
@@ -374,7 +344,6 @@ fun aplicarCartaAccion(
                     )
                 )
             }
-            nuevoEstado
         }
 
         "SALVAR_REY" -> {
@@ -397,7 +366,6 @@ fun aplicarCartaAccion(
                     )
                 )
             }
-            nuevoEstado
         }
 
         "SACRIFICIO" -> {
@@ -411,10 +379,49 @@ fun aplicarCartaAccion(
                     ficha = null
                 )
             }
-            nuevoEstado
-
         }
+    }
 
+    val cambioTurno = (tipo != "ROBAR")
+    val siguiente = if (equipo == EquipoID.AZUL) {
+        EquipoID.ROJO
+    }
+    else {
+        EquipoID.AZUL
+    }
+    val nuevoTurno = if (cambioTurno) {
+        siguiente 
+    }
+    else {
+        equipo
+    } 
+
+    val nuevasCartasAccionPropia = if (equipo == EquipoID.AZUL) {
+        estado.cartasAccionPropia - cartaNombre
+    }
+    else {
+        estado.cartasAccionPropia
+    }
+
+    val nuevasCartasAccionRival = if (equipo == EquipoID.ROJO) {
+        estado.cartasAccionRival - cartaNombre
+    }
+    else {
+        estado.cartasAccionRival
+    }
+
+    var nuevoEstado = estado.copy(
+        tablero = tablero,
+        turnoActual = nuevoTurno,
+        fichaSeleccionada = null,
+        cartaSeleccionada = null,
+        movimientosValidos = emptyList(),
+        modoAccion = null,
+        cartasAccionPropia = nuevasCartasAccionPropia,
+        cartasAccionRival = nuevasCartasAccionRival,
+    )
+
+    return when(tipo) {
         "ROBAR" -> {
             val misCartas = if (equipo == EquipoID.AZUL) {
                 estado.cartasJugador
@@ -445,7 +452,8 @@ fun aplicarCartaAccion(
                 nuevoEstado.copy(
                     cartasJugador = if (equipo == EquipoID.AZUL) nuevasJugador else nuevasOponente,
                     cartasOponente = if (equipo == EquipoID.ROJO) nuevasJugador else nuevasOponente,
-                    cartasSiguientes = siguientes
+                    cartasSiguientes = siguientes,
+                    turnoActual = equipo
                 )
             }
             else {
@@ -824,10 +832,12 @@ fun ejecutarMovimiento (
         ganador = null
     }
 
+    val siguiente = if (equipoActual == EquipoID.ROJO) EquipoID.AZUL else EquipoID.ROJO
+    
     var nuevoEstado = estado.copy(
         fasePartida = if (ganador != null) FasePartida.TERMINADA else estado.fasePartida,
         tablero = tablero,
-        turnoActual = if (equipoActual == EquipoID.ROJO) EquipoID.AZUL else EquipoID.ROJO,
+        turnoActual = siguiente,
         cartasJugador = nuevasCartasJugador,
         cartasOponente = nuevasCartasOponente,
         cartasSiguientes = nuevasSiguientes,
@@ -840,7 +850,6 @@ fun ejecutarMovimiento (
         restriccionSolo = resolverRestrccionSoloTrasMovimiento(estado.restriccionSolo, equipoActual)
     )
 
-    val siguiente = if (equipoActual == EquipoID.ROJO) EquipoID.AZUL else EquipoID.ROJO
     val puedeMoverDespues = tieneMovimientosPosibles(nuevoEstado, siguiente)
 
     val gana = when {

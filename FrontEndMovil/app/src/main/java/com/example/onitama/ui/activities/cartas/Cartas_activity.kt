@@ -239,24 +239,30 @@ fun CartasScreen(
                         val puntosNeeded = listasCartasAccion[card].puntos_necesarios
                         Log.d("DEBUG", "Puntos necesarios: $puntosNeeded")
                         
-                        val cartasAccion = Carta(
-                            nombre = listasCartasAccion[card].nombre,
-                            imagen = "",
-                            movimientos = emptyList()
-                        )
                         if(katanas >= puntosNeeded){
-                            CartaCatalogo(
-                                carta = cartasAccion,
-                                esAccion = true,
-                                onClick = {}
-                            )
-                            Text(
-                                text = listasCartasAccion[card].descripcion,
-                                fontFamily = quattrocentoBold,
-                                fontSize = 14.sp,
-                                color = Color.DarkGray,
-                                textAlign = TextAlign.Start
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(15.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CartaCatalogo(
+                                    carta =  Carta(
+                                        nombre = listasCartasAccion[card].nombre,
+                                        imagen = "",
+                                        movimientos = emptyList()
+                                    ),
+                                    esAccion = true,
+                                    onClick = {}
+                                )
+                                Text(
+                                    text = listasCartasAccion[card].descripcion,
+                                    fontFamily = quattrocentoBold,
+                                    fontSize = 14.sp,
+                                    color = Color.DarkGray,
+                                    textAlign = TextAlign.Start
+                                )
+                            }
                         }
                         else {
                             Box(
@@ -424,7 +430,13 @@ fun CartasScreen(
                         contentDescription = "Amigos")
                 }
                 IconButton(
-                    onClick = {},
+                    onClick = {
+                        val intent = Intent(
+                            context, 
+                            Tienda_Activity::class.java)
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    },
                     modifier = Modifier.size(60.dp)
                 ) {
                     Image(
