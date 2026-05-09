@@ -5,6 +5,8 @@ import com.example.onitama.Config
 import com.example.onitama.PartidaActiva
 import com.example.onitama.lib.EquipoID
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -116,9 +118,12 @@ class Partida(
         val equipo: Int,
         val x: Int,
         val y: Int,
-        val x_op: Int = -1,
-        val y_op: Int = -1,
-        val cartaRobar: String = ""
+        @OptIn(ExperimentalSerializationApi::class)
+        @EncodeDefault val x_op: Int = -1,
+        @OptIn(ExperimentalSerializationApi::class)
+        @EncodeDefault val y_op: Int = -1,
+        @OptIn(ExperimentalSerializationApi::class)
+        @EncodeDefault val cartaRobar: String = "ninguna"
     ) : MensajeCliente()
 
     // ----------------------------------------------------
@@ -286,7 +291,7 @@ class Partida(
     data class RespuestaCartaAccionJugada(
         @SerialName("carta_accion")
         val cartaAccion: String,
-        val equipo: Int,
+        val accion: String?,
         val x: Int,
         val y: Int,
         val x_op: Int,

@@ -336,12 +336,25 @@ class PartidaActivity : AppCompatActivity() {
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     estado.cartasOponente.forEach { carta ->
-                        CartaBoton(
-                            carta = carta,
-                            seleccionada = false,
-                            onClick = {},
-                            true
-                        )
+                        if(estado.equipoCiego == null || estado.equipoCiego != PartidaActiva.datosPartida!!.obtenerEquipoID()) {
+                            CartaBoton(
+                                carta = carta,
+                                seleccionada = false,
+                                onClick = {
+                                    if (estado.modoAccion == "ROBAR" && viewModel.cartaAccionEnUso != null) {
+                                        viewModel.ejecucionCartaAccion(
+                                            nombreCarta = "Atrapasueños",
+                                            cartaAccion = "ROBAR",
+                                            cartaARobar = carta.nombre // Pasamos el nombre de la carta rival elegida
+                                        )
+                                }
+                                          },
+                                true
+                            )
+                        }
+                        else{
+                            Oculto()
+                        }
                     }
 
                 }
@@ -1020,6 +1033,34 @@ class PartidaActivity : AppCompatActivity() {
 
                 Minigrid(carta.movimientos, isEnemy)
             }
+        }
+    }
+
+
+    @Composable
+    fun Oculto() {
+
+        val ancho = 170.dp
+        val alto = 100.dp
+        val context = LocalContext.current
+
+        Box(
+            modifier = Modifier
+                .padding(start = 15.dp)
+                .height(alto)
+                .width(ancho)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                .background(Color.DarkGray)
+        ) {
+            Image(
+                painterResource(id = R.drawable.hidden),
+                contentDescription = "bloqueado",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .align (Alignment.Center)
+                    .height(65.dp)
+                    .width(65.dp)
+            )
         }
     }
 

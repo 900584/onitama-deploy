@@ -1,6 +1,7 @@
 package com.example.onitama.lib
 
 import android.util.Log
+import com.example.onitama.PartidaActiva
 import com.example.onitama.api.Partida
 
 // ─── Constantes del tablero ───────────────────────────────────────────────────
@@ -333,7 +334,7 @@ fun aplicarCartaAccion(
     val tablero = estado.tablero.map {
         fila -> fila.toMutableList()
     }.toMutableList()
-    
+    Log.d("LOG de partida", "Intentando Aplicar acción: $tipo")
     when (tipo) {
         "REVIVIR" -> {
             if (y in 0 until DIM && x in 0 until DIM) {
@@ -423,14 +424,15 @@ fun aplicarCartaAccion(
 
     return when(tipo) {
         "ROBAR" -> {
-            val misCartas = if (equipo == EquipoID.AZUL) {
+            val miEquipo = PartidaActiva.datosPartida!!.obtenerEquipoID()
+            val misCartas = if (equipo == miEquipo) {
                 estado.cartasJugador
             }
             else {
                 estado.cartasOponente
             }
 
-            val susCartas = if (equipo == EquipoID.AZUL) {
+            val susCartas = if (equipo == miEquipo) {
                 estado.cartasOponente
             }
             else {
@@ -450,8 +452,8 @@ fun aplicarCartaAccion(
                 } + nueva
 
                 nuevoEstado.copy(
-                    cartasJugador = if (equipo == EquipoID.AZUL) nuevasJugador else nuevasOponente,
-                    cartasOponente = if (equipo == EquipoID.ROJO) nuevasJugador else nuevasOponente,
+                    cartasJugador = if (equipo == miEquipo) nuevasJugador else nuevasOponente,
+                    cartasOponente = if (equipo != miEquipo) nuevasJugador else nuevasOponente,
                     cartasSiguientes = siguientes,
                     turnoActual = equipo
                 )
@@ -471,8 +473,9 @@ fun aplicarCartaAccion(
         }
 
         "CEGAR" -> {
+            val victima = if (equipo == EquipoID.AZUL) EquipoID.ROJO else EquipoID.AZUL
             nuevoEstado.copy(
-                equipoCiego = equipo
+                equipoCiego = victima
             )
         }
 
@@ -757,7 +760,7 @@ fun ejecutarMovimiento (
 
     val equipoActual = estado.turnoActual
 
-    val cartasMovedor = if (equipoActual == EquipoID.AZUL) {
+    val cartasMovedor = if (equipoActual == equipoLocal) {
         estado.cartasJugador
     }
     else {
@@ -775,7 +778,7 @@ fun ejecutarMovimiento (
     }
     else {
         cartaRecibida = estado.cartasSiguientes[0]
-        nuevasSiguientes = listOf(estado.cartasSiguientes[1], estado.cartasSiguientes[2], carta)
+        nuevasSiguientes = estado.cartasSiguientes.drop(1) + carta
     }
 
     /**

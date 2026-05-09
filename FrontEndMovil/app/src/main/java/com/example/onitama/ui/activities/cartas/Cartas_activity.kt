@@ -61,6 +61,7 @@ import com.example.onitama.lib.Cartas
 import com.example.onitama.lib.Movimiento
 import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.amigos.Amigos_Activity
+import com.example.onitama.ui.tienda.Tienda_Activity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 
@@ -484,11 +485,20 @@ fun CartaCatalogo(
     // 1. Usamos tu función, pero por si acaso tiene espacios, le ponemos replace
     val nombreSeguro = Cartas.imagenCarta(carta).replace(" ", "_")
 
-    val imageResId = context.resources.getIdentifier(
+
+    var imageResId = context.resources.getIdentifier(
         nombreSeguro,
         "drawable",
         context.packageName
     )
+    //Caso especialito: Atrapasueños, como la ñ no la admite la carpeta res, tendremos que cambiarla
+    if(nombreSeguro == "atrapasueños"){
+        imageResId = context.resources.getIdentifier(
+            "atrapasuenos",
+            "drawable",
+            context.packageName
+        )
+    }
 
     //🛡️ PROTECCIÓN ANTI-CRASH: Si la imagen no existe (0), ponemos el logo por defecto
     val idSeguro = if (imageResId != 0) imageResId else R.drawable.onitama_text

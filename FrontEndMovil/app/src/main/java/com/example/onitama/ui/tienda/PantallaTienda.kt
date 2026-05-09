@@ -51,6 +51,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.text.font.FontWeight
+import com.example.onitama.ui.amigos.Amigos_Activity
 
 @Composable
 fun PantallaTienda(viewModel: ViewModelTienda = viewModel()) {
@@ -284,7 +285,7 @@ fun PantallaTienda(viewModel: ViewModelTienda = viewModel()) {
                 }
                 IconButton(
                     onClick = {
-                        al intent = Intent(
+                        val intent = Intent(
                             context, 
                             Amigos_Activity::class.java)
                         context.startActivity(intent)

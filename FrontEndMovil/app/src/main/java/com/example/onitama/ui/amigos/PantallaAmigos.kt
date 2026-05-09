@@ -47,6 +47,8 @@ import com.example.onitama.R
 import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.activities.cartas.Cartas_activity
 import com.example.onitama.ui.perfil.Perfil_Activity
+import com.example.onitama.ui.tienda.Tienda_Activity
+import kotlin.jvm.java
 
 /**
  * Pantalla de amigos.
@@ -296,7 +298,7 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                 }
                 IconButton(
                     onClick = {
-                        al intent = Intent(
+                        val intent = Intent(
                             context, 
                             Tienda_Activity::class.java)
                         context.startActivity(intent)
