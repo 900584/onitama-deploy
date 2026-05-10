@@ -399,6 +399,18 @@ Se envía para pedir el historial de partidas públicas del usuario.
 ---
 
 ### 2.3 Mensajes que envía el SERVIDOR al cliente 
+#### `PEON_MUERTO`
+Lo envia el servidor para avisar al los jugadores que un peon a muerto por causas especiales (Por ejemplo, inentar colocar un peon con la carta Illusia en una mina)
+
+```json
+{
+  "tipo": "PEON_MUERTO",
+  "pos_x": 4,
+  "pos_y": 3
+}
+```
+
+---
 
 #### `CARTA_ACCION_JUGADA`
 Lo envia el servidor para avisar al oponente de que carta de accion se ha jugado con sus parametros para que aplique los cambios al tablero/cartas
