@@ -5,6 +5,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +19,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
@@ -27,8 +31,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -37,8 +45,11 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.onitama.AutoLogin
 import com.example.onitama.AutoLogin.cerrarSesion
 import com.example.onitama.R
@@ -48,6 +59,8 @@ import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.notificaciones.Notificaciones_Activity
 import com.example.onitama.ui.activities.cartas.Cartas_activity
 import com.example.onitama.ui.amigos.Amigos_Activity
+import com.example.onitama.ui.components.BotonPrincipal
+import com.example.onitama.ui.components.CampoContrasenya
 
 /**
  * Pantalla que muestra datos del usuario.
@@ -58,11 +71,16 @@ import com.example.onitama.ui.amigos.Amigos_Activity
  * @param viewModel View Model que gestiona el estado y la lógica.
  */
 @Composable
-fun PantallaPerfil() {
+fun PantallaPerfil(
+    viewModel: ViewModelEditar
+) {
 
     val datosUsuario by AutoLogin.sesion.collectAsState()
+    if(datosUsuario == null) return
     val context = LocalContext.current
     val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
+    var chooseAvatar by remember { mutableStateOf(false) }
+    var changingPass by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -202,13 +220,15 @@ fun PantallaPerfil() {
                         .size(150.dp)
                         .clip(CircleShape)
                         .background(Color.LightGray)
+                        .clickable(onClick = {chooseAvatar = true})
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(150.dp)
                         .clip(CircleShape)
-                        .background(Color.LightGray),
+                        .background(Color.LightGray)
+                        .clickable(onClick = {chooseAvatar = true}),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -259,9 +279,9 @@ fun PantallaPerfil() {
                     .padding(horizontal = 40.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Botón 'Editar Perfil'
+                // Botón 'Cambiar Contraseña'
                 Button(
-                    onClick = { /* Acción editar perfil */ },
+                    onClick = { changingPass = true },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colorResource(id = R.color.azulBarraTareas),
@@ -271,12 +291,12 @@ fun PantallaPerfil() {
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.editar),
-                        contentDescription = "Editar Perfil",
+                        contentDescription = "Cambiar Contraseña",
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "EDITAR",
+                        text = "Cambiar Contraseña",
                         fontFamily = quattrocentoBold,
                         fontSize = 12.sp
                     )
@@ -334,6 +354,144 @@ fun PantallaPerfil() {
                 }
             }
         }
+
+        if(chooseAvatar){
+            Dialog(onDismissRequest = {chooseAvatar = false}){
+                val context = LocalContext.current
+                Box(
+                    modifier = Modifier
+                        .size(width = 300.dp, height = 600.dp)
+                        .clip(RoundedCornerShape(16.dp)) // Cambiado para que no corte tu lista
+                        .background(Color.LightGray)
+                ) {
+                    Column (
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ){
+                        Text(
+                            "Elige Tu avatar",
+                            fontSize = 25.sp,
+                            textAlign = TextAlign.Center,
+                            color = Color.Black
+                        )
+
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(3),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(12) { index ->
+                                val i = index + 1
+
+                                val nombre = "avatar_${i.toString().padStart(2, '0')}"
+
+                                val imageResId = context.resources.getIdentifier(
+                                    nombre, "drawable", context.packageName
+                                )
+                                val idSeguro = if (imageResId != 0) imageResId else R.drawable.onitama_text
+
+                                // Comparamos el nombre de esta imagen con el que tiene el ViewModel
+                                val isSelected = (viewModel.avatarState.collectAsState().value == nombre)
+
+                                Image(
+                                    painter = painterResource(id = idSeguro),
+                                    contentDescription = "Avatar $i",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(80.dp) // Tamaño fijo para que queden uniformes
+                                        // Ajusta el tamaño horizontal
+                                        .clip(CircleShape) // Los hacemos redondos
+                                        // 1. Borde condicional: Solo se dibuja si está seleccionado
+                                        .border(width = if (isSelected) 4.dp else 0.dp, color = if (isSelected) colorResource(R.color.azulFondo) else Color.Transparent, shape = CircleShape)
+                                        // 2. Efecto de opacidad: Los no seleccionados se ven un poco más apagados
+                                        .alpha(if (isSelected) 1f else 0.5f)
+                                        // 3. Evento click
+                                        .clickable { viewModel.onAvatarChange(nombre) }
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.cambiarPerfil(context, datosUsuario?.nombre ?: "", viewModel.avatarState.value)
+                            },
+                        ){
+                            Text("Cambiar Avatar")
+                        }
+                    }
+                }
+            }
+
+        }
+
+        if(changingPass){
+            Dialog(onDismissRequest = {changingPass = false}){
+                val context = LocalContext.current
+                Box(
+                    modifier = Modifier
+                        .size(width = 300.dp, height = 600.dp)
+                        .clip(RoundedCornerShape(16.dp)) // Cambiado para que no corte tu lista
+                        .background(Color.LightGray)
+                ) {
+                    Column (
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ){
+                        CampoContrasenya(
+                            entrada = viewModel.oldPassState.collectAsState().value,
+                            cambio = { viewModel.onOldPassChange(it) },
+                            etiqueta = "Introduce la contraseña actual"
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        CampoContrasenya(
+                            entrada = viewModel.newPass1State.collectAsState().value,
+                            cambio = { viewModel.onPass1Change(it) },
+                            etiqueta = "Introduce la nueva Contraseña"
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        CampoContrasenya(
+                            entrada = viewModel.newPass2State.collectAsState().value,
+                            cambio = { viewModel.onPass2Change(it) },
+                            etiqueta = "Repite la nueva contraseña"
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        val coincide = ((viewModel.newPass1State.collectAsState().value == viewModel.newPass2State.collectAsState().value) && (viewModel.newPass1State.collectAsState().value != ""))
+
+                        BotonPrincipal(
+                            texto = "Cambiar Contraseña",
+                            onClick = {
+                                val conseguido = viewModel.cambiarPass(context, datosUsuario?.nombre ?: "")
+                                if(conseguido){
+                                    Log.d("CambioPwd", "La contraseña se ha cambiado exitosamente")
+                                    changingPass = false
+                                }
+                                else{
+                                    Log.e("Error de cambio", "No se pudo cambiar o la Contraseña es incorrecta")
+                                }
+                            },
+                            activado = coincide
+                        )
+
+
+                    }
+                }
+            }
+
+        }
+
+
 
         // ==========================================
         // 3. BARRA INFERIOR DE TAREAS
