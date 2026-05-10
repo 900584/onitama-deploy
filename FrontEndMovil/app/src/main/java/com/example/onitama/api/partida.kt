@@ -308,6 +308,13 @@ class Partida(
     @SerialName("CARTA_ACCION_INVALIDA")
     object RespuestaCartaAccionInvalida : MensajeServidor()
 
+    @Serializable
+    @SerialName("PEON_MUERTO")
+    data class RespuestaPeonMuerto(
+        val pos_x: Int,
+        val pos_y: Int
+    ) : MensajeServidor()
+
     /**
      * Devuelve una función lambda () -> Unit que sirve para desconectar (limpiar).
      */
