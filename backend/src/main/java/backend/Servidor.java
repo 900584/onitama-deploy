@@ -1354,6 +1354,7 @@ public class Servidor extends WebSocketServer {
                 iniciarTimerTurno(pj, pj.partida.getTurno());
             }else if(estado != 0){
                 //Uno de los dos se quedo sin movimientos
+                pj.partida.finalizarPartida();
                 JSONObject msg1 = new JSONObject();
                 JSONObject msg2 = new JSONObject();
                 esperaPartida.remove(idPartida);
