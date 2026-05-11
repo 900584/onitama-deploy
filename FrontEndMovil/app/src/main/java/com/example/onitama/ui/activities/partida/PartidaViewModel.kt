@@ -292,7 +292,28 @@ class PartidaViewModel : ViewModel() {
                                     cartaAccionEnUso = null
                                     sacrificioPieza = null
                                 }
-                            }                           
+                            }
+                            is Partida.RespuestaPeonMuerto -> {
+                                Log.d("Partida", "has colocado el peon resucitado en una casilla trampa")
+                                val fila = END - mensaje.pos_y
+                                val columna = END - mensaje.pos_x
+                                val nuevoTablero = actual.tablero.map {
+                                    it.toMutableList()
+                                }.toMutableList()
+
+                                nuevoTablero[fila][columna] = nuevoTablero[fila][columna].copy(
+                                    ficha = null,
+                                    esTrampaEquipo = -1
+                                )
+
+                                // Solo actualizamos el tablero y limpiamos la UI de la carta,
+                                // respetando el turno que ya había avanzado 'ejecucionCartaAccion'
+                                _estado.value = actual.copy(
+                                    modoAccion = null,
+                                    cartaAccionYaUsada = true,
+                                    tablero = nuevoTablero
+                                )
+                            }
 
                             else -> {
                                 println("LOG: Mensaje recibido no reconocido: $mensaje")
@@ -662,17 +683,6 @@ class PartidaViewModel : ViewModel() {
         }
     }
 
-    fun seleccionarCartaRobar(
-        nombreCarta: String
-    ) {
-        val cartaAccion = cartaAccionEnUso ?: return 
-
-        ejecucionCartaAccion(
-            nombreCarta = cartaAccion,
-            cartaAccion = "ROBAR",
-            cartaARobar = nombreCarta
-        )
-    }
 
     fun activarPausa() {
         val datos = PartidaActiva.datosPartida ?: return

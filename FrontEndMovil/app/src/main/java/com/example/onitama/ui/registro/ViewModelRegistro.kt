@@ -40,7 +40,7 @@ class ViewModelRegistro() : ViewModel() {
         _estadoUI.value = _estadoUI.value.copy(contrasenyaR = contrasenyaR)
     }
 
-    fun onAvatarChange(avatar: String){
+    fun onAvatarChange(avatar: String?){
         _estadoUI.value = _estadoUI.value.copy(avatar = avatar)
     }
 

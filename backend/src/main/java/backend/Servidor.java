@@ -1379,31 +1379,70 @@ public class Servidor extends WebSocketServer {
                 conn.send((equipo == estado) ? msg2.toString() : msg1.toString());
                 // Juego terminado: no iniciar nuevo timer
             }else{
-                String accionTipo = "";
-                for (CartaAccion ca : pj.partida.getCartasAccion()) {
-                    if (ca.getNombre().equals(nomCartaAcc)) {
-                        accionTipo = ca.getAccion();
-                        break;
+                estado = pj.partida.eraTrampa(nomCartaAcc);
+                if(estado == 1){
+                    //Uno de los dos se quedo sin movimientos
+                    pj.partida.finalizarPartida();
+                    JSONObject msg1 = new JSONObject();
+                    JSONObject msg2 = new JSONObject();
+                    esperaPartida.remove(idPartida);
+                    try {
+                        mutexParejas.acquire();
+                        parejas.remove(pj);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } finally {
+                        mutexParejas.release();
                     }
+                    
+                    msg1.put("tipo", "DERROTA");
+                    msg1.put("motivo", "REY_EN_TRAMPA");
+                    msg1.put("equipo_responsable", equipo);
+                    msg2.put("tipo", "VICTORIA");
+                    msg2.put("motivo", "REY_EN_TRAMPA");
+                    msg2.put("equipo_responsable", equipo);
+
+                    InfoJugador oponente = pj.getOponente(conn);
+                    oponente.ws.send(msg2.toString());
+                    conn.send(msg1.toString());
+                    // Juego terminado: no iniciar nuevo timer
+                }else if(estado == 2){
+                    JSONObject msg1 = new JSONObject();
+                    
+                    msg1.put("tipo", "PEON_MUERTO");
+                    msg1.put("pos_x", x);
+                    msg1.put("pos_y", y);
+
+                    InfoJugador oponente = pj.getOponente(conn);
+                    oponente.ws.send(msg1.toString());
+                    conn.send(msg1.toString());
+                }else{
+                    String accionTipo = "";
+                    for (CartaAccion ca : pj.partida.getCartasAccion()) {
+                        if (ca.getNombre().equals(nomCartaAcc)) {
+                            accionTipo = ca.getAccion();
+                            break;
+                        }
+                    }
+                    JSONObject msg = new JSONObject();
+                    msg.put("tipo", "CARTA_ACCION_JUGADA");
+                    msg.put("carta_accion", nomCartaAcc);
+                    msg.put("accion", accionTipo);
+                    msg.put("x", x);
+                    msg.put("y", y);
+                    msg.put("x_op", xOp);
+                    msg.put("y_op", yOp);
+                    msg.put("carta_robar", cartaRobar);
+                    pj.getOponente(conn).ws.send(msg.toString()); //Avisamos al oponente de la carta que se ha jugado
+                    // actualizamos turno y estado de cartas en bd
+                    try {
+                        pj.partida.actualizarBD();
+                    } catch (Exception e) {
+                        System.err.println("Error al actualizar BD después de jugar acción: " + e.getMessage());
+                    }
+                    // Reiniciar timer para quien deba mover ahora
+                    iniciarTimerTurno(pj, pj.partida.getTurno());
                 }
-                JSONObject msg = new JSONObject();
-                msg.put("tipo", "CARTA_ACCION_JUGADA");
-                msg.put("carta_accion", nomCartaAcc);
-                msg.put("accion", accionTipo);
-                msg.put("x", x);
-                msg.put("y", y);
-                msg.put("x_op", xOp);
-                msg.put("y_op", yOp);
-                msg.put("carta_robar", cartaRobar);
-                pj.getOponente(conn).ws.send(msg.toString()); //Avisamos al oponente de la carta que se ha jugado
-                // actualizamos turno y estado de cartas en bd
-                try {
-                    pj.partida.actualizarBD();
-                } catch (Exception e) {
-                    System.err.println("Error al actualizar BD después de jugar acción: " + e.getMessage());
-                }
-                // Reiniciar timer para quien deba mover ahora
-                iniciarTimerTurno(pj, pj.partida.getTurno());
             }
         }
     }

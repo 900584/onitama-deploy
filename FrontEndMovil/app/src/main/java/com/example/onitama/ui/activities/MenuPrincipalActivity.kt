@@ -69,6 +69,8 @@ import com.example.onitama.ui.activities.profile.ProfileActivity
 import com.example.onitama.ui.amigos.Amigos_Activity
 import com.example.onitama.api.*
 import com.example.onitama.api.ManejadorPartidaAPI
+import com.example.onitama.ui.perfil.Perfil_Activity
+import com.example.onitama.ui.tienda.Tienda_Activity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -807,22 +809,42 @@ fun MainMenuScreen(
                 )
 
 
-                //🛡️ PROTECCIÓN ANTI-CRASH: Si la imagen no existe (0), ponemos el logo por defecto
-                val idSeguro = if (imageResId != 0) imageResId else R.drawable.onitama_text
-
-                Image(
-                    painterResource(idSeguro),
-                    contentDescription = "Imagen de perfil",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(80.dp)
-                        .align(Alignment.CenterEnd)
-                        .clip(CircleShape)
-                        .clickable(onClick = {
-                            val intent = Intent(context, ProfileActivity::class.java)
-                            context.startActivity(intent)
-                        })
-                )
+                //Si la imagen no existe (0), ponemos la inicial del username
+                if (imageResId != 0) {
+                    Image(
+                        painter = painterResource(imageResId),
+                        contentDescription = "Imagen de perfil",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(80.dp)
+                            .align(Alignment.CenterEnd)
+                            .clip(CircleShape)
+                            .clickable(onClick = {
+                                val intent = Intent(context, Perfil_Activity::class.java)
+                                context.startActivity(intent)
+                            })
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .align(Alignment.CenterEnd)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .clickable(onClick = {
+                                val intent = Intent(context, Perfil_Activity::class.java)
+                                context.startActivity(intent)
+                            }),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = datosUsuario?.nombre?.take(1)?.uppercase() ?: "",
+                            color = colorResource(id = R.color.azulFondo),
+                            fontSize = 32.sp,
+                            fontFamily = quattrocentoBold
+                        )
+                    }
+                }
 
                 // B) Título del juego
                 Image(
@@ -933,8 +955,8 @@ fun MainMenuScreen(
                 IconButton(
                     onClick = {
                         val intent = Intent(
-                            context, 
-                            Cartas_activity::class.java)
+                            context,
+                            Tienda_Activity::class.java)
                         context.startActivity(intent)
                         (context as? Activity)?.finish()
                     },
