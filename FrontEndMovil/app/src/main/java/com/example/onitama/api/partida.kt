@@ -41,6 +41,17 @@ val jsonPartida = Json {
     classDiscriminator = "tipo"
 }
 
+
+fun invertirCoordenadasString(input: String?, end: Int = 6): String? {
+    if (input == null) return null
+    val regex = Regex("(\\d+),(\\d+)")
+    return regex.replace(input) { matchResult ->
+        val x = matchResult.groupValues[1].toInt()
+        val y = matchResult.groupValues[2].toInt()
+        "${end - x},${end - y}"
+    }
+}
+
 class Partida(
     private val wsUrl: String = Config.WS_URL
 ){
@@ -161,8 +172,8 @@ class Partida(
         val turno: Int? = null,
         val cartas_accion_jugador: List<CartaAccionJson>? = emptyList(),
         val cartas_accion_oponente: List<CartaAccionJson>? = emptyList(),
-        val posTrampa_jugador: String? = null,
-        val posTrampa_oponente: String? = null
+        val trampa_j1_pos: String? = null,
+        val trampa_j2_pos: String? = null
     ): MensajeServidor() {
         fun obtenerEquipoID(): EquipoID {
             return if (equipo == 1) EquipoID.AZUL else EquipoID.ROJO
@@ -186,8 +197,8 @@ class Partida(
         val turno: Int? = null,
         val cartas_accion_jugador: List<CartaAccionJson>? = emptyList(),
         val cartas_accion_oponente: List<CartaAccionJson>? = emptyList(),
-        val posTrampa_jugador: String? = null,
-        val posTrampa_oponente: String? = null
+        val trampa_j1_pos: String? = null,
+        val trampa_j2_pos: String? = null
     ): MensajeServidor() {
         fun toPartidaEncontrada() = RespuestaPartidaEncontrada(
             partida_id = this.partida_id,
@@ -204,8 +215,8 @@ class Partida(
             turno = this.turno,
             cartas_accion_jugador = this.cartas_accion_jugador,
             cartas_accion_oponente = this.cartas_accion_oponente,
-            posTrampa_jugador = this.posTrampa_jugador,
-            posTrampa_oponente = this.posTrampa_oponente
+            trampa_j1_pos = this.trampa_j1_pos,
+            trampa_j2_pos = this.trampa_j2_pos
         )
     }
 

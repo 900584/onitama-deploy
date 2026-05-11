@@ -760,7 +760,7 @@ fun MainMenuScreen(
                     val minutos = tiempo / 60
                     val segundos = tiempo % 60
                     Text(
-                        text = String.format("%02d:%02.d", minutos, segundos),
+                        text = String.format("%02d:%02d", minutos, segundos),
                         fontFamily = quattrocentoBold,
                         fontSize = 30.sp,
                         color = Color.Black

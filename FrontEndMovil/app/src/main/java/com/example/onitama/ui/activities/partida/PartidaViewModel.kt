@@ -75,7 +75,7 @@ class PartidaViewModel : ViewModel() {
                 equipoPropio = if (datos.equipo == 1) EquipoID.AZUL else EquipoID.ROJO
 
                 // Primero construimos el tablero con las cartas del servidor
-                val esNueva = (modo == ModoJuego.PUBLICA || modo == ModoJuego.PRIVADA )
+                val esNueva = (modo == ModoJuego.PUBLICA || modo == ModoJuego.PRIVADA && (datos.trampa_j2_pos== null ) && (datos.trampa_j1_pos == null))
                 _estado.value = crearEstadoServidor(
                     cartas_jugador = datos.cartas_jugador.map { it.nombre },
                     cartas_oponente = datos.cartas_oponente.map { it.nombre },
@@ -87,6 +87,8 @@ class PartidaViewModel : ViewModel() {
                     cartas_accion_rival = datos.cartas_accion_oponente,
                     esReanudada = !esNueva
                 )
+
+
 
                 // Luego conectamos el WebSocket para escuchar los turnos
                 conectarAlServidor()

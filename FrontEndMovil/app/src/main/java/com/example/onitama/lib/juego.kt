@@ -607,8 +607,8 @@ fun tableroDesdeServidor(
         }
     }
 
-    colocar(eq1, EquipoID.ROJO)
-    colocar(eq2, EquipoID.AZUL)
+    colocar(eq1, EquipoID.AZUL)
+    colocar(eq2, EquipoID.ROJO)
 
     return nuevoTablero
 }
