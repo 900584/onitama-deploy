@@ -1511,7 +1511,7 @@ Definidos en: `src/lib/cartas.ts` → array `TODAS_LAS_CARTAS`
              -> javac -cp $LIB -d out Servidor.java VO\*.java JDBC\*.java gestor\*.java 
              (quiza necesites mkdir out)
              ->java -cp "out;$LIB" Servidor
-- Terminal 3: -> cd webFinal
+- Terminal 3: -> cd FrontEndWeb
              -> npm install
              -> npm run dev  
              (es necesario tener npm instalado)

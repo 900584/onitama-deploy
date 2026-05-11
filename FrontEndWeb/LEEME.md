@@ -29,7 +29,7 @@ npm --version    # Debe mostrar 9.x o superior
 ### 1. Abrir la carpeta del proyecto
 
 ```bash
-cd webFinal
+cd FrontEndWeb
 ```
 
 ### 2. Instalar dependencias
