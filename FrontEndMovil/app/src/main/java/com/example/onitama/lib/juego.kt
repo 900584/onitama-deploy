@@ -553,8 +553,8 @@ fun tableroDesdeServidor(
     eq1: String,
     eq2: String
 ) : List<List<Celda>> {
-    val nuevoTablero = MutableList(DIM) { fila -> 
-        MutableList(DIM) { col -> 
+    val nuevoTablero = MutableList(DIM) { fila ->
+        MutableList(DIM) { col ->
             Celda(
                 ficha = null,
                 esTrono = (fila == 0 && col == CENTRO) || (fila == DIM - 1 && col == CENTRO),
@@ -567,13 +567,20 @@ fun tableroDesdeServidor(
     val peonRe = Regex("\\((-?\\d+),(-?\\d+)\\)")
     val trampaRe = Regex("\\|(-?\\d+),(-?\\d+),(\\d+)\\|")
 
+    // Misma constante que usas en el ViewModel para invertir (asumo que DIM - 1 es 6)
+    val END = DIM - 1
+
     fun colocar(
         data: String,
         equipo: EquipoID
     ) {
         reyRe.findAll(data).forEach { m ->
-            val col = m.groupValues[1].toInt()
-            val fila = m.groupValues[2].toInt()
+            val colServidor = m.groupValues[1].toInt()
+            val filaServidor = m.groupValues[2].toInt()
+
+            // ¡Aplicamos la inversión aquí!
+            val col = END - colServidor
+            val fila = END - filaServidor
 
             if (fila in 0 until DIM && col in 0 until DIM) {
                 nuevoTablero[fila][col] = nuevoTablero[fila][col].copy(ficha = Ficha(equipo, true))
@@ -581,8 +588,12 @@ fun tableroDesdeServidor(
         }
 
         peonRe.findAll(data).forEach { m ->
-            val col = m.groupValues[1].toInt()
-            val fila = m.groupValues[2].toInt()
+            val colServidor = m.groupValues[1].toInt()
+            val filaServidor = m.groupValues[2].toInt()
+
+            // ¡Aplicamos la inversión aquí!
+            val col = END - colServidor
+            val fila = END - filaServidor
 
             if (fila in 0 until DIM && col in 0 until DIM) {
                 nuevoTablero[fila][col] = nuevoTablero[fila][col].copy(ficha = Ficha(equipo, false))
@@ -590,9 +601,13 @@ fun tableroDesdeServidor(
         }
 
         trampaRe.findAll(data).forEach { m ->
-            val col = m.groupValues[1].toInt()
-            val fila = m.groupValues[2].toInt()
+            val colServidor = m.groupValues[1].toInt()
+            val filaServidor = m.groupValues[2].toInt()
             val activa = m.groupValues[3].toInt()
+
+            // ¡Aplicamos la inversión aquí!
+            val col = END - colServidor
+            val fila = END - filaServidor
 
             if (fila in 0 until DIM && col in 0 until DIM) {
                 nuevoTablero[fila][col] = nuevoTablero[fila][col].copy(
