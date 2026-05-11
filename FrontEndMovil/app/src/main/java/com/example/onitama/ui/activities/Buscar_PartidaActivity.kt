@@ -3,6 +3,7 @@ package com.example.onitama.ui.activities
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
@@ -46,10 +47,15 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.onitama.R
+import com.example.onitama.PartidaActiva
 import com.example.onitama.api.BuscarPartida
+import com.example.onitama.api.jsonPartida
+import com.example.onitama.api.Partida
 import com.example.onitama.AutoLogin
+import com.example.onitama.api.ManejadorGlobal
 import com.example.onitama.ui.activities.partida.PartidaActivity
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 class Buscar_PartidaActivity: AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +63,8 @@ class Buscar_PartidaActivity: AppCompatActivity() {
         val nombreUsuario = AutoLogin.obtenerNombre(this) ?: "Jugador"
         val valorCores = AutoLogin.obtenerCores(this)
         val valorKatanas = AutoLogin.obtenerKatanas(this)
+
+        val tipoPartida = intent.getStringExtra("MODO_JUEGO") ?: "PUBLICA"
 
         setContent {
             //esta sirve para guardar el valor de la función de cancelar
@@ -70,25 +78,64 @@ class Buscar_PartidaActivity: AppCompatActivity() {
             ) {
 
                 LaunchedEffect(Unit) {
-                    val resultBuscOponente = servPartida.buscarPartida(scope, nombreUsuario, valorKatanas, 60000)
-                    funcionCancelar = resultBuscOponente.cancel
-                    val respuesta = resultBuscOponente.promise.await()
-                    if (respuesta.estado == BuscarPartida.EstadoPartida.ENCONTRADA) {
-                        // Si encuentra partida tendría que abrir la pantalla de juego
-                        val intentJuego = Intent(this@Buscar_PartidaActivity, PartidaActivity::class.java).apply {
-                            putExtra("MODO_JUEGO", "PUBLICA")
+                    if (!ManejadorGlobal.estaConectado()){
+                        ManejadorGlobal.conectarYMantener()
+                    }
+
+                    if (tipoPartida == "PUBLICA") {
+                        val resultBuscOponente = servPartida.buscarPartida(scope, nombreUsuario, valorKatanas, 60000)
+                        funcionCancelar = resultBuscOponente.cancel
+                        val respuesta = resultBuscOponente.promise.await()
+                        if (respuesta.estado == BuscarPartida.EstadoPartida.ENCONTRADA) {
+                            // Si encuentra partida tendría que abrir la pantalla de juego
+                            val intentJuego = Intent(this@Buscar_PartidaActivity, PartidaActivity::class.java).apply {
+                                putExtra("MODO_JUEGO", "PUBLICA")
+                            }
+                            startActivity(intentJuego)
+                            finish() // Cerramos la pantalla de búsqueda
                         }
-                        startActivity(intentJuego)
-                        finish() // Cerramos la pantalla de búsqueda
+                    }
+                    else {
+                        funcionCancelar = {
+                            finish()
+                        }
+
+                        ManejadorGlobal.mensajesEntrantes.collectLatest { json ->
+                            val tipo = json.optString("tipo")
+
+                            when (tipo) {
+                                "PARTIDA_PRIVADA_ENCONTRADA" -> {
+                                    try {
+                                        val datos = jsonPartida.decodeFromString<Partida.RespuestaPartidaPrivadaEncontrada>(json.toString())
+                                        PartidaActiva.datosPartida = datos.toPartidaEncontrada()
+
+                                        val intentJuego = Intent(this@Buscar_PartidaActivity, PartidaActivity::class.java).apply {
+                                            putExtra("MODO_JUEGO", "PRIVADA")
+                                        }
+                                        startActivity(intentJuego)
+                                        finish() // Cerramos la pantalla de búsqueda                                    
+                                    }
+                                    catch (e: Exception) {
+                                        Log.e("PARTIDA_PRIVADA", "Error al procesar la partida privada", e)
+                                    }
+                                }
+
+                                "ERROR_NO_UNIDO", "INVITACION_RECHAZADA", "NOTIFICACION_CANCELADA" -> {
+                                    finish()
+                                }
+                            }
+                        }
                     }
                 }
 
+                val textoWaitingPublicScreen = if (tipoPartida == "PRIVADA") "Esperando al amigo..." else "Buscando Oponente..."
 
                 WaitingPublicScreen(
                     nombre = nombreUsuario,
                     cores = valorCores,
                     katanas = valorKatanas,
-                    tiempo = 60,
+                    tiempo = 120,
+                    texto = textoWaitingPublicScreen,
                     funcionCancelacion = funcionCancelar
                 )
             }
@@ -102,6 +149,7 @@ class Buscar_PartidaActivity: AppCompatActivity() {
         cores: Int = 0,
         katanas: Int = 0,
         tiempo: Int = 0,
+        texto: String = "Buscando Oponente...",
         funcionCancelacion: (() -> Unit)? = null
     ) {
 
@@ -249,7 +297,7 @@ class Buscar_PartidaActivity: AppCompatActivity() {
             )
 
             Text(
-                text = "Buscando Oponente...",
+                text = texto,
                 fontFamily = quattrocentoBold,
                 fontSize = 20.sp,
                 color = Color.DarkGray,

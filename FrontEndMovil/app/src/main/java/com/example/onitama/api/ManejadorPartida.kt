@@ -33,6 +33,7 @@ class ManejadorPartidaAPI {
 
     fun responderInvitacion(
         idNotificacion: Int,
+        destinatario: String,
         aceptada: Boolean
     ) {
         var mensaje = ""
@@ -46,16 +47,19 @@ class ManejadorPartidaAPI {
         val json = JSONObject().apply {
             put("tipo", mensaje)
             put("idNotificacion", idNotificacion)
+            put("nombre", destinatario)
         }
         ManejadorGlobal.enviarMensaje(json.toString())
     }
 
     fun obtenerPartidasPausadas(
-        nombreUsuario: String
+        nombreUsuario: String,
+        nombreAmigo: String
     ) {
         val json = JSONObject().apply {
             put("tipo", "SOLICITAR_PARTIDAS_PRIV")
             put("usuario", nombreUsuario)
+            put("amigo", nombreAmigo)
         }
         ManejadorGlobal.enviarMensaje(json.toString())
     }
@@ -76,7 +80,7 @@ class ManejadorPartidaAPI {
 
     fun responderReanudacion(
         idNotificacion: Int,
-        miNombre: String,
+        nombreUsuario: String,
         aceptada: Boolean
     ){
         var mensaje = ""
@@ -90,7 +94,7 @@ class ManejadorPartidaAPI {
         val json = JSONObject().apply {
             put("tipo", mensaje)
             put("idNotificacion", idNotificacion)
-            put("nombre", miNombre)
+            put("nombre", nombreUsuario)
         }
         ManejadorGlobal.enviarMensaje(json.toString())
     }

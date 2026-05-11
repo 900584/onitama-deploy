@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import com.example.onitama.AutoLogin
 import com.example.onitama.R
 import com.example.onitama.api.Amigos
+import com.example.onitama.ui.activities.Buscar_PartidaActivity
 import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.activities.cartas.Cartas_activity
 import com.example.onitama.ui.amigos.Amigos_Activity
@@ -60,6 +61,7 @@ fun PantallaNotificaciones(
     val context = LocalContext.current
     val datosUsuario by AutoLogin.sesion.collectAsState()
     val listaNotif by viewModel.notificaciones.collectAsState()
+    val listaNotifPartida by viewModel.notificacionesPartida.collectAsState()
 
     Box(
         modifier = Modifier
@@ -192,7 +194,7 @@ fun PantallaNotificaciones(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            if (listaNotif.isEmpty()) {
+            if (listaNotif.isEmpty() && listaNotifPartida.isEmpty()) {
                 Text(
                     text = "No tienes notificaciones pendientes",
                     fontFamily = quattrocentoBold,
@@ -207,11 +209,53 @@ fun PantallaNotificaciones(
                 ) {
                     items(listaNotif) { notif ->
                         NotificacionItem(
-                            notif = notif,
+                            notif = "${notif.remitente} te ha enviado una solicitud de amistad",
                             fontFamily = quattrocentoBold,
                             onAceptar = { viewModel.aceptar(notif, datosUsuario?.nombre ?: "") },
                             onRechazar = { viewModel.rechazar(notif) }
                         )
+                    }
+
+                    items(listaNotifPartida) { notif ->
+                        when (notif) {
+                            is Amigos.MensajeInvitacionPartida -> {
+                                NotificacionItem(
+                                    notif = "${notif.remitente} te ha invitado a una partida privada",
+                                    fontFamily = quattrocentoBold,
+                                    onAceptar = {
+                                        viewModel.aceptarInvitacionPartida(notif.idNotificacion, datosUsuario?.nombre ?: "")
+                                        val intent = Intent (
+                                            context,
+                                            Buscar_PartidaActivity::class.java
+                                        ).apply {
+                                            putExtra("MODO_JUEGO", "PRIVADA")
+                                        }
+                                        context.startActivity(intent)
+                                    },
+                                    onRechazar = { viewModel.rechazarInvitacionPartida(notif.idNotificacion, datosUsuario?.nombre ?: "") }
+                                )
+                            }
+
+                            is Amigos.MensajeSolicitudReanudar -> {
+                                NotificacionItem(
+                                    notif = "${notif.remitente} quiere reanudar una partida privada",
+                                    fontFamily = quattrocentoBold,
+                                    onAceptar = { 
+                                        viewModel.aceptarReanudacionPartida(notif.idNotificacion, datosUsuario?.nombre ?: "") 
+                                        val intent = Intent (
+                                            context,
+                                            Buscar_PartidaActivity::class.java
+                                        ).apply {
+                                            putExtra("MODO_JUEGO", "PRIVADA")
+                                        }
+                                        context.startActivity(intent) 
+                                    },
+                                    onRechazar = { viewModel.rechazarReanudacionPartida(notif.idNotificacion, datosUsuario?.nombre ?: "") }
+                                )
+                            }
+
+                            else -> {}
+                        }
                     }
                 }
             }
@@ -316,7 +360,7 @@ fun PantallaNotificaciones(
 
 @Composable
 fun NotificacionItem(
-    notif: Amigos.MensajeSolicitudAmistadS,
+    notif: String,
     fontFamily: FontFamily,
     onAceptar: () -> Unit,
     onRechazar: () -> Unit
@@ -329,7 +373,7 @@ fun NotificacionItem(
             .padding(16.dp)
     ) {
         Text(
-            text = "${notif.remitente} te ha enviado una solicitud de amistad",
+            text = notif,
             fontFamily = fontFamily,
             fontSize = 16.sp,
             color = Color.Black

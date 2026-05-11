@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.onitama.AutoLogin
 import com.example.onitama.R
+import com.example.onitama.ui.activities.Buscar_PartidaActivity
 import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.activities.cartas.Cartas_activity
 import com.example.onitama.ui.perfil.Perfil_Activity
@@ -237,8 +238,26 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                             esAmigo = esAmigo,
                             onSeguir = { viewModel.seguir(item.nombre) },
                             onDejarDeSeguir = { viewModel.dejarDeSeguir(item.nombre) },
-                            onPartidaPrivada = { viewModel.enviarPartidaPrivada(item.nombre) },
-                            onReanudar = { viewModel.solicitarReanudacion(item.nombre) }
+                            onPartidaPrivada = { 
+                                viewModel.enviarPartidaPrivada(item.nombre) 
+                                val intent = Intent (
+                                    context,
+                                    Buscar_PartidaActivity::class.java
+                                ).apply {
+                                    putExtra("MODO_JUEGO", "PRIVADA")
+                                }
+                                context.startActivity(intent)    
+                            },
+                            onReanudar = { 
+                                viewModel.solicitarReanudacion(item.nombre) 
+                                val intent = Intent (
+                                    context,
+                                    Buscar_PartidaActivity::class.java
+                                ).apply {
+                                    putExtra("MODO_JUEGO", "PRIVADA")
+                                }
+                                context.startActivity(intent) 
+                            }
                         )
                     }
                 }

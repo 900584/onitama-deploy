@@ -204,7 +204,7 @@ fun MainMenuScreen(
             listaAmigos = amigosAPI.obtenerAmigos(datosUsuario?.nombre ?: "")
             
             if (!esNuevaPartida) {
-                manejadorPartidaAPI.obtenerPartidasPausadas(datosUsuario?.nombre ?: "")
+                manejadorPartidaAPI.obtenerPartidasPausadas(datosUsuario?.nombre ?: "", "")
             }
             else {
                 cargaDatos = false
@@ -571,6 +571,14 @@ fun MainMenuScreen(
                                         remitente = datosUsuario?.nombre ?: "",
                                         destinatario = amigo.nombre
                                     )
+
+                                    val intent = Intent (
+                                        context,
+                                        Buscar_PartidaActivity::class.java
+                                    ).apply {
+                                        putExtra("MODO_JUEGO", "PRIVADA")
+                                    }
+                                    context.startActivity(intent) 
                                 }
                                 else {
                                     amigoSeleccionadoParaReanudar = amigo
@@ -685,6 +693,14 @@ fun MainMenuScreen(
                                     destinatario = oponente,
                                     idPartida = idPartida
                                 )
+
+                                val intent = Intent (
+                                    context,
+                                    Buscar_PartidaActivity::class.java
+                                ).apply {
+                                    putExtra("MODO_JUEGO", "PRIVADA")
+                                }
+                                context.startActivity(intent) 
                             },
                             modifier = Modifier
                                 .fillMaxWidth(),
