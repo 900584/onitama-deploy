@@ -19,6 +19,7 @@ public class Revivir extends Accion {
             if(partida.getPosicion(x, y).esTrampa()){
                 eraTrampa = true;
                 partida.getPosicion(x, y).desactivarCasilla();
+                partida.getPosicion(x, y).matar();
             }
             return true;
         }
