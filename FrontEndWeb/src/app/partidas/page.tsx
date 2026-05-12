@@ -16,7 +16,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { obtenerJugadorActivo, guardarSesion, cerrarSesion, type DatosSesion } from "@/lib/sesion";
+import { obtenerJugadorActivo, guardarSesion, cerrarSesion, leerSesion, type DatosSesion } from "@/lib/sesion";
 import { obtenerPerfil, cambiarAvatar, cambiarContrasena } from "@/api/auth";
 import { activarSkin, comprarSkin, obtenerTiendaSkins, type SkinEstado } from "@/api/skins";
 import { obtenerCartas, obtenerCartasAccion, type CartaEstado } from "@/api/cartas";
@@ -53,7 +53,7 @@ import {
 import * as WS from "@/api/ws";
 import { getSkinNombre, getPiezaSrc, getSkinPrecio, normalizarSkinId, type SkinId } from "@/lib/skins";
 import { getImagenCarta, TODAS_LAS_CARTAS, type CartaMovDef } from "@/lib/cartas";
-import { getAvatarSrc, AvatarCircle } from "@/lib/avatar";
+import { AvatarCircle } from "@/lib/avatar";
 import { validarContrasena, HINT_CONTRASENA } from "@/lib/validacion";
 import TutorialOverlay, { type PasoTutorial } from "@/components/TutorialOverlay";
 
@@ -125,6 +125,7 @@ const TUTORIAL_LS_KEY = "onitama_tutorial_completado";
 
 export default function PartidasPage() {
   const router = useRouter();
+  const [sesionComprobada, setSesionComprobada] = useState(false);
   const [jugador, setJugador] = useState<DatosSesion>(obtenerJugadorActivo);
   const [mostrarModalDificultad, setMostrarModalDificultad] = useState(false);
   const [mostrarModalPartidaPrivada, setMostrarModalPartidaPrivada] = useState(false);
@@ -208,6 +209,17 @@ export default function PartidasPage() {
 
 
   // ── Efectos ─────────────────────────────────────────────────────────────────
+
+  /** /partidas requiere una sesión real guardada tras login o registro. */
+  useEffect(() => {
+    const sesion = leerSesion();
+    if (!sesion) {
+      router.replace("/iniciar-sesion");
+      return;
+    }
+    setJugador(sesion);
+    setSesionComprobada(true);
+  }, [router]);
 
   /** Mostrar modal de bienvenida al tutorial si es la primera visita. */
   useEffect(() => {
@@ -293,15 +305,16 @@ export default function PartidasPage() {
 
   /** Refrescar puntos/cores desde el servidor al entrar a la pantalla. */
   useEffect(() => {
-    const sesion = obtenerJugadorActivo();
-    if (!sesion.nombre) return;
+    if (!sesionComprobada) return;
+    const sesion = leerSesion();
+    if (!sesion?.nombre) return;
     obtenerPerfil(sesion.nombre)
       .then((datos) => {
         guardarSesion(datos);
         setJugador(datos);
       })
       .catch(() => { });
-  }, []);
+  }, [sesionComprobada]);
 
   /** Panel Mi cuenta: refrescar perfil e historial de partidas públicas. */
   useEffect(() => {
@@ -932,6 +945,8 @@ export default function PartidasPage() {
 
 
   // ── Render ───────────────────────────────────────────────────────────────────
+
+  if (!sesionComprobada) return null;
 
   const notifPendientes = notificaciones.length;
 
@@ -1880,8 +1895,9 @@ function PanelMiCuenta({
       } else {
         alert("Error al guardar avatar: " + (res.codigo || "Desconocido"));
       }
-    } catch (error: any) {
-      alert("Error de conexión: " + (error.message || "No se pudo contactar con el servidor."));
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : "No se pudo contactar con el servidor.";
+      alert("Error de conexión: " + mensaje);
     } finally {
       setGuardandoAvatar(false);
     }
@@ -1913,8 +1929,9 @@ function PanelMiCuenta({
       } else {
         setPassError("Error al cambiar contraseña: " + (res.codigo || "Desconocido"));
       }
-    } catch (error: any) {
-      setPassError("Error de conexión: " + (error.message || "No se pudo contactar con el servidor."));
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : "No se pudo contactar con el servidor.";
+      setPassError("Error de conexión: " + mensaje);
     } finally {
       setGuardandoPass(false);
     }
@@ -3115,7 +3132,7 @@ function PanelMisCartas({
               {cartaAmpliada.nombre}
             </h3>
             <p className="text-sm text-stone-500 font-semibold mb-6 italic text-center px-4">
-              "{FRASES_EPICAS[cartaAmpliada.nombre] ?? "Una carta misteriosa que esconde un poder oculto."}"
+              {`"${FRASES_EPICAS[cartaAmpliada.nombre] ?? "Una carta misteriosa que esconde un poder oculto."}"`}
             </p>
 
             <div className="w-full bg-stone-100 rounded-2xl p-6 flex flex-col items-center justify-center gap-8 shadow-inner mb-6">
