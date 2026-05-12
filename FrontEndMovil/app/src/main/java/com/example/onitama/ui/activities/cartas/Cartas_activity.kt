@@ -61,6 +61,7 @@ import com.example.onitama.lib.Cartas
 import com.example.onitama.lib.Movimiento
 import com.example.onitama.ui.activities.MenuPrincipalActivity
 import com.example.onitama.ui.amigos.Amigos_Activity
+import com.example.onitama.ui.perfil.Perfil_Activity
 import com.example.onitama.ui.tienda.Tienda_Activity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -336,20 +337,41 @@ fun CartasScreen(
                 context.packageName
             )
 
-
-            //🛡️ PROTECCIÓN ANTI-CRASH: Si la imagen no existe (0), ponemos el logo por defecto
-            val idSeguro = if (imageResId != 0) imageResId else R.drawable.onitama_text
-
-
-            Image(
-                painterResource(idSeguro),
-                contentDescription = "Imagen de perfil",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(80.dp)
-                    .align(Alignment.CenterEnd)
-                    .clip(CircleShape)
-            )
+            if (imageResId != 0) {
+                Image(
+                    painter = painterResource(imageResId),
+                    contentDescription = "Imagen de perfil",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(80.dp)
+                        .align(Alignment.CenterEnd)
+                        .clip(CircleShape)
+                        .clickable(onClick = {
+                            val intent = Intent(context, Perfil_Activity::class.java)
+                            context.startActivity(intent)
+                        })
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .align(Alignment.CenterEnd)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .clickable(onClick = {
+                            val intent = Intent(context, Perfil_Activity::class.java)
+                            context.startActivity(intent)
+                        }),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = datosUsuario?.nombre?.take(1)?.uppercase() ?: "",
+                        color = colorResource(id = R.color.azulFondo),
+                        fontSize = 32.sp,
+                        fontFamily = quattrocentoBold
+                    )
+                }
+            }
 
             // B) Título del juego
             Image(
@@ -407,6 +429,9 @@ fun CartasScreen(
                     Image(painterResource(R.drawable.tablero),
                         contentDescription = "Skins")
                 }
+
+                Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
+
                 IconButton(
                     onClick = {
                         val intent = Intent(context, MenuPrincipalActivity::class.java)
@@ -416,8 +441,6 @@ fun CartasScreen(
                     Image(painterResource(R.drawable.espadas),
                         contentDescription = "Jugar")
                 }
-
-                Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
 
                 IconButton(
                     onClick = {
@@ -449,8 +472,9 @@ fun CartasScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 5.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(bottom = 5.dp, start = 90.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.Start
             ) {
                 IconButton(
                     onClick = {  },

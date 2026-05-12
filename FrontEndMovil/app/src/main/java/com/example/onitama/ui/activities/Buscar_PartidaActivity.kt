@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -54,6 +57,7 @@ import com.example.onitama.api.Partida
 import com.example.onitama.AutoLogin
 import com.example.onitama.api.ManejadorGlobal
 import com.example.onitama.ui.activities.partida.PartidaActivity
+import com.example.onitama.ui.perfil.Perfil_Activity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
@@ -156,7 +160,7 @@ class Buscar_PartidaActivity: AppCompatActivity() {
         val context = LocalContext.current
         val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
         var tiempoEnSegundos by remember { mutableIntStateOf(tiempo) }
-
+        val datosUsuario by AutoLogin.sesion.collectAsState()
 
         LaunchedEffect(Unit) {
             while (tiempoEnSegundos > 0) { // Solo resta si es mayor que 0
@@ -213,17 +217,40 @@ class Buscar_PartidaActivity: AppCompatActivity() {
                     .background(colorResource(id = R.color.azulFondo))
                     .padding(horizontal = 16.dp)
             ) {
-                // A) Botón de Perfil (A diferencia del de menu principal este debe de estar deshabilitado)
-                IconButton(
-                    onClick = { /* Acción perfil */ },
-                    enabled = false,
-                    modifier = Modifier
-                        .size(80.dp)
-                        .align(Alignment.CenterEnd)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                ) {
 
+                val imageResId = context.resources.getIdentifier(
+                    datosUsuario?.avatar_id,
+                    "drawable",
+                    context.packageName
+                )
+                // A) Botón de Perfil (A diferencia del de menu principal este debe de estar deshabilitado)
+                if (imageResId != 0) {
+                    Image(
+                        painter = painterResource(imageResId),
+                        contentDescription = "Imagen de perfil",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(80.dp)
+                            .align(Alignment.CenterEnd)
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .align(Alignment.CenterEnd)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            ,
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = datosUsuario?.nombre?.take(1)?.uppercase() ?: "",
+                            color = colorResource(id = R.color.azulFondo),
+                            fontSize = 32.sp,
+                            fontFamily = quattrocentoBold
+                        )
+                    }
                 }
 
                 // B) Título del juego

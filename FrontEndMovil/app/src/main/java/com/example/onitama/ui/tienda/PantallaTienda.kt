@@ -270,8 +270,6 @@ fun PantallaTienda(viewModel: ViewModelTienda = viewModel()) {
                         contentDescription = "Cards")
                 }
 
-                Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
-
                 IconButton(
                     onClick = {
                         val intent = Intent(context, MenuPrincipalActivity::class.java)
@@ -297,14 +295,15 @@ fun PantallaTienda(viewModel: ViewModelTienda = viewModel()) {
                         painterResource(R.drawable.amigos),
                         contentDescription = "Tienda")
                 }
+                Spacer(modifier = Modifier.width(80.dp))
             }
 
             // Botón central "Carrito" sobresaliendo
             Column(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 5.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth()
+                    .padding(bottom = 5.dp, end = 15.dp),
+                horizontalAlignment = Alignment.End
             ) {
                 IconButton(
                     onClick = {},
@@ -313,11 +312,11 @@ fun PantallaTienda(viewModel: ViewModelTienda = viewModel()) {
                     Image(painterResource(R.drawable.carrito), contentDescription = "Amigos")
                 }
                 Text(
-                    text = "AMIGOS",
+                    text = "TIENDA",
                     fontFamily = quattrocentoBold,
                     fontSize = 12.sp,
                     color = Color.White,
-                    modifier = Modifier.offset(y = (-8).dp)
+                    modifier = Modifier.offset(y = (-5).dp, x = (-5).dp)
                 )
             }
         }

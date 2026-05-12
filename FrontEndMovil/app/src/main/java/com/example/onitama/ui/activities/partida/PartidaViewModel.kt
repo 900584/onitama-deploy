@@ -1,6 +1,9 @@
 package com.example.onitama.ui.activities.partida
 
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.onitama.PartidaActiva
@@ -52,7 +55,10 @@ class PartidaViewModel : ViewModel() {
     private var estadoAntesCartaAccion: EstadoJuego? = null
 
     private val _mensajeCartaAccion = MutableStateFlow<String>("")
-    val mensajeCartaAccion = _mensajeCartaAccion.asStateFlow()    
+    val mensajeCartaAccion = _mensajeCartaAccion.asStateFlow()
+
+    var mostrarPopPausa by mutableStateOf(false)
+        private set
 
     private val _notificacionPausa = MutableStateFlow<Partida.RespuestaSolicitudPausa?>(null)
     val notificacionPausa = _notificacionPausa.asStateFlow()
@@ -207,7 +213,9 @@ class PartidaViewModel : ViewModel() {
                                 _notificacionPausa.value = mensaje
                             }
 
-                            is Partida.RespuestaPartidaPausada -> { }
+                            is Partida.RespuestaPartidaPausada -> {
+                                mostrarPopPausa = true
+                            }
 
                             is Partida.RespuestaPausaRechazada -> { }
 

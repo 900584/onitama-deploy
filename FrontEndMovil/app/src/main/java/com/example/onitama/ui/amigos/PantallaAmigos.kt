@@ -302,8 +302,6 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                         contentDescription = "Cards")
                 }
 
-                Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
-
                 IconButton(
                     onClick = {
                         val intent = Intent(context, MenuPrincipalActivity::class.java)
@@ -315,10 +313,14 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                     Image(painterResource(R.drawable.espadas),
                         contentDescription = "Jugar")
                 }
+
+                Spacer(modifier = Modifier.width(80.dp))
+
+
                 IconButton(
                     onClick = {
                         val intent = Intent(
-                            context, 
+                            context,
                             Tienda_Activity::class.java)
                         context.startActivity(intent)
                         (context as? Activity)?.finish()
@@ -330,13 +332,12 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                         contentDescription = "Tienda")
                 }
             }
-
-            // Botón central "Amigos" sobresaliendo
+            // Botón "Amigos" sobresaliendo
             Column(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 5.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth()
+                    .padding(bottom = 5.dp, end = 90.dp),
+                horizontalAlignment = Alignment.End
             ) {
                 IconButton(
                     onClick = {},
@@ -349,7 +350,7 @@ fun PantallaAmigos(viewModel: ViewModelAmigos = viewModel()) {
                     fontFamily = quattrocentoBold,
                     fontSize = 12.sp,
                     color = Color.White,
-                    modifier = Modifier.offset(y = (-8).dp)
+                    modifier = Modifier.offset(y = (-8).dp, x =(-5).dp)
                 )
             }
         }

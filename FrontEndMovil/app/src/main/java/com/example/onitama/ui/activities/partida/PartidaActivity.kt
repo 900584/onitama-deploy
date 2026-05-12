@@ -1,5 +1,6 @@
 package com.example.onitama.ui.activities.partida
 
+import android.app.Activity
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -38,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -96,8 +98,9 @@ class PartidaActivity : AppCompatActivity() {
             Dificultad.FACIL
         }
 
-        // Pasamos también la dificultad
-        viewModel.iniciarPartida(modoJuego, nivelDificultad)
+        if (savedInstanceState == null) {
+            viewModel.iniciarPartida(modoJuego, nivelDificultad)
+        }
 
         setContent {
             // Observamos el estado del ViewModel. Cuando cambie, la UI se repintará sola.
@@ -125,10 +128,49 @@ class PartidaActivity : AppCompatActivity() {
         val datosUsuario by AutoLogin.sesion.collectAsState()
         val authClient: Auth = Auth()
         val context = LocalContext.current
+        val activity = context as? Activity
         val partida = Partida()
         var vermazo by remember { mutableStateOf(false) }
         var verAcciones by remember { mutableStateOf(false) }
         val infoCartasAccion by viewModel.mensajeCartaAccion.collectAsState()
+        val mostrarPop by remember { derivedStateOf { viewModel.mostrarPopPausa } }
+        val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
+
+
+
+        if (mostrarPop) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { /* Opcional: no permitir cerrar fuera */ },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            // Al pulsar, cerramos la actividad
+                            activity?.finish()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = colorResource(id = R.color.azulFondo))
+                    ) {
+                        Text("Aceptar", color = Color.White)
+                    }
+                },
+                title = {
+                    Text(
+                        "Partida Pausada",
+                        fontFamily = quattrocentoBold,
+                        color = colorResource(id = R.color.azulFondo)
+                    )
+                },
+                text = {
+                    Text(
+                        "La partida se ha guardado correctamente. Podrás reanudarla más tarde desde el menú de amigos.",
+                        fontFamily = quattrocentoBold
+                    )
+                },
+                shape = RoundedCornerShape(16.dp),
+                containerColor = Color.White
+            )
+        }
+
+
 
         LaunchedEffect(estado.modoAccion, estado.cartaAccionYaUsada) {
             if (estado.modoAccion != null) {
@@ -140,7 +182,7 @@ class PartidaActivity : AppCompatActivity() {
             }
         }
 
-        val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
+
 
         Box(
             modifier = Modifier.Companion
@@ -184,17 +226,39 @@ class PartidaActivity : AppCompatActivity() {
                         .background(colorResource(id = R.color.azulFondo))
                         .padding(horizontal = 16.dp)
                 ) {
+                    val imageResId = context.resources.getIdentifier(
+                        datosUsuario?.avatar_id,
+                        "drawable",
+                        context.packageName
+                    )
                     // A) Botón de Perfil (A diferencia del de menu principal este debe de estar deshabilitado)
-                    IconButton(
-                        onClick = { },
-                        enabled = false,
-                        modifier = Modifier.Companion
-                            .size(80.dp)
-                            .align(Alignment.Companion.CenterEnd)
-                            .clip(CircleShape)
-                            .background(Color.Companion.White)
-                    ) {
-
+                    if (imageResId != 0) {
+                        Image(
+                            painter = painterResource(imageResId),
+                            contentDescription = "Imagen de perfil",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(80.dp)
+                                .align(Alignment.CenterEnd)
+                                .clip(CircleShape)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .align(Alignment.CenterEnd)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                            ,
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = datosUsuario?.nombre?.take(1)?.uppercase() ?: "",
+                                color = colorResource(id = R.color.azulFondo),
+                                fontSize = 32.sp,
+                                fontFamily = quattrocentoBold
+                            )
+                        }
                     }
 
                     // B) Título del juego
@@ -384,6 +448,70 @@ class PartidaActivity : AppCompatActivity() {
                     }
 
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Companion.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.Companion.End)
+                ) {
+
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = datosUsuario!!.nombre,
+                            fontFamily = quattrocentoBold,
+                            fontSize = 30.sp,
+                            color = Color.Companion.White
+                        )
+                        Row(verticalAlignment = Alignment.Companion.CenterVertically) {
+                            Image(
+                                painterResource(id = R.drawable.katanas),
+                                contentDescription = "Katanas",
+
+                                modifier = Modifier.Companion
+                                    .size(30.dp)
+                            )
+                            Text(
+                                datosUsuario?.puntos.toString(),
+                                color = Color.Companion.White,
+                                fontSize = 24.sp,
+                                fontFamily = quattrocentoBold,
+                                modifier = Modifier.Companion.padding(start = 4.dp)
+                            )
+                        }
+                    }
+                    val imageResId = context.resources.getIdentifier(
+                        datosUsuario?.avatar_id,
+                        "drawable",
+                        context.packageName
+                    )
+                    // A) Botón de Perfil (A diferencia del de menu principal este debe de estar deshabilitado)
+                    if (imageResId != 0) {
+                        Image(
+                            painter = painterResource(imageResId),
+                            contentDescription = "Imagen de perfil",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                            ,
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = datosUsuario?.nombre?.take(1)?.uppercase() ?: "",
+                                color = colorResource(id = R.color.azulFondo),
+                                fontSize = 32.sp,
+                                fontFamily = quattrocentoBold
+                            )
+                        }
+                    }
+                }
 
 
                 if (estado.cartasAccionPropia.isNotEmpty() && estado.fasePartida == FasePartida.JUGANDO) {
@@ -439,50 +567,6 @@ class PartidaActivity : AppCompatActivity() {
                                 }
                             }
                         }
-                    }
-                }
-
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Companion.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.Companion.End)
-                ) {
-
-
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = datosUsuario!!.nombre,
-                            fontFamily = quattrocentoBold,
-                            fontSize = 30.sp,
-                            color = Color.Companion.White
-                        )
-                        Row(verticalAlignment = Alignment.Companion.CenterVertically) {
-                            Image(
-                                painterResource(id = R.drawable.katanas),
-                                contentDescription = "Katanas",
-
-                                modifier = Modifier.Companion
-                                    .size(30.dp)
-                            )
-                            Text(
-                                datosUsuario?.puntos.toString(),
-                                color = Color.Companion.White,
-                                fontSize = 24.sp,
-                                fontFamily = quattrocentoBold,
-                                modifier = Modifier.Companion.padding(start = 4.dp)
-                            )
-                        }
-                    }
-                    IconButton(
-                        onClick = { },
-                        enabled = false,
-                        modifier = Modifier.Companion
-                            .size(80.dp)
-                            .clip(CircleShape)
-                            .background(Color.Companion.White)
-                    ) {
-
                     }
                 }
             }
@@ -554,8 +638,9 @@ class PartidaActivity : AppCompatActivity() {
             if (estado.fasePartida == FasePartida.JUGANDO && estado.cartasAccionPropia.isNotEmpty()) {
                 Box(
                     Modifier
+                        .padding(start = 80.dp, bottom = 10.dp)
                         .fillMaxSize(),
-                    contentAlignment = Alignment.BottomEnd
+                    contentAlignment = Alignment.BottomStart
                 ) {
                     Column(horizontalAlignment = Alignment.End) {
                         Button(
@@ -1073,14 +1158,17 @@ class PartidaActivity : AppCompatActivity() {
     ) {
         val context = LocalContext.current
         
-        val nombreSeguro = nombre.replace(" ", "_").lowercase()
+        var nombreSeguro = nombre.replace(" ", "_").lowercase()
+        if(nombre == "Atrapasueños"){
+            nombreSeguro = "atrapasuenos" //caso especial: contiene una ñ
+        }
         val imageResId = context.resources.getIdentifier(
             nombreSeguro,
             "drawable",
             context.packageName
         )
         val idSeguro = if (imageResId != 0) imageResId else R.drawable.onitama_text
-        
+
         val descripcion = when (nombre) {
             "Pensatorium" -> "Invierte en espejo los movimientos de todas las cartas del tablero. Dura hasta que el rival realice un movimiento."
             "Atrapasueños" -> "Elige una carta de movimiento del oponente y añádela a tu mano."
