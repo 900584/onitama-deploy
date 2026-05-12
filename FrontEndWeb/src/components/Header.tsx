@@ -10,6 +10,7 @@ const DISPLAY = "var(--font-rajdhani), var(--font-geist-sans), sans-serif";
 export default function Header() {
   return (
     <header
+      className="oni-site-header"
       style={{
         background: "rgba(10, 21, 32, 0.96)",
         backdropFilter: "blur(12px)",
@@ -43,6 +44,7 @@ export default function Header() {
       {/* Logo */}
       <Link href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
         <Image
+          className="oni-header-logo"
           src="/nombre.png"
           alt="Onitama"
           width={130}
@@ -53,7 +55,7 @@ export default function Header() {
       </Link>
 
       {/* Nav */}
-      <nav style={{ display: "flex", alignItems: "center", gap: 36 }}>
+      <nav className="oni-header-nav" style={{ display: "flex", alignItems: "center", gap: 36 }}>
         <Link
           href="/juego"
           className="oni-nav-link"
@@ -87,6 +89,7 @@ export default function Header() {
       {/* CTA */}
       <Link
         href="/iniciar-sesion"
+        className="oni-header-cta"
         style={{
           fontFamily: DISPLAY,
           background: "#b85c38",

@@ -29,7 +29,7 @@ function SectionLabel({ text, dark = false }: { text: string; dark?: boolean }) 
   const lineClr = dark ? "rgba(196,181,160,0.25)" : "rgba(26,17,8,0.2)";
   const txtClr  = dark ? C.muted : "#5c4f42";
   return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:14, marginBottom:40 }}>
+    <div className="oni-section-label" style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:14, marginBottom:40 }}>
       <div style={{ width:44, height:1, background:lineClr }} />
       <span style={{ fontFamily:BODY, color:txtClr, fontSize:10, letterSpacing:"0.35em", textTransform:"uppercase" }}>{text}</span>
       <div style={{ width:44, height:1, background:lineClr }} />
@@ -75,7 +75,7 @@ export default function Home() {
           I. HERO
       ══════════════════════════════════════════════════════ */}
       <section
-        className="oni-scanlines"
+        className="oni-scanlines oni-landing-hero"
         style={{ position:"relative", minHeight:"calc(100vh - 68px)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", overflow:"hidden" }}
       >
         {/* Background photo */}
@@ -111,16 +111,16 @@ export default function Home() {
         </svg>
 
         {/* ── Content ── */}
-        <div style={{ position:"relative", zIndex:10, textAlign:"center", padding:"0 24px", maxWidth:900 }}>
+        <div className="oni-hero-content" style={{ position:"relative", zIndex:10, textAlign:"center", padding:"0 24px", maxWidth:900 }}>
 
           {/* Pre-label */}
-          <p className="oni-anim-1" style={{ fontFamily:BODY, color:C.cyber, fontSize:10, letterSpacing:"0.45em", textTransform:"uppercase", marginBottom:28, opacity:0.85 }}>
+          <p className="oni-anim-1 oni-hero-label" style={{ fontFamily:BODY, color:C.cyber, fontSize:10, letterSpacing:"0.45em", textTransform:"uppercase", marginBottom:28, opacity:0.85 }}>
             ◈ &nbsp;Duelo de Maestros&nbsp; ◈
           </p>
 
           {/* TITLE — Rajdhani 700 + glitch */}
           <h1
-            className="oni-glitch oni-anim-2"
+            className="oni-glitch oni-anim-2 oni-hero-title"
             style={{
               fontFamily: DISPLAY,
               fontSize: "clamp(5rem, 18vw, 12rem)",
@@ -136,19 +136,19 @@ export default function Home() {
           </h1>
 
           {/* Sub-title */}
-          <p className="oni-anim-3" style={{ fontFamily:DISPLAY, color:C.copper, fontSize:"clamp(1rem, 2.5vw, 1.375rem)", fontWeight:600, letterSpacing:"0.18em", textTransform:"uppercase", marginBottom:20 }}>
+          <p className="oni-anim-3 oni-hero-subtitle" style={{ fontFamily:DISPLAY, color:C.copper, fontSize:"clamp(1rem, 2.5vw, 1.375rem)", fontWeight:600, letterSpacing:"0.18em", textTransform:"uppercase", marginBottom:20 }}>
             No hay azar. Solo disciplina, lectura y el instante preciso.
           </p>
 
-          <p className="oni-anim-3" style={{ fontFamily:BODY, color:C.muted, fontSize:"clamp(0.875rem, 1.5vw, 1.0625rem)", lineHeight:1.85, maxWidth:480, margin:"0 auto 52px", fontWeight:300 }}>
+          <p className="oni-anim-3 oni-hero-copy" style={{ fontFamily:BODY, color:C.muted, fontSize:"clamp(0.875rem, 1.5vw, 1.0625rem)", lineHeight:1.85, maxWidth:480, margin:"0 auto 52px", fontWeight:300 }}>
             Dos maestros. Un tablero. Cartas que dictan cada paso. Una sola apertura separa la victoria de la derrota.
           </p>
 
           {/* CTAs */}
-          <div className="oni-anim-4" style={{ display:"flex", gap:14, justifyContent:"center", flexWrap:"wrap" }}>
+          <div className="oni-anim-4 oni-landing-actions" style={{ display:"flex", gap:14, justifyContent:"center", flexWrap:"wrap" }}>
             <Link
               href="/iniciar-sesion"
-              className="oni-glow"
+              className="oni-glow oni-landing-button"
               style={{
                 fontFamily: DISPLAY,
                 padding: "16px 52px",
@@ -166,6 +166,7 @@ export default function Home() {
             </Link>
             <Link
               href="/registro"
+              className="oni-landing-button"
               style={{
                 fontFamily: DISPLAY,
                 padding: "16px 52px",
@@ -184,14 +185,14 @@ export default function Home() {
           </div>
 
           {/* Stat strip */}
-          <div className="oni-anim-5" style={{ display:"flex", justifyContent:"center", gap:0, marginTop:56, borderTop:`1px solid rgba(196,181,160,0.12)`, borderLeft:`1px solid rgba(196,181,160,0.12)` }}>
+          <div className="oni-anim-5 oni-stat-strip" style={{ display:"flex", justifyContent:"center", gap:0, marginTop:56, borderTop:`1px solid rgba(196,181,160,0.12)`, borderLeft:`1px solid rgba(196,181,160,0.12)` }}>
             {[
               { v:"7×7", l:"Tablero" },
               { v:"5",   l:"Cartas activas" },
               { v:"2+",  l:"Jugadores" },
               { v:"∞",   l:"Estrategias" },
             ].map(({ v, l }) => (
-              <div key={l} style={{ flex:1, padding:"20px 12px", borderRight:`1px solid rgba(196,181,160,0.12)`, borderBottom:`1px solid rgba(196,181,160,0.12)`, textAlign:"center" }}>
+              <div className="oni-stat-item" key={l} style={{ flex:1, padding:"20px 12px", borderRight:`1px solid rgba(196,181,160,0.12)`, borderBottom:`1px solid rgba(196,181,160,0.12)`, textAlign:"center" }}>
                 <div style={{ fontFamily:DISPLAY, fontSize:"clamp(1.5rem,4vw,2.25rem)", fontWeight:700, color:C.copper, letterSpacing:"-0.02em", lineHeight:1 }}>{v}</div>
                 <div style={{ fontFamily:BODY, color:C.muted, fontSize:9, letterSpacing:"0.2em", textTransform:"uppercase", marginTop:6, opacity:0.7 }}>{l}</div>
               </div>
@@ -208,7 +209,7 @@ export default function Home() {
       {/* ══════════════════════════════════════════════════════
           II. BATTLE — los dos lados
       ══════════════════════════════════════════════════════ */}
-      <section style={{ background:C.navy, padding:"96px 24px", position:"relative", overflow:"hidden" }}>
+      <section className="oni-landing-section" style={{ background:C.navy, padding:"96px 24px", position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", inset:0, overflow:"hidden" }} aria-hidden>
           <AnimGrid id="battle-grid" spacing={60} color={C.stone} opacity={0.04}/>
         </div>
@@ -224,7 +225,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:24, alignItems:"center" }}>
+          <div className="oni-battle-grid" style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:24, alignItems:"center" }}>
 
             {/* Player 1 */}
             <div className="oni-left-1" style={{ background:"rgba(74,127,165,0.07)", border:`1px solid rgba(74,127,165,0.25)`, padding:"40px 32px" }}>
@@ -235,7 +236,7 @@ export default function Home() {
               <p style={{ fontFamily:BODY, color:C.muted, fontSize:"0.9rem", lineHeight:1.85, fontWeight:300 }}>
                 Mueve primero. Presiona al rival. Domina el centro del tablero y fuerza los errores. La agresión sin lectura es derrota segura.
               </p>
-              <div style={{ marginTop:28, paddingTop:20, borderTop:`1px solid rgba(74,127,165,0.2)`, display:"flex", gap:10 }}>
+              <div className="oni-chip-row" style={{ marginTop:28, paddingTop:20, borderTop:`1px solid rgba(74,127,165,0.2)`, display:"flex", gap:10 }}>
                 {["Presión","Apertura","Control"].map(t => (
                   <span key={t} style={{ fontFamily:BODY, color:C.steel, fontSize:9, letterSpacing:"0.2em", textTransform:"uppercase", background:"rgba(74,127,165,0.1)", padding:"5px 10px", border:`1px solid rgba(74,127,165,0.2)` }}>{t}</span>
                 ))}
@@ -243,7 +244,7 @@ export default function Home() {
             </div>
 
             {/* VS */}
-            <div className="oni-vs-pulse" style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+            <div className="oni-vs-pulse oni-battle-vs" style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
               <div aria-hidden style={{ width:1, height:64, background:`linear-gradient(to bottom, transparent, ${C.copper})` }}/>
               <div style={{ fontFamily:DISPLAY, color:C.copper, fontSize:"clamp(1.75rem,5vw,3rem)", fontWeight:700, letterSpacing:"0.1em", textShadow:`0 0 24px rgba(184,92,56,0.6)` }}>
                 VS
@@ -264,7 +265,7 @@ export default function Home() {
               <p style={{ fontFamily:BODY, color:C.muted, fontSize:"0.9rem", lineHeight:1.85, fontWeight:300 }}>
                 Reacciona. Lee las cartas del rival. Espera la apertura y golpea con precisión quirúrgica. La paciencia es el arma más letal.
               </p>
-              <div style={{ marginTop:28, paddingTop:20, borderTop:`1px solid rgba(184,92,56,0.2)`, display:"flex", gap:10 }}>
+              <div className="oni-chip-row" style={{ marginTop:28, paddingTop:20, borderTop:`1px solid rgba(184,92,56,0.2)`, display:"flex", gap:10 }}>
                 {["Paciencia","Lectura","Contragolpe"].map(t => (
                   <span key={t} style={{ fontFamily:BODY, color:C.copper, fontSize:9, letterSpacing:"0.2em", textTransform:"uppercase", background:"rgba(184,92,56,0.08)", padding:"5px 10px", border:`1px solid rgba(184,92,56,0.2)` }}>{t}</span>
                 ))}
@@ -277,7 +278,7 @@ export default function Home() {
       {/* ══════════════════════════════════════════════════════
           III. MECÁNICAS
       ══════════════════════════════════════════════════════ */}
-      <section style={{ background:C.dark, padding:"112px 24px", position:"relative", overflow:"hidden" }}>
+      <section className="oni-landing-section" style={{ background:C.dark, padding:"112px 24px", position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", inset:0, overflow:"hidden" }} aria-hidden>
           <AnimGrid id="mec-grid" spacing={80} color={C.cyber} opacity={0.03}/>
         </div>
@@ -296,7 +297,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(300px, 1fr))", gap:2, background:`rgba(0,200,255,0.05)` }}>
+          <div className="oni-card-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(300px, 1fr))", gap:2, background:`rgba(0,200,255,0.05)` }}>
             {[
               {
                 cls: "oni-scale-1",
@@ -325,7 +326,7 @@ export default function Home() {
             ].map(({ cls, num, accent, title, body, tags }) => (
               <div
                 key={num}
-                className={`${cls} oni-card-hover`}
+                className={`${cls} oni-card-hover oni-info-card`}
                 style={{ background:C.mid, padding:"56px 44px", position:"relative", overflow:"hidden", cursor:"default" }}
               >
                 {/* Ghost number */}
@@ -356,7 +357,7 @@ export default function Home() {
       {/* ══════════════════════════════════════════════════════
           IV. FEATURES — más allá del tablero
       ══════════════════════════════════════════════════════ */}
-      <section style={{ background:C.navy, padding:"112px 24px", position:"relative", overflow:"hidden" }}>
+      <section className="oni-landing-section" style={{ background:C.navy, padding:"112px 24px", position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", inset:0, overflow:"hidden" }} aria-hidden>
           <AnimGrid id="feat-grid" spacing={64} color={C.stone} opacity={0.04}/>
         </div>
@@ -369,7 +370,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(240px, 1fr))", gap:2, background:"rgba(196,181,160,0.06)" }}>
+          <div className="oni-card-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(240px, 1fr))", gap:2, background:"rgba(196,181,160,0.06)" }}>
             {[
               {
                 cls:"oni-scale-1",
@@ -428,7 +429,7 @@ export default function Home() {
             ].map(({ cls, color, icon, title, body }) => (
               <div
                 key={title}
-                className={`${cls} oni-card-hover`}
+                className={`${cls} oni-card-hover oni-feature-card`}
                 style={{ background:C.mid, padding:"52px 36px", textAlign:"center", cursor:"default" }}
               >
                 <HexIcon color={color}>{icon}</HexIcon>
@@ -447,9 +448,9 @@ export default function Home() {
       {/* ══════════════════════════════════════════════════════
           V. CTA FINAL
       ══════════════════════════════════════════════════════ */}
-      <section style={{ background:C.dark, padding:"180px 24px", textAlign:"center", position:"relative", overflow:"hidden" }}>
+      <section className="oni-final-cta" style={{ background:C.dark, padding:"180px 24px", textAlign:"center", position:"relative", overflow:"hidden" }}>
         {/* Concentric geo shapes */}
-        <svg style={{ position:"absolute", left:"50%", top:"50%", transform:"translate(-50%,-50%)", opacity:0.055, width:700, height:700 }} viewBox="0 0 700 700" aria-hidden>
+        <svg className="oni-final-geo" style={{ position:"absolute", left:"50%", top:"50%", transform:"translate(-50%,-50%)", opacity:0.055, width:700, height:700 }} viewBox="0 0 700 700" aria-hidden>
           {[40, 110, 180, 255, 320].map(o => (
             <polygon key={o} points={`350,${o} ${700-o},350 350,${700-o} ${o},350`} fill="none" stroke={C.stone} strokeWidth="0.7"/>
           ))}
@@ -482,10 +483,10 @@ export default function Home() {
             Cada duelo es un nuevo camino. Cada derrota, una lección de maestría. El primer paso es el más difícil.
           </p>
 
-          <div style={{ display:"flex", gap:16, justifyContent:"center", flexWrap:"wrap" }}>
+          <div className="oni-landing-actions" style={{ display:"flex", gap:16, justifyContent:"center", flexWrap:"wrap" }}>
             <Link
               href="/iniciar-sesion"
-              className="oni-glow"
+              className="oni-glow oni-landing-button"
               style={{
                 fontFamily: DISPLAY,
                 display:"inline-block",
@@ -503,7 +504,7 @@ export default function Home() {
             </Link>
             <Link
               href="/registro"
-              className="oni-glow-blue"
+              className="oni-glow-blue oni-landing-button"
               style={{
                 fontFamily: DISPLAY,
                 display:"inline-block",
@@ -523,7 +524,7 @@ export default function Home() {
           </div>
 
           {/* Bottom word strip */}
-          <div style={{ marginTop:80, display:"flex", justifyContent:"center", alignItems:"center", gap:32 }}>
+          <div className="oni-word-strip" style={{ marginTop:80, display:"flex", justifyContent:"center", alignItems:"center", gap:32 }}>
             {["Maestría","◈","Honor","◈","Estrategia"].map((w, i) => (
               <span key={i} style={{ fontFamily: w==="◈" ? BODY : DISPLAY, color: w==="◈" ? C.copper : C.stone, fontSize: w==="◈" ? 10 : 11, letterSpacing:"0.3em", textTransform:"uppercase", opacity: w==="◈" ? 0.5 : 0.3, fontWeight: w==="◈" ? 400 : 600 }}>
                 {w}
@@ -534,7 +535,7 @@ export default function Home() {
       </section>
 
       {/* ── Footer ── */}
-      <footer style={{ background:"#050d15", padding:"28px 40px", borderTop:`1px solid rgba(0,200,255,0.07)`, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
+      <footer className="oni-landing-footer" style={{ background:"#050d15", padding:"28px 40px", borderTop:`1px solid rgba(0,200,255,0.07)`, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
         <span style={{ fontFamily:DISPLAY, color:C.muted, fontSize:12, letterSpacing:"0.28em", textTransform:"uppercase", fontWeight:600 }}>Onitama</span>
         <span style={{ fontFamily:BODY, color:C.dim, fontSize:11, letterSpacing:"0.12em" }}>El duelo de los maestros</span>
       </footer>

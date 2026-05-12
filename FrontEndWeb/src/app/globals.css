@@ -34,6 +34,25 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]):not([type="range"]),
+textarea,
+select {
+  color: #000 !important;
+  caret-color: #000;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280;
+}
+
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: #000 !important;
+  caret-color: #000;
+}
+
 /* ═══════════════════════════════════════════════════
    LANDING — Battle-Tech animation system
 ═══════════════════════════════════════════════════ */
@@ -190,4 +209,155 @@ body {
 }
 .oni-nav-link:hover {
   color: #c4b5a0;
+}
+
+/* Landing responsive layout */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.oni-landing-button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  text-align: center;
+}
+
+@media (max-width: 860px) {
+  .oni-site-header {
+    display: none !important;
+  }
+
+  .oni-landing-hero {
+    min-height: auto !important;
+    padding: 72px 0 54px;
+  }
+
+  .oni-hero-content {
+    width: 100%;
+    padding: 0 18px !important;
+  }
+
+  .oni-hero-title {
+    font-size: clamp(3.4rem, 18vw, 7rem) !important;
+    letter-spacing: 0.06em !important;
+  }
+
+  .oni-hero-label,
+  .oni-hero-subtitle {
+    letter-spacing: 0.16em !important;
+  }
+
+  .oni-hero-copy {
+    margin-bottom: 34px !important;
+  }
+
+  .oni-landing-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .oni-landing-button {
+    width: 100%;
+    padding: 14px 18px !important;
+    letter-spacing: 0.18em !important;
+  }
+
+  .oni-stat-strip {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 38px !important;
+  }
+
+  .oni-stat-item {
+    min-width: 0;
+  }
+
+  .oni-landing-section {
+    padding: 64px 18px !important;
+  }
+
+  .oni-section-label {
+    gap: 10px !important;
+    margin-bottom: 26px !important;
+  }
+
+  .oni-section-label > div {
+    width: 28px !important;
+  }
+
+  .oni-section-label span {
+    letter-spacing: 0.22em !important;
+    text-align: center;
+  }
+
+  .oni-battle-grid {
+    grid-template-columns: 1fr !important;
+    gap: 18px !important;
+  }
+
+  .oni-battle-vs {
+    flex-direction: row !important;
+    justify-content: center;
+    padding: 4px 0;
+  }
+
+  .oni-battle-vs > div:first-child,
+  .oni-battle-vs > div:last-child {
+    width: 48px !important;
+    height: 1px !important;
+    background: linear-gradient(to right, transparent, #b85c38) !important;
+  }
+
+  .oni-chip-row {
+    flex-wrap: wrap;
+  }
+
+  .oni-card-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .oni-info-card,
+  .oni-feature-card {
+    padding: 36px 24px !important;
+  }
+
+  .oni-final-cta {
+    padding: 82px 18px !important;
+  }
+
+  .oni-final-geo {
+    width: 420px !important;
+    height: 420px !important;
+  }
+
+  .oni-word-strip {
+    flex-wrap: wrap;
+    gap: 14px !important;
+    margin-top: 48px !important;
+  }
+
+  .oni-landing-footer {
+    justify-content: center !important;
+    padding: 24px 18px !important;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .oni-hero-title {
+    font-size: clamp(2.8rem, 19vw, 4.6rem) !important;
+  }
+
+  .oni-stat-strip {
+    grid-template-columns: 1fr;
+  }
 }

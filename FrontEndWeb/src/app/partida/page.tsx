@@ -643,9 +643,11 @@ function PartidaInterna({
   } | null>(null);
   const [razonLocalFin, setRazonLocalFin] = useState<string | null>(null);
 
-  /** Partida pausada o cancelada por tiempo agotado (sin victoria/derrota) */
+  /** Partida pausada o cancelada sin victoria/derrota. */
   const [partidaInterrumpida, setPartidaInterrumpida] = useState<{
     tipo: "PAUSADA" | "CANCELADA";
+    motivo?: string;
+    equipoResponsable?: EquipoID;
   } | null>(null);
 
   /** Toast in-game: reemplaza los alert() del navegador */
@@ -1032,7 +1034,7 @@ function PartidaInterna({
           const motivo = (msg as { motivo?: string }).motivo;
           if (motivo === "TIEMPO_AGOTADO") {
             // Tiempo agotado en partida privada: mostrar pantalla explicativa
-            setPartidaInterrumpida({ tipo: "PAUSADA" });
+            setPartidaInterrumpida({ tipo: "PAUSADA", motivo });
           } else {
             // Pausa normal acordada entre jugadores → volver al menú
             desconectarPartida();
@@ -1041,10 +1043,17 @@ function PartidaInterna({
           break;
         }
 
-        case "PARTIDA_CANCELADA":
-          // Partida pública cancelada por tiempo agotado: mostrar pantalla explicativa
-          setPartidaInterrumpida({ tipo: "CANCELADA" });
+        case "PARTIDA_CANCELADA": {
+          const cancelada = msg as { motivo?: string; equipo_responsable?: number };
+          setPartidaInterrumpida({
+            tipo: "CANCELADA",
+            motivo: cancelada.motivo,
+            equipoResponsable: cancelada.equipo_responsable === 1 || cancelada.equipo_responsable === 2
+              ? cancelada.equipo_responsable
+              : undefined,
+          });
           break;
+        }
 
         case "PAUSA_RECHAZADA":
           // El rival rechazó mi solicitud de pausa
@@ -1661,9 +1670,9 @@ function PartidaInterna({
       {partidaInterrumpida && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="bg-[#1a2d4a] border border-white/20 rounded-2xl p-10 flex flex-col items-center gap-5 shadow-2xl max-w-xs w-full mx-4">
-            <div className="text-5xl">⏰</div>
+            <div className="text-5xl">{partidaInterrumpida.motivo === "ABANDONO" ? "🚪" : "⏰"}</div>
             <h2 className="text-2xl font-bold text-white uppercase tracking-widest text-center">
-              Tiempo agotado
+              {partidaInterrumpida.motivo === "ABANDONO" ? "Partida cancelada" : "Tiempo agotado"}
             </h2>
             {partidaInterrumpida.tipo === "PAUSADA" ? (
               <>
@@ -1676,7 +1685,11 @@ function PartidaInterna({
               <>
                 <p className="text-white/50 text-xs uppercase tracking-widest">PARTIDA CANCELADA</p>
                 <p className="text-white/60 text-sm text-center">
-                  Se acabó el tiempo. La partida pública ha sido cancelada sin ganador.
+                  {partidaInterrumpida.motivo === "ABANDONO"
+                    ? partidaInterrumpida.equipoResponsable === miEquipoActual
+                      ? "Has abandonado antes del primer movimiento. La partida ha sido cancelada sin ganador."
+                      : "Tu rival ha abandonado antes del primer movimiento. La partida ha sido cancelada sin ganador."
+                    : "Se acabó el tiempo. La partida pública ha sido cancelada sin ganador."}
                 </p>
               </>
             )}

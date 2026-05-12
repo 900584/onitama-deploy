@@ -10,15 +10,12 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Collections;
 import java.util.concurrent.*;
 import java.util.Map;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.Map;
 
 import backend.VO.Partida;
 import backend.VO.CartaMov;
@@ -37,10 +34,6 @@ import backend.gestor.GestorPartida;
 import backend.gestor.GestorCartasMov;
 import backend.gestor.GestorCartasAccion;
 import backend.gestor.GestorEmail;
-
-import java.util.Comparator;
-
-import netscape.javascript.JSObject;
 
 //POR HACER:
 // -> El xml que querias hacer: PRIORIDAD ALTA <-- Puedes empezar con esto si quieres 
@@ -241,9 +234,6 @@ public class Servidor extends WebSocketServer {
         pj.p2.ws.send(msg2.toString());
         System.out.println("Partida " + pj.partida.getIDPartida() + " iniciada.");
 
-        // Iniciar timer para el primer turno (equipo 1 siempre empieza)
-        iniciarTimerTurno(pj, pj.partida.getTurno());
-
         // Envío las 3 cartas de la cola para que el frontend gestione la rotación por
         // su cuenta,
         // porque si solo enviáramos la carta visible, el servidor tendría que guardar
@@ -255,36 +245,62 @@ public class Servidor extends WebSocketServer {
 
     }
 
-    /**
-     * Ejecuta la lógica de tiempo agotado para una partida:
-     *   - Partida PRIVADA → pausa y envía PARTIDA_PAUSADA (puede reanudarse).
-     *   - Partida PÚBLICA → cancela sin ganador y envía PARTIDA_CANCELADA.
-     * Llama a este método tanto desde el timer de respaldo como desde el handler
-     * del mensaje TIEMPO_AGOTADO enviado por el cliente.
-     */
+    /** Ejecuta el tiempo agotado: antes del primer movimiento no hay ganador; después pierde quien debía mover. */
     private void ejecutarTiempoAgotado(Pareja pj) {
-        boolean esPrivada = "PRIVADA".equalsIgnoreCase(pj.partida.getTipo());
-        System.out.println("TIEMPO_AGOTADO partida=" + pj.partida.getIDPartida()
-            + " tipo=" + pj.partida.getTipo());
+        if (pj.partida.getTurno() == 0) {
+            boolean esPrivada = "PRIVADA".equalsIgnoreCase(pj.partida.getTipo());
+            System.out.println("TIEMPO_AGOTADO partida=" + pj.partida.getIDPartida()
+                + " sin_movimientos tipo=" + pj.partida.getTipo());
 
-        if (esPrivada) {
-            boolean ok = pj.partida.pausarPartida();
-            if (!ok) {
-                System.err.println("ejecutarTiempoAgotado: pausarPartida falló partida="
-                    + pj.partida.getIDPartida() + " estado=" + pj.partida.getEstado());
+            if (esPrivada) {
+                pj.partida.pausarPartida();
+                JSONObject msg = new JSONObject()
+                    .put("tipo", "PARTIDA_PAUSADA")
+                    .put("motivo", "TIEMPO_AGOTADO");
+                if (pj.p1.ws.isOpen()) pj.p1.ws.send(msg.toString());
+                if (pj.p2.ws.isOpen()) pj.p2.ws.send(msg.toString());
+            } else {
+                pj.partida.cancelarPartida();
+                JSONObject msg = new JSONObject()
+                    .put("tipo", "PARTIDA_CANCELADA")
+                    .put("motivo", "TIEMPO_AGOTADO");
+                if (pj.p1.ws.isOpen()) pj.p1.ws.send(msg.toString());
+                if (pj.p2.ws.isOpen()) pj.p2.ws.send(msg.toString());
             }
-            JSONObject msg = new JSONObject()
-                .put("tipo", "PARTIDA_PAUSADA")
-                .put("motivo", "TIEMPO_AGOTADO");
-            if (pj.p1.ws.isOpen()) pj.p1.ws.send(msg.toString());
-            if (pj.p2.ws.isOpen()) pj.p2.ws.send(msg.toString());
+
+            try {
+                mutexParejas.acquire();
+                parejas.remove(pj);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                mutexParejas.release();
+            }
+            return;
+        }
+
+        int equipoSinMover = pj.partida.getTurno() % 2 + 1;
+        int equipoGanador = (equipoSinMover == 1) ? 2 : 1;
+        System.out.println("TIEMPO_AGOTADO partida=" + pj.partida.getIDPartida()
+            + " equipo_sin_mover=" + equipoSinMover);
+
+        pj.partida.abandonarPartida(equipoSinMover);
+
+        JSONObject msgVictoria = new JSONObject()
+            .put("tipo", "VICTORIA")
+            .put("motivo", "TIEMPO_AGOTADO")
+            .put("equipo_responsable", equipoSinMover);
+        JSONObject msgDerrota = new JSONObject()
+            .put("tipo", "DERROTA")
+            .put("motivo", "TIEMPO_AGOTADO")
+            .put("equipo_responsable", equipoSinMover);
+
+        if (equipoGanador == 1) {
+            if (pj.p1.ws.isOpen()) pj.p1.ws.send(msgVictoria.toString());
+            if (pj.p2.ws.isOpen()) pj.p2.ws.send(msgDerrota.toString());
         } else {
-            pj.partida.cancelarPartida();
-            JSONObject msg = new JSONObject()
-                .put("tipo", "PARTIDA_CANCELADA")
-                .put("motivo", "TIEMPO_AGOTADO");
-            if (pj.p1.ws.isOpen()) pj.p1.ws.send(msg.toString());
-            if (pj.p2.ws.isOpen()) pj.p2.ws.send(msg.toString());
+            if (pj.p1.ws.isOpen()) pj.p1.ws.send(msgDerrota.toString());
+            if (pj.p2.ws.isOpen()) pj.p2.ws.send(msgVictoria.toString());
         }
 
         try {
@@ -298,12 +314,13 @@ public class Servidor extends WebSocketServer {
     }
 
     /**
-     * Inicia (o reinicia) el timer de respaldo para el turno del equipo indicado.
+     * Inicia (o reinicia) el timer de respaldo para el turno indicado.
      * Se dispara 10 s después de que el frontend debería haber enviado TIEMPO_AGOTADO,
      * como seguro ante desconexiones o clientes maliciosos.
      */
-    private void iniciarTimerTurno(Pareja pj, int equipoQueDebeMover) {
+    private void iniciarTimerTurno(Pareja pj, int turnoActual) {
         final int idPartida = pj.partida.getIDPartida();
+        final int equipoQueDebeMover = turnoActual % 2 + 1;
 
         ScheduledFuture<?> timerAntiguo = esperaPartida.remove(idPartida);
         if (timerAntiguo != null) timerAntiguo.cancel(false);
@@ -715,6 +732,27 @@ public class Servidor extends WebSocketServer {
             ScheduledFuture<?> timerAntiguo = esperaPartida.remove(idPartida);
             if (timerAntiguo != null) {
                 timerAntiguo.cancel(false);
+            }
+
+            if (pj.partida.getTurno() == 0) {
+                pj.partida.cancelarPartida();
+                JSONObject msgCancelada = new JSONObject();
+                msgCancelada.put("tipo", "PARTIDA_CANCELADA");
+                msgCancelada.put("motivo", "ABANDONO");
+                msgCancelada.put("equipo_responsable", equipoAbandona);
+
+                if (pj.p1.ws.isOpen()) pj.p1.ws.send(msgCancelada.toString());
+                if (pj.p2.ws.isOpen()) pj.p2.ws.send(msgCancelada.toString());
+
+                try {
+                    mutexParejas.acquire();
+                    parejas.remove(pj);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    mutexParejas.release(); // SIGNAL
+                }
+                return;
             }
 
             InfoJugador oponente = pj.getOponente(conn);
@@ -1526,6 +1564,7 @@ public class Servidor extends WebSocketServer {
                     // msg1 siempre a p1 (equipo 1) y msg2 siempre a p2 (equipo 2)
                     pj.p1.ws.send(msg1.toString());
                     pj.p2.ws.send(msg2.toString());
+                    iniciarTimerTurno(pj, pj.partida.getTurno());
                 }
             }
         }
