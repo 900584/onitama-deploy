@@ -10,13 +10,13 @@
  * Tras el login exitoso, guarda los datos del jugador en sessionStorage (sesion.ts)
  * y redirige a la pantalla principal.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import HeaderLogo from "@/components/HeaderLogo";
 import FondoPantalla from "@/components/FondoPantalla";
 import { iniciarSesion } from "@/api/auth";
-import { guardarSesion } from "@/lib/sesion";
+import { guardarSesion, leerSesion } from "@/lib/sesion";
 import { validarContrasena } from "@/lib/validacion";
 import * as WS from "@/api/ws";
 
@@ -36,6 +36,12 @@ export default function IniciarSesionPage() {
   const [estadoRecuperar, setEstadoRecuperar] = useState<
     "idle" | "enviando" | "enviado" | "error_noexiste" | "error_email" | "error_timeout"
   >("idle");
+
+  useEffect(() => {
+    if (leerSesion()) {
+      router.replace("/partidas");
+    }
+  }, [router]);
 
   const handleRecuperarContrasena = async (e: React.FormEvent) => {
     e.preventDefault();

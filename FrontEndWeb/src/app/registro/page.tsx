@@ -15,7 +15,7 @@
  *   REGISTRO_EXITOSO → redirigir a /iniciar-sesion
  *   REGISTRO_ERRONEO → mostrar error
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -23,7 +23,7 @@ import HeaderLogo from "@/components/HeaderLogo";
 import FondoPantalla from "@/components/FondoPantalla";
 import { validarContrasena, HINT_CONTRASENA } from "@/lib/validacion";
 import { registrarUsuario } from "@/api/auth";
-import { guardarSesion } from "@/lib/sesion";
+import { guardarSesion, leerSesion } from "@/lib/sesion";
 
 type Paso = 1 | 2 | 3;
 /** Sin elección aún (no se puede confirmar). `null` = explícitamente sin foto. */
@@ -45,6 +45,12 @@ export default function RegistroPage() {
   const [cargando, setCargando] = useState(false);
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const [avatarSeleccionado, setAvatarSeleccionado] = useState<EleccionAvatar>("sin_elegir");
+
+  useEffect(() => {
+    if (leerSesion()) {
+      router.replace("/partidas");
+    }
+  }, [router]);
 
   // ─── Paso 1: validar datos y pasar a confirmación ─────────────────────────
   const handleContinuar = (e: React.FormEvent) => {

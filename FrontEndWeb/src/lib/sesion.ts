@@ -2,12 +2,9 @@
  * Gestión de la sesión del jugador en el navegador.
  *
  * Tras un inicio de sesión o registro exitoso, el servidor devuelve los datos
- * del jugador. Esta utilidad los guarda en sessionStorage para que el resto
+ * del jugador. Esta utilidad los guarda en localStorage para que el resto
  * de la aplicación (buscar partida, pantalla de juego, etc.) pueda leerlos
- * sin necesidad de volver a consultar al servidor.
- *
- * Se usa sessionStorage (no localStorage) para que los datos se borren
- * automáticamente al cerrar el navegador o la pestaña.
+ * también desde pestañas nuevas del mismo navegador.
  */
 
 const CLAVE_SESION = "sesionJugador";
@@ -23,21 +20,27 @@ export interface DatosSesion {
   avatar_id: string | null;
 }
 
-/** Guarda los datos del jugador en sessionStorage tras el login. */
+/** Guarda los datos del jugador en localStorage tras el login. */
 export function guardarSesion(datos: DatosSesion): void {
   if (typeof window !== "undefined") {
-    sessionStorage.setItem(CLAVE_SESION, JSON.stringify(datos));
+    localStorage.setItem(CLAVE_SESION, JSON.stringify(datos));
+    sessionStorage.removeItem(CLAVE_SESION);
   }
 }
 
-/** Lee los datos del jugador desde sessionStorage. Devuelve null si no hay sesión activa. */
+/** Lee los datos del jugador desde localStorage. Devuelve null si no hay sesión activa. */
 export function leerSesion(): DatosSesion | null {
   if (typeof window === "undefined") return null;
-  const raw = sessionStorage.getItem(CLAVE_SESION);
+  const raw = localStorage.getItem(CLAVE_SESION) ?? sessionStorage.getItem(CLAVE_SESION);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as DatosSesion;
+    const datos = JSON.parse(raw) as DatosSesion;
+    localStorage.setItem(CLAVE_SESION, JSON.stringify(datos));
+    sessionStorage.removeItem(CLAVE_SESION);
+    return datos;
   } catch {
+    localStorage.removeItem(CLAVE_SESION);
+    sessionStorage.removeItem(CLAVE_SESION);
     return null;
   }
 }
@@ -45,6 +48,7 @@ export function leerSesion(): DatosSesion | null {
 /** Elimina la sesión (cierre de sesión). */
 export function cerrarSesion(): void {
   if (typeof window !== "undefined") {
+    localStorage.removeItem(CLAVE_SESION);
     sessionStorage.removeItem(CLAVE_SESION);
   }
 }
