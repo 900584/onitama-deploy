@@ -3,6 +3,7 @@ services:
   database:
     image: postgis/postgis:17-3.4
     container_name: proy-postgres
+    restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
@@ -29,6 +30,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: proy-backend
+    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
