@@ -134,12 +134,46 @@ class PartidaActivity : AppCompatActivity() {
         var vermazo by remember { mutableStateOf(false) }
         var verAcciones by remember { mutableStateOf(false) }
         val infoCartasAccion by viewModel.mensajeCartaAccion.collectAsState()
-        val mostrarPop by remember { derivedStateOf { viewModel.mostrarPopPausa } }
+        val mostrarPopPausa by remember { derivedStateOf { viewModel.mostrarPopPausa } }
+        val mostrarPopCancel by remember { derivedStateOf { viewModel.mostrarPopCancel } }
         val quattrocentoBold = FontFamily(Font(R.font.quattrocento_bold))
 
 
+        if (mostrarPopCancel) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { /* Opcional: no permitir cerrar fuera */ },
+                confirmButton = {
+                    Button(
+                        onClick = {
 
-        if (mostrarPop) {
+                            activity?.finish()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = colorResource(id = R.color.azulFondo))
+                    ) {
+                        Text("Aceptar", color = Color.White)
+                    }
+                },
+                title = {
+                    Text(
+                        "Partida Cancelada",
+                        fontFamily = quattrocentoBold,
+                        color = colorResource(id = R.color.azulFondo)
+                    )
+                },
+                text = {
+                    Text(
+                        "Se ha agotado el tiempo límite, la partida se cancela sin ganador",
+                        fontFamily = quattrocentoBold
+                    )
+                },
+                shape = RoundedCornerShape(16.dp),
+                containerColor = Color.White
+            )
+        }
+
+
+
+        if (mostrarPopPausa) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { /* Opcional: no permitir cerrar fuera */ },
                 confirmButton = {

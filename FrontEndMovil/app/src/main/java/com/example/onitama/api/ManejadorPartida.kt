@@ -3,6 +3,10 @@ package com.example.onitama.api
 import com.example.onitama.api.Amigos.MensajeServidor
 import com.example.onitama.api.Auth.MensajeCambiarContrasegna
 import com.example.onitama.api.Auth.MensajeCliente
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -39,6 +43,28 @@ data class MensajeRechazarInvitacion(
     val idNotificacion: Int,
     val nombre: String
 ): MensajeCliente()
+
+
+@Serializable
+@SerialName("SOLICITAR_PARTIDAS_PUB")
+data class MensajeSolicitarPartidasRecientes(
+    val usuario: String,
+): MensajeCliente()
+
+@Serializable
+data class PartidaReciente(
+    val partida_id: Int,
+    val oponente: String,
+    val estado: String,
+    val tiempo: Int,
+    val ganador: String
+)
+
+@Serializable
+data class RespuestaPartidasPublicas(
+    val tipo: String,
+    val partidas: List<PartidaReciente>
+)
 
 @Serializable
 @SerialName("SOLICITAR_PARTIDAS_PRIV")
@@ -117,6 +143,27 @@ class ManejadorPartidaAPI {
         val mensaje = MensajeSolicitarReanudar(remitente, destinatario, idPartida)
         val jsonMsg = jsonSerializer.encodeToString<MensajeCliente>(mensaje)
         ManejadorGlobal.enviarMensaje(jsonMsg)
+    }
+
+
+    suspend fun solicitarRecientes(usuario: String): List<PartidaReciente> {
+        val mensaje = MensajeSolicitarPartidasRecientes(usuario)
+        val jsonMsg = jsonSerializer.encodeToString<MensajeCliente>(mensaje)
+
+        ManejadorGlobal.enviarMensaje(jsonMsg)
+
+        val respuestaStr: String = withTimeoutOrNull(5000L) {
+            ManejadorGlobal.mensajesEntrantes
+                .filter { json ->
+                    json.optString("tipo") == "PARTIDAS_PUBLICAS"
+                }
+                .first()
+                .toString()
+        } ?: throw Exception("Tiempo de espera agotado al recibir partidas")
+
+        val respuesta = jsonSerializer.decodeFromString<RespuestaPartidasPublicas>(respuestaStr)
+
+        return respuesta.partidas.take(3)
     }
 
     @Serializable

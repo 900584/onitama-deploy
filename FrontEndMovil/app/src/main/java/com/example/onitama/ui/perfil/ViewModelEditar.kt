@@ -2,6 +2,7 @@ package com.example.onitama.ui.perfil
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.onitama.AutoLogin
@@ -9,6 +10,8 @@ import com.example.onitama.DatosPerfil
 import com.example.onitama.api.Auth
 import com.example.onitama.api.Auth.MensajeCliente
 import com.example.onitama.api.ManejadorGlobal
+import com.example.onitama.api.ManejadorPartidaAPI
+import com.example.onitama.api.PartidaReciente
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,6 +42,8 @@ class ViewModelEditar() : ViewModel() {
     val newPass2State: StateFlow<String> = newPass2.asStateFlow()
     val oldPassState: StateFlow<String> = oldPass.asStateFlow()
 
+    private val _partidasRecientes = MutableStateFlow<List<PartidaReciente>>(emptyList())
+    val partidasRecientes: StateFlow<List<PartidaReciente>> = _partidasRecientes.asStateFlow()
     fun onPass1Change(contrasenya: String) {
         newPass1.value =  contrasenya
     }
@@ -92,6 +97,19 @@ class ViewModelEditar() : ViewModel() {
             }
         }
         return !error
+    }
+
+    fun getPartidas(nombre: String){
+        viewModelScope.launch {
+            try {
+                val misPartidas = ManejadorPartidaAPI().solicitarRecientes(nombre)
+                _partidasRecientes.value = misPartidas
+                // Aquí ya puedes actualizar tu estado de Compose o tu lista
+                Log.d("API", "He recibido ${misPartidas.size} partidas")
+            } catch (e: Exception) {
+                Log.e("API", "Error: ${e.message}")
+            }
+        }
     }
 
 }

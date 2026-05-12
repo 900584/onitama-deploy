@@ -29,6 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -270,6 +271,71 @@ fun PantallaPerfil(
                     fontFamily = quattrocentoBold
                 )
             }
+
+            // Dentro de tu Composable de Perfil
+            val last3Partidas by viewModel.partidasRecientes.collectAsState()
+
+            // Esto para que al cargar la pantalla solicite las 3 últimas públicas al servidor
+            LaunchedEffect(Unit) {
+                viewModel.getPartidas(datosUsuario?.nombre ?: "")
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 40.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (last3Partidas.isEmpty()) {
+                    Text("No hay partidas recientes", color = Color.Gray)
+                }
+
+                for (partida in last3Partidas) {
+                    // Determinamos el color de fondo según el resultado
+                    val colorFondo = when {
+                        partida.ganador == datosUsuario?.nombre -> Color(0xFFC8E6C9) // Verde clarito
+                        partida.ganador == "Empate" || partida.ganador == "NO_HAY" -> Color(0xFFFFF9C4) // Amarillo clarito
+                        else -> Color(0xFFFFCDD2) // Rojo clarito
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp)) // Un poco de diseño
+                            .background(colorFondo)
+                            .padding(12.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween, // Separa los textos
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "vs ${partida.oponente}",
+                                    fontFamily = quattrocentoBold, // Si la tienes definida
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    text = "Estado: ${partida.estado}",
+                                    fontSize = 12.sp,
+                                    color = Color.DarkGray
+                                )
+                            }
+
+                            Text(
+                                text = if(partida.ganador == datosUsuario?.nombre) "¡VICTORIA!"
+                                else if (partida.ganador == "Empate") "EMPATE"
+                                else if (partida.ganador == "NO_HAY") "NO HUBO GANADOR"
+                                else "DERROTA",
+                                fontFamily = quattrocentoBold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
+
 
             Spacer(modifier = Modifier.height(24.dp))
 

@@ -326,6 +326,12 @@ class Partida(
         val pos_y: Int
     ) : MensajeServidor()
 
+    @Serializable
+    @SerialName("PARTIDA_CANCELADA")
+    data class RespuestaPartidaCancelada(
+        val motivo: String
+    ) : MensajeServidor()
+
 
     fun desconectarPartida() {
             PartidaActiva.wsEstoyListoEnviado = false

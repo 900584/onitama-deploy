@@ -63,11 +63,14 @@ class PartidaViewModel : ViewModel() {
     private val _notificacionPausa = MutableStateFlow<Partida.RespuestaSolicitudPausa?>(null)
     val notificacionPausa = _notificacionPausa.asStateFlow()
 
+    var mostrarPopCancel by mutableStateOf(false)
+        private set
+
     var partida = Partida()
 
     var equipoPropio = EquipoID.AZUL //de momento el bot siempre es el rojo, ya si eso se mejorará más adelante
 
-    var limpiar: (() -> Unit)? = null
+
 
     fun iniciarPartida(modo: ModoJuego, dificultad: Dificultad = Dificultad.FACIL) {
         modoJuegoActual = modo
@@ -217,6 +220,11 @@ class PartidaViewModel : ViewModel() {
 
                             is Partida.RespuestaPartidaPausada -> {
                                 mostrarPopPausa = true
+                            }
+
+                            is Partida.RespuestaPartidaCancelada -> {
+                                mostrarPopCancel = true
+
                             }
 
                             is Partida.RespuestaPausaRechazada -> { }
