@@ -24,6 +24,7 @@ import { CartaAccionFicha, getDescripcionCartaAccion } from "@/lib/cartasAccionV
 import {
   leerNotificaciones,
   eliminarNotificacion,
+  eliminarSolicitudesAmistadPorRemitente,
   limpiarNotificaciones,
   type Notificacion,
 } from "@/lib/notificaciones";
@@ -181,6 +182,8 @@ export default function PartidasPage() {
   const [partidasConAmigo, setPartidasConAmigo] = useState<ResumenPartidaAmigo[]>([]);
   const [cargandoPartidasAmigo, setCargandoPartidasAmigo] = useState(false);
   const [mostrarModalPartidasAmigo, setMostrarModalPartidasAmigo] = useState(false);
+  const [confirmacionBorrarAmigo, setConfirmacionBorrarAmigo] = useState<InfoAmigo | null>(null);
+  const [borrandoAmigo, setBorrandoAmigo] = useState(false);
 
   // ── Búsqueda de jugadores ───────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState("");
@@ -236,7 +239,12 @@ export default function PartidasPage() {
         fecha_fin: msg.fecha_fin as string | undefined,
       };
       setNotificaciones((prev) =>
-        prev.find((n) => n.idNotificacion === nueva.idNotificacion)
+        prev.find((n) => n.idNotificacion === nueva.idNotificacion) ||
+          prev.find(
+            (n) =>
+              n.tipo === "SOLICITUD_AMISTAD" &&
+              n.remitente === nueva.remitente
+          )
           ? prev
           : [...prev, nueva]
       );
@@ -531,9 +539,11 @@ export default function PartidasPage() {
   const handleAceptarSolicitud = useCallback(
     (notif: Notificacion) => {
       aceptarSolicitudAmistad(notif.remitente, jugador.nombre, notif.idNotificacion);
-      eliminarNotificacion(notif.idNotificacion);
+      eliminarSolicitudesAmistadPorRemitente(notif.remitente);
       setNotificaciones((prev) =>
-        prev.filter((n) => n.idNotificacion !== notif.idNotificacion)
+        prev.filter(
+          (n) => !(n.tipo === "SOLICITUD_AMISTAD" && n.remitente === notif.remitente)
+        )
       );
     },
     [jugador.nombre]
@@ -541,9 +551,11 @@ export default function PartidasPage() {
 
   const handleRechazarSolicitud = useCallback((notif: Notificacion) => {
     rechazarSolicitudAmistad(notif.idNotificacion);
-    eliminarNotificacion(notif.idNotificacion);
+    eliminarSolicitudesAmistadPorRemitente(notif.remitente);
     setNotificaciones((prev) =>
-      prev.filter((n) => n.idNotificacion !== notif.idNotificacion)
+      prev.filter(
+        (n) => !(n.tipo === "SOLICITUD_AMISTAD" && n.remitente === notif.remitente)
+      )
     );
   }, []);
 
@@ -586,21 +598,28 @@ export default function PartidasPage() {
     [jugador.nombre]
   );
 
-  const handleBorrarAmigo = useCallback(
-    async (amigo: InfoAmigo) => {
-      const confirmar = window.confirm(`¿Seguro que quieres borrar a ${amigo.nombre} de tus amigos?`);
-      if (!confirmar) return;
-      const ok = await borrarAmigo(jugador.nombre, amigo.nombre);
-      if (!ok) return;
-      setAmigos((prev) => prev.filter((a) => a.nombre !== amigo.nombre));
-      if (amigoSeleccionado?.nombre === amigo.nombre) {
-        setAmigoSeleccionado(null);
-        setPartidasConAmigo([]);
-        setMostrarModalPartidasAmigo(false);
-      }
-    },
-    [jugador.nombre, amigoSeleccionado]
-  );
+  const handleBorrarAmigo = useCallback((amigo: InfoAmigo) => {
+    setConfirmacionBorrarAmigo(amigo);
+  }, []);
+
+  const handleConfirmarBorrarAmigo = useCallback(async () => {
+    if (!confirmacionBorrarAmigo || borrandoAmigo) return;
+    const amigo = confirmacionBorrarAmigo;
+    setBorrandoAmigo(true);
+    const ok = await borrarAmigo(jugador.nombre, amigo.nombre);
+    setBorrandoAmigo(false);
+    if (!ok) {
+      setMensajePrivada("No se pudo borrar a este amigo. Inténtalo de nuevo.");
+      return;
+    }
+    setAmigos((prev) => prev.filter((a) => a.nombre !== amigo.nombre));
+    if (amigoSeleccionado?.nombre === amigo.nombre) {
+      setAmigoSeleccionado(null);
+      setPartidasConAmigo([]);
+      setMostrarModalPartidasAmigo(false);
+    }
+    setConfirmacionBorrarAmigo(null);
+  }, [confirmacionBorrarAmigo, borrandoAmigo, jugador.nombre, amigoSeleccionado]);
 
   const handleConfirmarCerrarSesion = useCallback(() => {
     setMostrarModalCerrarSesion(false);
@@ -1461,6 +1480,40 @@ export default function PartidasPage() {
                 className="flex-1 py-3 rounded-xl font-bold uppercase tracking-widest text-sm bg-red-700 text-white hover:bg-red-600 transition-colors"
               >
                 Salir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmacionBorrarAmigo && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="bg-[#1a2d4a] border border-white/20 rounded-2xl p-8 flex flex-col items-center gap-5 shadow-2xl max-w-sm w-full mx-4">
+            <span className="text-4xl" aria-hidden>
+              🗑️
+            </span>
+            <h2 className="text-xl font-bold text-white uppercase tracking-widest text-center">
+              ¿Borrar amigo?
+            </h2>
+            <p className="text-white/60 text-sm text-center">
+              Se eliminará a <span className="text-white font-semibold">@{confirmacionBorrarAmigo.nombre}</span> de tu lista de amigos.
+            </p>
+            <div className="flex gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => setConfirmacionBorrarAmigo(null)}
+                disabled={borrandoAmigo}
+                className="flex-1 py-3 rounded-xl font-bold uppercase tracking-widest text-sm border border-white/20 text-white/70 hover:bg-white/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarBorrarAmigo}
+                disabled={borrandoAmigo}
+                className="flex-1 py-3 rounded-xl font-bold uppercase tracking-widest text-sm bg-red-700 text-white hover:bg-red-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {borrandoAmigo ? "Borrando..." : "Borrar"}
               </button>
             </div>
           </div>

@@ -20,10 +20,35 @@ export interface Notificacion {
 
 const CLAVE = "onitama_notificaciones";
 
+function deduplicar(lista: Notificacion[]): Notificacion[] {
+  const salida: Notificacion[] = [];
+  const remitentesAmistad = new Set<string>();
+  const ids = new Set<number>();
+
+  for (const n of lista) {
+    if (ids.has(n.idNotificacion)) continue;
+    ids.add(n.idNotificacion);
+
+    if (n.tipo === "SOLICITUD_AMISTAD") {
+      if (remitentesAmistad.has(n.remitente)) continue;
+      remitentesAmistad.add(n.remitente);
+    }
+
+    salida.push(n);
+  }
+
+  return salida;
+}
+
 function leer(): Notificacion[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(sessionStorage.getItem(CLAVE) ?? "[]") as Notificacion[];
+    const lista = JSON.parse(sessionStorage.getItem(CLAVE) ?? "[]") as Notificacion[];
+    const limpia = deduplicar(lista);
+    if (limpia.length !== lista.length) {
+      sessionStorage.setItem(CLAVE, JSON.stringify(limpia));
+    }
+    return limpia;
   } catch {
     return [];
   }
@@ -46,14 +71,23 @@ export function leerNotificaciones(): Notificacion[] {
  */
 export function guardarNotificacion(n: Notificacion): void {
   const lista = leer();
-  if (!lista.find((x) => x.idNotificacion === n.idNotificacion)) {
-    escribir([...lista, n]);
-  }
+  if (lista.find((x) => x.idNotificacion === n.idNotificacion)) return;
+  if (n.tipo === "SOLICITUD_AMISTAD" && lista.find((x) => x.tipo === "SOLICITUD_AMISTAD" && x.remitente === n.remitente)) return;
+  escribir(deduplicar([...lista, n]));
 }
 
 /** Elimina una notificación por id (tras aceptar, rechazar o expirar). */
 export function eliminarNotificacion(id: number): void {
   escribir(leer().filter((n) => n.idNotificacion !== id));
+}
+
+/** Elimina todas las solicitudes de amistad pendientes de un remitente concreto. */
+export function eliminarSolicitudesAmistadPorRemitente(remitente: string): void {
+  escribir(
+    leer().filter(
+      (n) => !(n.tipo === "SOLICITUD_AMISTAD" && n.remitente === remitente)
+    )
+  );
 }
 
 /** Limpia todas las notificaciones (al cerrar sesión). */
