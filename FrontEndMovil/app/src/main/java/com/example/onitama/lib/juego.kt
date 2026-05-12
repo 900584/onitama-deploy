@@ -550,6 +550,8 @@ fun convertirCarta(cartaS: Any):Carta{
 }
 
 fun tableroDesdeServidor(
+    trampa1: String,
+    trampa2: String,
     eq1: String,
     eq2: String
 ) : List<List<Celda>> {
@@ -565,7 +567,7 @@ fun tableroDesdeServidor(
 
     val reyRe = Regex("\\[(-?\\d+),(-?\\d+)\\]")
     val peonRe = Regex("\\((-?\\d+),(-?\\d+)\\)")
-    val trampaRe = Regex("\\|(-?\\d+),(-?\\d+),(\\d+)\\|")
+
 
     // Misma constante que usas en el ViewModel para invertir (asumo que DIM - 1 es 6)
     val END = DIM - 1
@@ -599,31 +601,39 @@ fun tableroDesdeServidor(
                 nuevoTablero[fila][col] = nuevoTablero[fila][col].copy(ficha = Ficha(equipo, false))
             }
         }
-
-        trampaRe.findAll(data).forEach { m ->
-            val colServidor = m.groupValues[1].toInt()
-            val filaServidor = m.groupValues[2].toInt()
-            val activa = m.groupValues[3].toInt()
-
-            // ¡Aplicamos la inversión aquí!
-            val col = END - colServidor
-            val fila = END - filaServidor
-
-            if (fila in 0 until DIM && col in 0 until DIM) {
-                nuevoTablero[fila][col] = nuevoTablero[fila][col].copy(
-                    esTrampaEquipo = if (activa == 1) {
-                        equipo.id
-                    }
-                    else {
-                        -1
-                    }
-                )
-            }
-        }
     }
 
     colocar(eq1, EquipoID.AZUL)
     colocar(eq2, EquipoID.ROJO)
+
+
+    fun colocarTrampaManual(datos: String?, equipo: EquipoID) {
+        if (datos.isNullOrBlank()) return
+
+        try {
+            val partes = datos.split(",")
+            if (partes.size == 3) {
+                val colServidor = partes[0].toInt()
+                val filaServidor = partes[1].toInt()
+                val activa = partes[2].toInt()
+
+                val col = END - colServidor
+                val fila = END - filaServidor
+
+                if (fila in 0 until DIM && col in 0 until DIM) {
+                    nuevoTablero[fila][col] = nuevoTablero[fila][col].copy(
+                        esTrampaEquipo = if (activa == 1) equipo.id else -1
+                    )
+                    Log.d("DEBUG_TRAMPA", "Trampa reanudada en $fila,$col para ${equipo.id} (Activa: $activa)")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ERROR_TRAMPA", "Error procesando trampa: $datos")
+        }
+    }
+
+    colocarTrampaManual(trampa1, EquipoID.AZUL)
+    colocarTrampaManual(trampa2, EquipoID.ROJO)
 
     return nuevoTablero
 }
@@ -647,6 +657,8 @@ fun crearEstadoServidor (
     tablero_eq1: String?,
     tablero_eq2: String?,
     esReanudada: Boolean,
+    trampa_eq1: String?,
+    trampa_eq2: String?,
     
     /** Turno numérico del servidor: par=equipo1, impar=equipo2 */
     turno: Int?,
@@ -658,7 +670,7 @@ fun crearEstadoServidor (
 ): EstadoJuego {
     Log.d("LOG de partida", "Partida reanudada?: $esReanudada")
     val tablero = if (esReanudada) {
-        tableroDesdeServidor(tablero_eq1!!, tablero_eq2!!)
+        tableroDesdeServidor(eq1 = tablero_eq1!!, eq2 = tablero_eq2!!,trampa1 = trampa_eq1!!, trampa2 = trampa_eq2!!)
     }
     else {
         crearTableroInicial()

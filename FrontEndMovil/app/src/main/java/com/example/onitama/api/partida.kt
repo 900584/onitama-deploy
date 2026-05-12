@@ -326,23 +326,6 @@ class Partida(
         val pos_y: Int
     ) : MensajeServidor()
 
-    /**
-     * Devuelve una función lambda () -> Unit que sirve para desconectar (limpiar).
-     */
-    /*fun conectarPartida(onMensaje: (MensajeServidor) -> Unit): () -> Unit {
-
-        val receptor: (String) -> Unit = { textoJson ->
-            try {
-                val mensaje = jsonPartida.decodeFromString<MensajeServidor>(textoJson)
-                onMensaje(mensaje)
-            } catch (e: Exception) {
-                Log.e("Partida", "Mensaje no válido o tipo desconocido: $textoJson", e)
-            }
-        }
-
-
-
-    }*/
 
     fun desconectarPartida() {
             PartidaActiva.wsEstoyListoEnviado = false

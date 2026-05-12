@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -395,29 +396,33 @@ class PartidaActivity : AppCompatActivity() {
                         }
                     }
                 }
-                Row(
+                LazyRow(
                     verticalAlignment = Alignment.Companion.Top,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     estado.cartasOponente.forEach { carta ->
                         if(estado.equipoCiego == null || estado.equipoCiego != PartidaActiva.datosPartida!!.obtenerEquipoID()) {
-                            CartaBoton(
-                                carta = carta,
-                                seleccionada = false,
-                                onClick = {
-                                    if (estado.modoAccion == "ROBAR" && viewModel.cartaAccionEnUso != null) {
-                                        viewModel.ejecucionCartaAccion(
-                                            nombreCarta = "Atrapasueños",
-                                            cartaAccion = "ROBAR",
-                                            cartaARobar = carta.nombre // Pasamos el nombre de la carta rival elegida
-                                        )
-                                }
-                                          },
-                                true
-                            )
+                            item{
+                                CartaBoton(
+                                    carta = carta,
+                                    seleccionada = false,
+                                    onClick = {
+                                        if (estado.modoAccion == "ROBAR" && viewModel.cartaAccionEnUso != null) {
+                                            viewModel.ejecucionCartaAccion(
+                                                nombreCarta = "Atrapasueños",
+                                                cartaAccion = "ROBAR",
+                                                cartaARobar = carta.nombre // Pasamos el nombre de la carta rival elegida
+                                            )
+                                        }
+                                    },
+                                    true
+                                )
+                            }
                         }
                         else{
-                            Oculto()
+                            item{
+                                Oculto()
+                            }
                         }
                     }
 
@@ -432,19 +437,21 @@ class PartidaActivity : AppCompatActivity() {
                         onCasillaClick = { pos -> viewModel.tocarCelda(pos) }
                     )
                 }
-                Row(
+                LazyRow(
                     verticalAlignment = Alignment.Companion.Top,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     estado.cartasJugador.forEach { carta ->
-                        CartaBoton(
-                            carta = carta,
-                            seleccionada = estado.cartaSeleccionada == carta,
-                            onClick = {
-                                cambiarEstadoCarta(carta, estado)
-                            },
-                            false
-                        )
+                        item{
+                            CartaBoton(
+                                carta = carta,
+                                seleccionada = estado.cartaSeleccionada == carta,
+                                onClick = {
+                                    cambiarEstadoCarta(carta, estado)
+                                },
+                                false
+                            )
+                        }
                     }
 
                 }
@@ -1324,16 +1331,14 @@ class PartidaActivity : AppCompatActivity() {
                 Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
                     for (c in 0 until tamanoGrid) {
 
-                        // ⚡ LA MAGIA: Calculamos la coordenada real del tablero interno
+
                         val logicaF = if (invertirPantalla) (6 - f) else f
                         val logicaC = if (invertirPantalla) (6 - c) else c
 
                         val posLogica = Posicion(logicaF, logicaC)
                         val celda = estado.tablero[logicaF][logicaC]
-
                         val esTrampaSeleccionada = estado.posicionTrampa == posLogica
-                      
-                        val esErrorEnEstaCasilla = estado.posicionErrorTrampa == posLogica
+
 
                         Box(
                             modifier = Modifier

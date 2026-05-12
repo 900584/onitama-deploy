@@ -91,7 +91,9 @@ class PartidaViewModel : ViewModel() {
                     turno = datos.turno,
                     cartas_accion_propia = datos.cartas_accion_jugador,
                     cartas_accion_rival = datos.cartas_accion_oponente,
-                    esReanudada = !esNueva
+                    esReanudada = !esNueva,
+                    trampa_eq1 = datos.trampa_j1_pos,
+                    trampa_eq2 = datos.trampa_j2_pos
                 )
 
 
@@ -307,6 +309,10 @@ class PartidaViewModel : ViewModel() {
                                 Log.d("Partida", "has colocado el peon resucitado en una casilla trampa")
                                 val fila = END - mensaje.pos_y
                                 val columna = END - mensaje.pos_x
+                                var turnoActual = equipoPropio
+                                if (fila > 3){
+                                    turnoActual = if (equipoPropio == EquipoID.AZUL) EquipoID.ROJO else EquipoID.AZUL
+                                }
                                 val nuevoTablero = actual.tablero.map {
                                     it.toMutableList()
                                 }.toMutableList()
@@ -320,8 +326,8 @@ class PartidaViewModel : ViewModel() {
                                 // respetando el turno que ya había avanzado 'ejecucionCartaAccion'
                                 _estado.value = actual.copy(
                                     modoAccion = null,
-                                    cartaAccionYaUsada = true,
-                                    tablero = nuevoTablero
+                                    tablero = nuevoTablero,
+                                    turnoActual = turnoActual
                                 )
                             }
 

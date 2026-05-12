@@ -247,8 +247,9 @@ fun PantallaNotificaciones(
                                             Buscar_PartidaActivity::class.java
                                         ).apply {
                                             putExtra("MODO_JUEGO", "PRIVADA")
+                                            addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY) //así la activity de búsqueda se borrará en cuanto la partida empiece
                                         }
-                                        context.startActivity(intent) 
+                                        context.startActivity(intent)
                                     },
                                     onRechazar = { viewModel.rechazarReanudacionPartida(notif.idNotificacion, datosUsuario?.nombre ?: "") }
                                 )
@@ -258,101 +259,6 @@ fun PantallaNotificaciones(
                         }
                     }
                 }
-            }
-        }
-
-        // ==========================================
-        // 3. BARRA INFERIOR DE TAREAS
-        // ==========================================
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter) // Se ancla abajo del todo
-        ) {
-            // Fondo y botones laterales de la barra
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(63.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(colorResource(id = R.color.azulBarraTareas)),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = {},
-                    modifier = Modifier.size(60.dp)
-                ) {
-                    Image(
-                        painterResource(R.drawable.tablero),
-                        contentDescription = "Skins"
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        val intent = Intent(context, Cartas_activity::class.java)
-                        context.startActivity(intent)
-                        (context as? Activity)?.finish()
-                    },
-
-                    modifier = Modifier.size(60.dp)
-                ) {
-                    Image(
-                        painterResource(R.drawable.cards),
-                        contentDescription = "Cards"
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(80.dp)) // Hueco para el botón central
-
-                IconButton(
-                    onClick = {
-                        val intent = Intent(context, Amigos_Activity::class.java)
-                        context.startActivity(intent)
-                        (context as? Activity)?.finish()
-                    },
-                    modifier = Modifier.size(60.dp)
-                ) {
-                    Image(
-                        painterResource(R.drawable.amigos),
-                        contentDescription = "Amigos"
-                    )
-                }
-                IconButton(
-                    onClick = {},
-                    modifier = Modifier.size(60.dp)
-                ) {
-                    Image(
-                        painterResource(R.drawable.carrito),
-                        contentDescription = "Tienda"
-                    )
-                }
-            }
-
-            // Botón central "A JUGAR" sobresaliendo
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 5.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                IconButton(
-                    onClick = {
-                        val intent = Intent(context, MenuPrincipalActivity::class.java)
-                        context.startActivity(intent)
-                        (context as? Activity)?.finish()
-                    },
-                    modifier = Modifier.size(70.dp)
-                ) {
-                    Image(painterResource(R.drawable.espadas), contentDescription = "Jugar")
-                }
-                Text(
-                    text = "¡A JUGAR!",
-                    fontFamily = quattrocentoBold,
-                    fontSize = 12.sp,
-                    color = Color.White,
-                    modifier = Modifier.offset(y = (-8).dp)
-                )
             }
         }
     }
