@@ -1407,15 +1407,43 @@ public class Servidor extends WebSocketServer {
                     conn.send(msg1.toString());
                     // Juego terminado: no iniciar nuevo timer
                 }else if(estado == 2){
-                    JSONObject msg1 = new JSONObject();
-                    
-                    msg1.put("tipo", "PEON_MUERTO");
-                    msg1.put("pos_x", x);
-                    msg1.put("pos_y", y);
+                    JSONObject msgPeonMuerto = new JSONObject();
+                    msgPeonMuerto.put("tipo", "PEON_MUERTO");
+                    msgPeonMuerto.put("pos_x", x);
+                    msgPeonMuerto.put("pos_y", y);
 
                     InfoJugador oponente = pj.getOponente(conn);
-                    oponente.ws.send(msg1.toString());
-                    conn.send(msg1.toString());
+                    oponente.ws.send(msgPeonMuerto.toString());
+                    conn.send(msgPeonMuerto.toString());
+
+                    // Aunque el peón muera por trampa, la carta de acción se ha jugado y
+                    // el rival debe sincronizar cambio de turno/estado de carta.
+                    String accionTipo = "";
+                    for (CartaAccion ca : pj.partida.getCartasAccion()) {
+                        if (ca.getNombre().equals(nomCartaAcc)) {
+                            accionTipo = ca.getAccion();
+                            break;
+                        }
+                    }
+                    JSONObject msgAccion = new JSONObject();
+                    msgAccion.put("tipo", "CARTA_ACCION_JUGADA");
+                    msgAccion.put("carta_accion", nomCartaAcc);
+                    msgAccion.put("accion", accionTipo);
+                    msgAccion.put("x", x);
+                    msgAccion.put("y", y);
+                    msgAccion.put("x_op", xOp);
+                    msgAccion.put("y_op", yOp);
+                    msgAccion.put("carta_robar", cartaRobar);
+                    oponente.ws.send(msgAccion.toString());
+
+                    try {
+                        pj.partida.actualizarBD();
+                    } catch (Exception e) {
+                        System.err.println("Error al actualizar BD después de PEON_MUERTO: " + e.getMessage());
+                    }
+
+                    // Reiniciar timer para quien deba mover ahora
+                    iniciarTimerTurno(pj, pj.partida.getTurno());
                 }else{
                     String accionTipo = "";
                     for (CartaAccion ca : pj.partida.getCartasAccion()) {
