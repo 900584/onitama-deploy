@@ -145,6 +145,13 @@ export interface RespuestaTrampaActivada {
   fila: number;
 }
 
+/** Un peón murió por causa especial (p. ej. revivir en casilla trampa). */
+export interface RespuestaPeonMuerto {
+  tipo: "PEON_MUERTO";
+  pos_x: number;
+  pos_y: number;
+}
+
 export interface RespuestaTrampaInvalida {
   tipo: "TRAMPA_INVALIDA";
 }
@@ -164,6 +171,7 @@ export type MensajeServidor =
   | RespuestaPartidaLista
   | RespuestaCartaAccionJugada
   | RespuestaTrampaActivada
+  | RespuestaPeonMuerto
   | RespuestaTrampaInvalida
   | RespuestaCartaAccionInvalida
   | { tipo: string; [key: string]: unknown };

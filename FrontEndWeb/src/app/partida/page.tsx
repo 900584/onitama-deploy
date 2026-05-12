@@ -736,7 +736,11 @@ function PartidaInterna({
 
       if (c === "REVIVIR") {
         if (y >= 0 && x >= 0) {
-          nuevoTablero[y][x].ficha = { equipo: equipoEjecutor as 1 | 2, esRey: false };
+          // Si la trampa ya se disparó en esa casilla (PEON_MUERTO/TRAMPA_ACTIVADA),
+          // no re-colocar la ficha al procesar CARTA_ACCION_JUGADA.
+          if (nuevoTablero[y][x].esTrampaEquipo !== -1) {
+            nuevoTablero[y][x].ficha = { equipo: equipoEjecutor as 1 | 2, esRey: false };
+          }
         }
       } else if (c === "SALVAR_REY") {
         // Mueve el rey a la celda vacía (x, y); no hace swap
@@ -747,8 +751,11 @@ function PartidaInterna({
           }
         }));
         if (reyPos.f !== -1 && y >= 0 && x >= 0) {
-          nuevoTablero[reyPos.f][reyPos.c].ficha = null;
-          nuevoTablero[y][x].ficha = { equipo: equipoEjecutor as 1 | 2, esRey: true };
+          // Mismo criterio defensivo que REVIVIR: no pintar rey sobre casilla ya destruida.
+          if (nuevoTablero[y][x].esTrampaEquipo !== -1) {
+            nuevoTablero[reyPos.f][reyPos.c].ficha = null;
+            nuevoTablero[y][x].ficha = { equipo: equipoEjecutor as 1 | 2, esRey: true };
+          }
         }
       } else if (c === "SACRIFICIO") {
         if (y >= 0 && x >= 0) nuevoTablero[y][x].ficha = null;
@@ -1098,6 +1105,19 @@ function PartidaInterna({
             const nuevo = prev.tablero.map(f => f.map(c => ({ ...c })));
             nuevo[ta.fila][ta.columna].ficha = null;
             nuevo[ta.fila][ta.columna].esTrampaEquipo = -1; // celda injugable
+            return { ...prev, tablero: nuevo };
+          });
+          break;
+        }
+
+        case "PEON_MUERTO": {
+          const pm = msg as import("@/api/partida").RespuestaPeonMuerto;
+          setEstado((prev) => {
+            const nuevo = prev.tablero.map((f) => f.map((c) => ({ ...c })));
+            if (nuevo[pm.pos_y]?.[pm.pos_x]) {
+              nuevo[pm.pos_y][pm.pos_x].ficha = null;
+              nuevo[pm.pos_y][pm.pos_x].esTrampaEquipo = -1; // trampa ya disparada
+            }
             return { ...prev, tablero: nuevo };
           });
           break;
